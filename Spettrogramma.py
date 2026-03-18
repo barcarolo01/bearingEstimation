@@ -5,7 +5,7 @@
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 
-samplingFrequency, signalData = wavfile.read('AudioFiles/0937.wav')
+samplingFrequency, signalData = wavfile.read('AudioFiles/0958_crop.wav')
 signalData = signalData[:,0]
 
 plt.title('Spectrogram')    

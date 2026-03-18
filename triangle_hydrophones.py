@@ -5,7 +5,7 @@ import scipy.io.wavfile as wav
 from utils_filters import *
 from utils_2 import *
 
-
+tau_thr = 0.0005
 MAX_SAMPLE_DELAY = 25
 
 if __name__ == "__main__":
