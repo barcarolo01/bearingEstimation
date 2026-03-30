@@ -16,20 +16,23 @@ def precompute_bearing_angles(d):
     '''
     for angle in range(360):
         theta = angle * np.pi / 180 # Converione gradi --> radianti
-        lut_tau32[angle] = d/c * np.cos(theta)
-        lut_tau21[angle] = -d/c * np.sin(theta + np.pi/6)
-        lut_tau31[angle] = -d/c * np.sin(theta - np.pi/6)
+        lut_tau32[angle] = -d/c * np.cos(theta)
+        lut_tau21[angle] = d/c * np.sin(theta + np.pi/6)
+        lut_tau31[angle] = d/c * np.sin(theta - np.pi/6)
 
 def find_bearing(measured_tau32, measured_tau21, measured_tau31):
     """
-    This function estimates the angle of arrival (0°-259°) by minimizing the least square error.
+    This function estimates the angle of arrival (0°-359°) by minimizing the least square error.
     """
     E = ((measured_tau32 - lut_tau32)**2 + (measured_tau21 - lut_tau21)**2 + (measured_tau31 - lut_tau31)**2)
     #E = np.abs(measured_tau32 - lut_tau32) + np.abs(measured_tau21 - lut_tau21) + np.abs(measured_tau31 - lut_tau31)
-    to_be_returned = np.argmin(E)
-    least_square_error = np.abs(lut_tau21[to_be_returned]-measured_tau21) + np.abs(lut_tau32[to_be_returned]-measured_tau32) + np.abs(lut_tau31[to_be_returned]-measured_tau31)
 
-    return to_be_returned,least_square_error
+    estimated_angle = np.argmin(E)
+
+    error = (lut_tau21[estimated_angle]-measured_tau21)**2 + (lut_tau32[estimated_angle]-measured_tau32)**2 + (lut_tau31[estimated_angle]-measured_tau31)**2
+    #error = np.abs(lut_tau21[estimated_angle]-measured_tau21) + np.abs(lut_tau32[estimated_angle]-measured_tau32) + np.abs(lut_tau31[estimated_angle]-measured_tau31)
+
+    return estimated_angle,error
 
 
 def compute_sample_delay(sig_A,sig_B,fs,campioni_finestra,overlap=0.5):
@@ -64,7 +67,7 @@ def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1
     sample_delay = np.zeros(n_finestre)
     times        = np.arange(n_finestre) * step / fs
 
-    # Range fisicamente possibile (es. ±7 campioni per d=10cm, c=1500, fs=96000)
+    # Range fisicamente possibile
     tau_max_samples = int(np.ceil(d / c * fs))+1
 
     i = 0
@@ -86,6 +89,16 @@ def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1
         sample_delay[i] = lag
         i += 1
 
+    # 99esimo percentile per stima distanza idrofoni
     tau_percentile = np.nanpercentile(np.abs(sample_delay), 99)
 
     return sample_delay, times, tau_percentile
+
+
+def add_white_noise(signal, snr_db):
+    watt_signal = np.mean(signal**2)
+    snr_linear = 10**(snr_db / 10)
+    watt_noise = watt_signal / snr_linear
+    sigma = np.sqrt(watt_noise)
+    noise = np.random.normal(0, sigma, signal.shape)
+    return signal + noise

@@ -6,30 +6,49 @@ import numpy as np
 from utils_filters import *
 from utils import *
 
-MAX_SAMPLE_DELAY = 25
+MAX_SAMPLE_DELAY = 20
 
-d = 0.31 # Meters
+d = 0.3 # Meters
 c = 1500 # Meters/second
 tau_thr = 5 * 10**(-7)
 
 if __name__ == "__main__":
     precompute_bearing_angles(d)
-    fs, data = wav.read('AudioFiles/0958_.wav')
+    fs, sig1 = wav.read('RX1_received.wav')
+    _, sig2 = wav.read('RX2_received.wav')
+    _, sig3 = wav.read('RX3_received.wav')
+        
+    '''
+    # 1. Definisci l'SNR (200 è altissimo, quasi impercettibile)
+    desired_SNR = 200
 
-    # Secondi di inizio e fine lettura
-    start = 0
-    #end = 350
-    end = len(data)
+    # 2. Converti TUTTI i segnali in float normalizzato prima di fare calcoli
+    s1_f = sig1.astype(np.float32) / 32768.0
+    s2_f = sig2.astype(np.float32) / 32768.0
+    s3_f = sig3.astype(np.float32) / 32768.0
 
-    
-    start *= fs
-    end *= fs 
-    sig1 = data[start:end, 0]
-    sig2 = data[start:end, 1]
-    sig3 = data[start:end, 2]
+    # 3. Genera il rumore basandoti su uno dei segnali (es. il primo)
+    # Usiamo la funzione add_white_noise definita precedentemente per calcolare sigma
+    def get_noise_sigma(signal, snr_db):
+        watt_signal = np.mean(signal**2)
+        snr_linear = 10**(snr_db / 10)
+        return np.sqrt(watt_signal / snr_linear)
+
+    sigma = get_noise_sigma(s1_f, desired_SNR)
+    common_noise = np.random.normal(0, sigma, s1_f.shape)
+
+    # 4. Aggiungi lo STESSO rumore a tutti (Preserva la coerenza spaziale)
+    s1_n = s1_f + common_noise
+    s2_n = s2_f + common_noise
+    s3_n = s3_f + common_noise
+
+    # 5. Riporta in int16 con clipping corretto
+    sig1 = (np.clip(s1_n, -1.0, 1.0) * 32767.0).astype(np.int16)
+    sig2 = (np.clip(s2_n, -1.0, 1.0) * 32767.0).astype(np.int16)
+    sig3 = (np.clip(s3_n, -1.0, 1.0) * 32767.0).astype(np.int16)
+    '''
     
     # Filtering (?)
-    
     '''
     fc = 100
     fc2 = 40000
@@ -45,9 +64,10 @@ if __name__ == "__main__":
     print(f"FINESTRA: {durata_finestra*1000} ms - {campioni_finestra} samples")
 
     
-    sample_delay_21, times = compute_sample_delay(sig2,sig1,fs,campioni_finestra)
-    sample_delay_32, _ = compute_sample_delay(sig3,sig2,fs,campioni_finestra)
-    sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
+    '''
+    #sample_delay_21, times = compute_sample_delay(sig2,sig1,fs,campioni_finestra)
+    #sample_delay_32, _ = compute_sample_delay(sig3,sig2,fs,campioni_finestra)
+    #sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
 
     '''
     quality_threshold = 0.1
@@ -57,7 +77,7 @@ if __name__ == "__main__":
     print(f"TAU percentile H2-H1: {tau_percentile_21} samples")
     print(f"TAU percentile H3-H2: {tau_percentile_32} samples")
     print(f"TAU percentile H3-H1: {tau_percentile_31} samples")
-    '''
+    
 
     datasets_sample_delay = [sample_delay_21,sample_delay_32,sample_delay_31]
     datasets_label = ["tau21","tau32","tau31"]
@@ -89,7 +109,7 @@ if __name__ == "__main__":
     axes[0].set_ylabel('Time (s)', fontsize=10)
 
     # Plot Bearing angle
-    estimated_bearing = (estimated_bearing + 30) % 360
+    #estimated_bearing = (estimated_bearing + 300) % 360
 
     ax = axes[3]
     ax.scatter(estimated_bearing[mask_tau],times[mask_tau],color='red',s=0.5) #Masked

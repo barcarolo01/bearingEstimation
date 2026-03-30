@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from gcc_phat import *
 import scipy.io.wavfile as wav
 from utils_filters import *
-from utils_2 import *
+from utils import *
 
 tau_thr = 0.0005
 MAX_SAMPLE_DELAY = 25
