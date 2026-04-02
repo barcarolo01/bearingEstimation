@@ -1,11 +1,17 @@
 import matplotlib.pyplot as plt
 from scipy.io import wavfile
 
-samplingFrequency, signalData = wavfile.read('AudioFiles/0958_crop.wav')
-signalData = signalData[:,0]
+filename = 'AudioFiles/0958_clean.wav'
 
-plt.title('Spectrogram')    
-Pxx, freqs, bins, im = plt.specgram(signalData,Fs=samplingFrequency,NFFT=512)
+samplingFrequency, signalData = wavfile.read(filename)
+
+signalData = signalData[:,2]
+    
+widthHeight = (12, 8)
+plt.figure(figsize=widthHeight)
+Pxx, freqs, bins, im = plt.specgram(signalData,Fs=samplingFrequency,NFFT=512,scale='dB')
 plt.xlabel('Time')
+plt.title(filename)
 plt.ylabel('Frequency')
+plt.savefig(f'{filename}.png')
 plt.show()
