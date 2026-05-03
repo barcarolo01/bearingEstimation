@@ -12,19 +12,21 @@ d = 0.3 # Meters
 c = 1500 # Meters/second
 tau_thr = 5 * 10**(-7)
 
+H_index = 1
+
 if __name__ == "__main__":
     precompute_bearing_angles(d)
-    fs, sig1 = wav.read('RX1.wav')
-    _, sig2 = wav.read('RX2.wav')
-    _, sig3 = wav.read('RX3.wav')
+    fs, sig1 = wav.read(f'SyntAudio/H{H_index}_RX1.wav')
+    _, sig2 = wav.read(f'SyntAudio/H{H_index}_RX2.wav')
+    _, sig3 = wav.read(f'SyntAudio/H{H_index}_RX3.wav')
     
     desired_SNR = 200
-    sig1 = add_gaussian_noise(sig1,desired_SNR)
-    sig2 = add_gaussian_noise(sig2,desired_SNR)
-    sig3 = add_gaussian_noise(sig3,desired_SNR)
+    #sig1 = add_gaussian_noise(sig1,desired_SNR)
+    #sig2 = add_gaussian_noise(sig2,desired_SNR)
+    #sig3 = add_gaussian_noise(sig3,desired_SNR)
     print(f"UNO = {sig1.shape}")
     print(f"DUE = {sig2.shape}")
-    print(f"TRe = {sig3.shape}")
+    print(f"TRE = {sig3.shape}")
 
     # Parametri finestra
     durata_finestra = 0.05 # Secondi
@@ -38,7 +40,7 @@ if __name__ == "__main__":
     #sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
 
     '''
-    quality_threshold = 0
+    quality_threshold = 0.1
     sample_delay_21, times, tau_percentile_21  = compute_sample_delay_d_aware(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
     sample_delay_32, _, tau_percentile_32 = compute_sample_delay_d_aware(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
     sample_delay_31, _, tau_percentile_31 = compute_sample_delay_d_aware(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
@@ -94,6 +96,6 @@ if __name__ == "__main__":
     #ax.set_xlim(0, (10**(-4)))
     ax.grid(True, linestyle='--', alpha=0.5)
 
-   
+    np.save(f"H{H_index}",estimated_bearing)
     plt.tight_layout()
     plt.show()

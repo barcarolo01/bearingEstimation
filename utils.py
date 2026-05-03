@@ -1,7 +1,8 @@
-from matplotlib import pyplot as plt
 import numpy as np
 from gcc_phat import *
 from utils_filters import *
+import numpy as np
+import scipy.io.wavfile as wav
 
 c = 1500 # Meters/second
 
@@ -82,6 +83,7 @@ def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1
         search = cc[center - tau_max_samples : center + tau_max_samples + 1]
         peak   = np.max(search)
 
+
         if peak >= quality_threshold:
             lag = np.argmax(search) - tau_max_samples  # in campioni, relativo a lag=0
         else:
@@ -94,6 +96,41 @@ def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1
 
     return sample_delay, times, tau_percentile
 
+def compute_sample_delay_colormap(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1500, overlap=0.5, quality_threshold=0.1):
+    step = int(campioni_finestra * (1 - overlap))
+    n_finestre = 1 + (len(sig_A) - campioni_finestra) // step
+    sample_delay = np.zeros(n_finestre)
+    times        = np.arange(n_finestre) * step / fs
+
+    # Range fisicamente possibile
+    tau_max_samples = int(np.ceil(d / c * fs)) + 3
+
+    i = 0
+    searches = []
+    for inizio in range(0, min(len(sig_A), len(sig_B)) - campioni_finestra, step):
+        fine      = inizio + campioni_finestra
+        finestra1 = sig_A[inizio:fine]
+        finestra2 = sig_B[inizio:fine]
+        cc     = gcc_phat(finestra1, finestra2)
+        #cc     = gcc_phat_bandlimited(finestra1, finestra2,fs,10,20000)
+        center = len(cc) // 2
+
+        # Cerca SOLO nel range fisico ±tau_max_samples
+        search = cc[center - tau_max_samples : center + tau_max_samples + 1]
+        peak   = np.max(search)
+
+        if peak >= quality_threshold:
+            lag = np.argmax(search) - tau_max_samples  # in campioni, relativo a lag=0
+        else:
+            lag = np.nan   # finestra scartata
+        sample_delay[i] = lag
+        searches.append(search)
+        i += 1
+
+    # 99esimo percentile per stima distanza idrofoni
+    tau_percentile = np.nanpercentile(np.abs(sample_delay), 99)
+    searches_np = np.array(searches)
+    return searches_np, sample_delay, times, tau_percentile
 
 def add_white_noise(signal, snr_db):
     watt_signal = np.mean(signal**2)
@@ -102,3 +139,16 @@ def add_white_noise(signal, snr_db):
     sigma = np.sqrt(watt_noise)
     noise = np.random.normal(0, sigma, signal.shape)
     return signal + noise
+
+
+# This method concatenates two .wav files and save the result in out_file
+def join_audio_files(file1, file2, out_file):
+    fs_A, signal_A = wav.read(file1)
+    fs_B, signal_B = wav.read(file2)
+    
+    if(fs_A != fs_B):
+        print("Warning: Files have different sampling frequency.")
+
+    conc = np.concatenate((signal_A, signal_B))
+
+    wav.write(out_file,fs_A,conc.astype(np.int16))

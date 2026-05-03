@@ -37,11 +37,8 @@ if __name__ == "__main__":
     f1 = 200
     f2 = 45000
 
-    # Bandpass filter
-    filtered_data = bandpass_filter(sig0, f1, f2, fs)
-
     # Envelope and decimation
-    envelope = np.abs(hilbert(filtered_data))
+    envelope = np.abs(hilbert(sig0))
     '''
     hilbert(...) restituisce il segnale ANALITICO (stesso array dei tempi dell'argomento),
     in cui le frequenze positive vengono sfasate di 90° e quelle negative di -90°.
@@ -57,7 +54,7 @@ if __name__ == "__main__":
 
     # Passa alto
     hpf = 4.0 #Hz
-    #envelope_dec = highpass_filter(envelope_dec, hpf ,env_fs, 10)
+    envelope_dec = FIR_bandpass_filter(envelope_dec,hpf,env_fs//2,env_fs)
 
     # 1. FFT
     N = len(envelope_dec)

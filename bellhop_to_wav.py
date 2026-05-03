@@ -1,41 +1,15 @@
-"""
-bellhop_to_wav.py
-─────────────────────────────────────────────────────────────────────
-Genera file .wav simulati per RX1, RX2 (e opzionalmente RX3)
-a partire da file .arr di Bellhop.
-
-UTILIZZO:
-    # Sorgente sintetica, 1 arrivo per RD (default):
-    python bellhop_to_wav.py --rx1 RX1.arr --rx2 RX2.arr
-
-    # Con terzo ricevitore:
-    python bellhop_to_wav.py --rx1 RX1.arr --rx2 RX2.arr --rx3 RX3.arr
-
-    # Sorgente da file audio, 10 arrivi per RD:
-    python bellhop_to_wav.py --rx1 RX1.arr --rx2 RX2.arr --source audio.wav --n_arrivals 10
-
-    # Tutti gli arrivi:
-    python bellhop_to_wav.py --rx1 RX1.arr --rx2 RX2.arr --n_arrivals 0
-
-DIPENDENZE:
-    pip install numpy scipy soundfile
-"""
-
 import numpy as np
-from scipy.signal import butter, sosfilt, fftconvolve, resample_poly
+from scipy.signal import fftconvolve, resample_poly
 from math import gcd
 import soundfile as sf
-import os
-from scipy.signal import correlate as xcorr
 
 # ═══════════════════════════════════════════════════════════════════════
 # PARAMETRI CONFIGURABILI
 # ═══════════════════════════════════════════════════════════════════════
 
-FS_OUT       = 96000     # Hz — frequenza di campionamento output
+FS_OUT = 96000     # Hz — frequenza di campionamento output
 
 # ═══════════════════════════════════════════════════════════════════════
-
 
 def read_arr(filename):
     with open(filename) as f:
@@ -72,7 +46,6 @@ def read_arr(filename):
 
     return rr_values, rd_values, arrivals
 
-
 def load_audio_source(filepath, fs_target):
     data, fs_orig = sf.read(filepath, dtype='float32')
     if data.ndim > 1:
@@ -89,7 +62,6 @@ def load_audio_source(filepath, fs_target):
     data /= np.max(np.abs(data))
     print(f"  Durata: {len(data)/fs_target:.2f} s ({len(data)} campioni)")
     return data
-
 
 def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
     """
@@ -133,7 +105,7 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
         used_arrivals.extend(selected)
 
     if not used_arrivals:
-        print("  ⚠️  Nessun arrivo trovato per questo range!")
+        print("Nessun arrivo trovato per questo range!")
         return np.zeros(int(0.01 * fs), dtype=np.float32), []
 
     max_time = max(a[2] for a in used_arrivals)

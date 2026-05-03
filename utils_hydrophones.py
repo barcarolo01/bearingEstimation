@@ -1,8 +1,8 @@
 import numpy as np
 from gcc_phat import *
 from utils_filters import *
+from utils import gcc_phat
 
-d = 0.1 # Meters
 c = 1500 # Meters/second
 tau_thr = 0.001
 
@@ -10,7 +10,7 @@ lut_tau23 = np.zeros(360)
 lut_tau21 = np.zeros(360)
 lut_tau31 = np.zeros(360)
 
-def precompute_bearing_angles():
+def precompute_bearing_angles(d):
     '''
     This function precomputes the time delay expected for each pair of hydrophones
     for each angle between 0° and 359°
