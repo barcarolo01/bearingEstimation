@@ -16,9 +16,9 @@ H_index = 1
 
 if __name__ == "__main__":
     precompute_bearing_angles(d)
-    fs, sig1 = wav.read(f'SyntAudio/H{H_index}_RX1.wav')
-    _, sig2 = wav.read(f'SyntAudio/H{H_index}_RX2.wav')
-    _, sig3 = wav.read(f'SyntAudio/H{H_index}_RX3.wav')
+    fs, sig1 = wav.read(f'Synth/H{H_index}_RX1.wav')
+    _, sig2 = wav.read(f'Synth/H{H_index}_RX2.wav')
+    _, sig3 = wav.read(f'Synth/H{H_index}_RX3.wav')
     
     desired_SNR = 200
     #sig1 = add_gaussian_noise(sig1,desired_SNR)

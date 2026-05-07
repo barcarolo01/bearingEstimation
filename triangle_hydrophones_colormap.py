@@ -16,8 +16,9 @@ tau_thr = 5 * 10**(-9)
 
 if __name__ == "__main__":
     precompute_bearing_angles(d)
+    
+    
     fs, data = wav.read('AudioFiles/0958_crop.wav')
-
     # Secondi di inizio e fine lettura
     start = 0
     #end = 1
@@ -28,7 +29,15 @@ if __name__ == "__main__":
     sig1 = data[start:end, 0]
     sig2 = data[start:end, 1]
     sig3 = data[start:end, 2]
+
+    '''
+    # Reading synth tracks
+    fs,sig1 = wav.read('Synth/H1_RX1.wav')
+    _,sig2 = wav.read('Synth/H1_RX2.wav')
+    _,sig3 = wav.read('Synth/H1_RX3.wav')
+    '''
     
+    #wav.write('sig1afterFilt.wav',fs,sig1)
     # ==================== Filtering (?) ====================
     fc = 10
     fc2 = 30000
@@ -37,10 +46,15 @@ if __name__ == "__main__":
     #sig2 = FIR_bandpass_filter(sig2,fc,fc2,fs,N)
     #sig3 = FIR_bandpass_filter(sig3,fc,fc2,fs,N)    
 
+    #sig1 = FIR_lowpass_filter(sig1,fc2,fs,N)
+    #sig2 = FIR_lowpass_filter(sig2,fc2,fs,N)
+    #sig3 = FIR_lowpass_filter(sig3,fc2,fs,N)    
+
     #sig1 = lowpass_filter_fft(sig1,fs,fc2)
     #sig2 = lowpass_filter_fft(sig2,fs,fc2)
     #sig3 = lowpass_filter_fft(sig3,fs,fc2)
     # =======================================================
+    wav.write('sig1afterFilt.wav',fs,sig1)
 
     # Parametri finestra
     durata_finestra = 0.05 # Secondi
@@ -54,7 +68,7 @@ if __name__ == "__main__":
     sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
     '''
 
-    quality_threshold = 0.1
+    quality_threshold = 0.0
     delay_arr21,sample_delay_21, times, tau_percentile_21  = compute_sample_delay_colormap(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
     delay_arr32,sample_delay_32, _, tau_percentile_32 = compute_sample_delay_colormap(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
     delay_arr31,sample_delay_31, _, tau_percentile_31 = compute_sample_delay_colormap(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
@@ -142,5 +156,5 @@ if __name__ == "__main__":
     ax.grid(True, linestyle='--', alpha=0.5)
     '''
     #plt.tight_layout()
-    plt.savefig("real_delay_bearing_estimation.png")
+    plt.savefig("delay_bearing_estimation.png")
     plt.show()

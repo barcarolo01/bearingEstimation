@@ -104,13 +104,17 @@ def compute_sample_delay_colormap(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=
 
     # Range fisicamente possibile
     tau_max_samples = int(np.ceil(d / c * fs)) + 3
-
+    
     i = 0
     searches = []
     for inizio in range(0, min(len(sig_A), len(sig_B)) - campioni_finestra, step):
         fine      = inizio + campioni_finestra
         finestra1 = sig_A[inizio:fine]
         finestra2 = sig_B[inizio:fine]
+
+        #finestra1 = lowpass_filter_fft(finestra1,fs,30000)
+        #finestra2 = lowpass_filter_fft(finestra2,fs,30000)
+
         cc     = gcc_phat(finestra1, finestra2)
         #cc     = gcc_phat_bandlimited(finestra1, finestra2,fs,10,20000)
         center = len(cc) // 2

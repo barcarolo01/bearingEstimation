@@ -166,31 +166,17 @@ def from_arr_to_wav(
     rr_rx3 = max(rr3_vals)
 
     # ── Risposta impulsiva ─────────────────────────────────────────────
-    print(f"\n⚙️  IR per RX1 — range {rr_rx1:.4f} m  [{label} arrivi per RD]")
     h1, used1 = build_ir(arr1, rd1_vals, rr_rx1, fs, n_arrivals=n_arr)
-    print(f"  Spike totali nella IR: {len(used1)}")
-    print(f"  Primo arrivo: {min(a[2] for a in used1):.7f} s  "
-          f"(campione {int(round(min(a[2] for a in used1) * fs))})")
-
-    print(f"\n⚙️  IR per RX2 — range {rr_rx2:.4f} m  [{label} arrivi per RD]")
     h2, used2 = build_ir(arr2, rd2_vals, rr_rx2, fs, n_arrivals=n_arr)
-    print(f"  Spike totali nella IR: {len(used2)}")
-    print(f"  Primo arrivo: {min(a[2] for a in used2):.7f} s  "
-          f"(campione {int(round(min(a[2] for a in used2) * fs))})")
-
-    print(f"\n⚙️  IR per RX3 — range {rr_rx3:.4f} m  [{label} arrivi per RD]")
     h3, used3 = build_ir(arr3, rd3_vals, rr_rx3, fs, n_arrivals=n_arr)
-    print(f"  Spike totali nella IR: {len(used3)}")
-    print(f"  Primo arrivo: {min(a[2] for a in used3):.7f} s  "
-            f"(campione {int(round(min(a[2] for a in used3) * fs))})")
+
 
     # ── Convoluzione ──────────────────────────────────────────────────
-    transient = len(h1) - 1
+    transient = np.max([len(h1),len(h2),len(h3)]) - 1
     rx1_out = fftconvolve(src, h1)[transient:transient+len(src)].astype(np.float32)
     rx2_out = fftconvolve(src, h2)[transient:transient+len(src)].astype(np.float32)
     rx3_out = fftconvolve(src, h3)[transient:transient+len(src)].astype(np.float32)
         
-
     signals = [rx1_out, rx2_out, rx3_out]
     gmax = max(np.max(np.abs(s)) for s in signals)
     rx1_out = (rx1_out / gmax).astype(np.float32)

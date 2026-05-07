@@ -10,8 +10,36 @@ def FIR_bandpass_filter(signal, lowcut, highcut, fs, N=201):
         fs=fs
     )
     
-    processed = filtfilt(coeffs, 1.0, signal)
+    processed = filtfilt(coeffs,1.0, signal)
     return processed
+
+def FIR_lowpass_filter(signal, fc, fs, N=201):
+    coeffs = firwin(
+        N,
+        fc,
+        #window=('kaiser', 8.0),
+        window = 'hamming',
+        pass_zero=False,
+        fs=fs
+    )
+    
+    processed = filtfilt(coeffs,1.0, signal)
+    return processed
+
+
+def lowpass_filter_fft(signal: np.ndarray, fs: float, fH: float):
+    n = len(signal)
+    spectrum = np.fft.fft(signal)
+
+    frequencies = np.fft.fftfreq(n, d=1.0 / fs)
+    
+    spectrum[np.abs(frequencies) > fH] = 0.0
+    #spectrum[frequencies > fH] = 0.0
+
+    filtered_signal = np.fft.ifft(spectrum).real
+
+    return filtered_signal
+
 
 
 def add_gaussian_noise(signal, desired_SNR_dB):
@@ -44,18 +72,3 @@ def add_gaussian_noise(signal, desired_SNR_dB):
         noisy_signal = np.clip(noisy_signal, info.min, info.max)
 
     return noisy_signal.astype(signal.dtype)
-
-import numpy as np
-
-def lowpass_filter_fft(signal: np.ndarray, fs: float, fH: float):
-    n = len(signal)
-    spectrum = np.fft.fft(signal)
-
-    # Calcola le frequenze corrispondenti a ciascun bin e azzera quelli Z= fH
-    frequencies = np.fft.fftfreq(n, d=1.0 / fs)
-    spectrum[np.abs(frequencies) > fH] = 0.0
-
-    # Calcola la IFFT e restituisce la parte REALE
-    filtered_signal = np.fft.ifft(spectrum).real
-
-    return filtered_signal

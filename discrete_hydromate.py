@@ -6,9 +6,7 @@ import matlab.engine
 from bellhop_to_wav import from_arr_to_wav
 from utils import join_audio_files
 
-
-prof = 100.0 # Remember the decimal (for MATLAB)
-
+prof = 10.0 # Remember the decimal (for MATLAB)
 
 def run_discrete_hydromate(Lat_TXs, Lon_TXs, Lat_RX2,Lon_RX2,H_index):
     eng = matlab.engine.start_matlab() 
@@ -40,15 +38,16 @@ def run_discrete_hydromate(Lat_TXs, Lon_TXs, Lat_RX2,Lon_RX2,H_index):
         for j in range(3):
             fs, track = wav.read(f'TMP/{i}_RX{j+1}.wav')
             center = len(track) // 2
-            track_clipped = track[center - int(fs/2*(durata)) : center + int(fs/2*(durata))]
+            #track_clipped = track[center - int(fs/2*(durata)) : center + int(fs/2*(durata))]
+            track_clipped = track[0 : int(96000*(durata))]
             wav.write(f'TMP/{i}_RX{j+1}.wav',fs,track_clipped.astype(np.int16))
             
         if i == 0:
             for j in range(3):
-                shutil.copyfile(f'TMP/{i}_RX{j+1}.wav',f'SyntAudio/H{H_index}_RX{j+1}.wav')
+                shutil.copyfile(f'TMP/{i}_RX{j+1}.wav',f'Synth/H{H_index}_RX{j+1}.wav')
             
         if i > 0:
             for j in range(3):
-                join_audio_files(f'SyntAudio/H{H_index}_RX{j+1}.wav',f'TMP/{i}_RX{j+1}.wav',f'SyntAudio/H{H_index}_RX{j+1}.wav')
+                join_audio_files(f'Synth/H{H_index}_RX{j+1}.wav',f'TMP/{i}_RX{j+1}.wav',f'Synth/H{H_index}_RX{j+1}.wav')
 
     eng.quit()
