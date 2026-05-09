@@ -51,9 +51,9 @@ if __name__ == "__main__":
     '''
 
     quality_threshold = 0.2
-    sample_delay_21, times, tau_percentile_21  = compute_sample_delay_d_aware(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    sample_delay_32, _, tau_percentile_32 = compute_sample_delay_d_aware(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    sample_delay_31, _, tau_percentile_31 = compute_sample_delay_d_aware(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_21, times  = compute_sample_delay_d_aware(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_32, _ = compute_sample_delay_d_aware(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_31, _ = compute_sample_delay_d_aware(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
 
 
     datasets_sample_delay = [sample_delay_21,sample_delay_32,sample_delay_31]

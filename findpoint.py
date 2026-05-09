@@ -1,27 +1,9 @@
 import numpy as np
 from scipy.signal import savgol_filter
 from scipy.ndimage import median_filter
+from collections import Counter
 import math
 
-"""
-find_intersection_points.py
-
-Calcola i punti di intersezione tra semirette geodetiche sulla superficie terrestre.
-Gli angoli sono espressi in gradi, misurati in senso ANTIORARIO a partire dalla direzione EST
-(convenzione matematica standard).
-
-Uso:
-    H1 = (-35, 153)
-    H2 = (-33, 151)
-    bearing_H1 = [45, 90, 135]
-    bearing_H2 = [225, 270, 315]
-    result = find_points(H1, H2, bearing_H1, bearing_H2)
-    # result è un array Nx2 con colonne [lat, lon]
-"""
-
-# ---------------------------------------------------------------------------
-# Utilità angolari
-# ---------------------------------------------------------------------------
 
 def math_to_bearing(math_angle_deg: float) -> float:
     """
@@ -32,11 +14,6 @@ def math_to_bearing(math_angle_deg: float) -> float:
     Relazione:  bearing = 90 - math_angle   (mod 360)
     """
     return (90.0 - math_angle_deg) % 360.0
-
-
-# ---------------------------------------------------------------------------
-# Intersezione di due grandi cerchi  (coordinate sferiche)
-# ---------------------------------------------------------------------------
 
 def _flat_earth_intersection(
     lat1: float, lon1: float, brg1: float,
@@ -97,358 +74,166 @@ def _flat_earth_intersection(
 
     return lat_out, lon_out
 
-def _great_circle_intersection(
-    lat1: float, lon1: float, brg1: float,
-    lat2: float, lon2: float, brg2: float,
-) -> tuple[float, float] | tuple[float, float]:
-    """
-    Restituisce il punto di intersezione tra due semirette geodetiche.
-
-    Parametri
-    ---------
-    lat1, lon1 : coordinate del primo punto (gradi decimali)
-    brg1       : bearing geografico (°N, orario) della prima semiretta
-    lat2, lon2 : coordinate del secondo punto (gradi decimali)
-    brg2       : bearing geografico (°N, orario) della seconda semiretta
-
-    Ritorna
-    -------
-    (lat, lon) del punto di intersezione, oppure (nan, nan) se non esiste.
-
-    Algoritmo
-    ---------
-    Implementazione vettoriale basata sul metodo di Ed Williams
-    (Aviation Formulary, intersection of two radials):
-    https://edwilliams.org/avform147.htm#Intersection
-    """
-    # Converti tutto in radianti
-    lat1_rad, lon1_rad = np.radians(lat1), np.radians(lon1)
-    lat2_rad, lon2_rad = np.radians(lat2), np.radians(lon2)
-    brg1_rad = np.radians(brg1)
-    brg2_rad = np.radians(brg2)
-
-    dlat = lat2_rad - lat1_rad
-    dlon = lon2_rad - lon1_rad
-
-    # Distanza angolare tra i due punti di origine (haversine)
-    angular_dist_12 = 2.0 * np.arcsin(
-        np.sqrt(
-            np.sin(dlat / 2.0) ** 2
-            + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2.0) ** 2
-        )
-    )
-
-    if np.abs(angular_dist_12) < 1e-12:    # punti coincidenti
-        return np.nan, np.nan
-
-    # Bearing iniziale e finale del segmento 1→2
-    cos_brg_fwd = (
-        (np.sin(lat2_rad) - np.sin(lat1_rad) * np.cos(angular_dist_12))
-        / (np.sin(angular_dist_12) * np.cos(lat1_rad))
-    )
-    cos_brg_rev = (
-        (np.sin(lat1_rad) - np.sin(lat2_rad) * np.cos(angular_dist_12))
-        / (np.sin(angular_dist_12) * np.cos(lat2_rad))
-    )
-
-    cos_brg_fwd = np.clip(cos_brg_fwd, -1.0, 1.0)
-    cos_brg_rev = np.clip(cos_brg_rev, -1.0, 1.0)
-
-    brg_fwd = np.arccos(cos_brg_fwd)   # bearing P1→P2 visto da P1
-    brg_rev = np.arccos(cos_brg_rev)   # bearing P2→P1 visto da P2
-
-    if np.sin(dlon) > 0:
-        brg_12, brg_21 = brg_fwd, 2.0 * np.pi - brg_rev
-    else:
-        brg_12, brg_21 = 2.0 * np.pi - brg_fwd, brg_rev
-
-    angle_at_p1 = brg1_rad - brg_12    # angolo al vertice P1
-    angle_at_p2 = brg_21   - brg2_rad  # angolo al vertice P2
-
-    # Angoli quasi paralleli → nessuna intersezione utile
-    if np.abs(np.sin(angle_at_p1)) < 1e-12 and np.abs(np.sin(angle_at_p2)) < 1e-12:
-        return np.nan, np.nan
-
-    angle_at_p3 = np.arccos(
-        np.clip(
-            -np.cos(angle_at_p1) * np.cos(angle_at_p2)
-            + np.sin(angle_at_p1) * np.sin(angle_at_p2) * np.cos(angular_dist_12),
-            -1.0, 1.0,
-        )
-    )
-
-    angular_dist_13 = np.arctan2(
-        np.sin(angular_dist_12) * np.sin(angle_at_p1) * np.sin(angle_at_p2),
-        np.cos(angle_at_p2) + np.cos(angle_at_p1) * np.cos(angle_at_p3),
-    )
-
-    lat3_rad = np.arcsin(
-        np.clip(
-            np.sin(lat1_rad) * np.cos(angular_dist_13)
-            + np.cos(lat1_rad) * np.sin(angular_dist_13) * np.cos(brg1_rad),
-            -1.0, 1.0,
-        )
-    )
-
-    dlon_13 = np.arctan2(
-        np.sin(brg1_rad) * np.sin(angular_dist_13) * np.cos(lat1_rad),
-        np.cos(angular_dist_13) - np.sin(lat1_rad) * np.sin(lat3_rad),
-    )
-
-    lon3_rad = lon1_rad + dlon_13
-
-    lat_out = np.degrees(lat3_rad)
-    lon_out = (np.degrees(lon3_rad) + 540.0) % 360.0 - 180.0
-
-    return lat_out, lon_out
-
-def _point_is_on_semiretta(
-    lat0: float, lon0: float, bearing_geo: float,
-    lat_i: float, lon_i: float,
-    tol_deg: float = 0.5,
-) -> bool:
-    """
-    Verifica che il punto (lat_i, lon_i) si trovi sulla semiretta
-    (non sul prolungamento opposto) definita da (lat0, lon0) con
-    bearing geografico bearing_geo.
-
-    Il test è: il bearing dal punto di origine verso il punto di intersezione
-    deve essere entro tol_deg dal bearing atteso.
-    """
-    φ0, λ0 = np.radians(lat0), np.radians(lon0)
-    φi, λi = np.radians(lat_i), np.radians(lon_i)
-    Δλ = λi - λ0
-
-    brg_to_i = np.degrees(
-        np.arctan2(
-            np.sin(Δλ) * np.cos(φi),
-            np.cos(φ0) * np.sin(φi) - np.sin(φ0) * np.cos(φi) * np.cos(Δλ),
-        )
-    ) % 360.0
-
-    diff = abs((brg_to_i - bearing_geo + 180.0) % 360.0 - 180.0)
-    return diff <= tol_deg
-
-
 def find_points(
-    H1: tuple[float, float],
-    H2: tuple[float, float],
-    bearing_H1: list[float] | np.ndarray,
-    bearing_H2: list[float] | np.ndarray,
+    hydrophones: np.ndarray,
+    bearings: np.ndarray,
 ) -> np.ndarray:
     """
-    Calcola i punti di intersezione tra coppie di semirette geodetiche.
+    Per ogni colonna di bearing, calcola il punto che minimizza la distanza
+    dalle N semirette geodetiche emesse dagli N idrofoni.
 
     Parametri
     ---------
-    H1 : (lat, lon) del primo punto origine, in gradi decimali.
-    H2 : (lat, lon) del secondo punto origine, in gradi decimali.
-    bearing_H1 : array di N angoli (gradi) per H1,
-                 misurati in senso ANTIORARIO a partire da EST.
-    bearing_H2 : array di N angoli (gradi) per H2,
-                 misurati in senso ANTIORARIO a partire da EST.
+    hydrophones : np.ndarray di forma (N, 2)
+        Coordinate [lat, lon] in gradi decimali di N idrofoni.
+    bearings : np.ndarray di forma (N, M)
+        M set di N angoli (gradi), convenzione CCW da EST.
+        Ogni colonna m contiene i bearing dei N idrofoni per l'evento m.
 
     Ritorna
     -------
-    np.ndarray di forma (N, 2) con colonne [latitudine, longitudine].
-    Le righe senza intersezione valida contengono [NaN, NaN].
-    """
-    bearing_H1 = np.asarray(bearing_H1, dtype=float)
-    bearing_H2 = np.asarray(bearing_H2, dtype=float)
-
-    if bearing_H1.shape != bearing_H2.shape:
-        raise ValueError(
-            f"bearing_H1 e bearing_H2 devono avere la stessa dimensione, "
-            f"ma sono {bearing_H1.shape} e {bearing_H2.shape}."
-        )
-
-    n = bearing_H1.size
-    result = np.full((n, 2), np.nan)
-
-    lat1, lon1 = float(H1[0]), float(H1[1])
-    lat2, lon2 = float(H2[0]), float(H2[1])
-
-    for k in range(n):
-        # Converti dalla convenzione matematica (CCW da EST)
-        # al bearing geografico (CW da NORD)
-        brg1 = math_to_bearing(bearing_H1[k])
-        brg2 = math_to_bearing(bearing_H2[k])
-
-        '''
-        lat_i, lon_i = _great_circle_intersection(
-            lat1, lon1, brg1,
-            lat2, lon2, brg2,
-        )
-        '''
-
-        lat_i, lon_i = _flat_earth_intersection(
-            lat1, lon1, brg1,
-            lat2, lon2, brg2,
-        )
-
-        if np.isnan(lat_i):
-            continue  # nessuna intersezione geometrica
-
-        # Verifica che il punto cada su entrambe le SEMI-rette
-        # (non sul prolungamento opposto del raggio)
-        on1 = _point_is_on_semiretta(lat1, lon1, brg1, lat_i, lon_i)
-        on2 = _point_is_on_semiretta(lat2, lon2, brg2, lat_i, lon_i)
-
-        if on1 and on2:
-            result[k, 0] = lat_i
-            result[k, 1] = lon_i
-        # altrimenti rimane NaN
-
-    return result
-
-def find_points_3(
-    H1: tuple[float, float],
-    H2: tuple[float, float],
-    H3: tuple[float, float],
-    bearing_H1: list[float] | np.ndarray,
-    bearing_H2: list[float] | np.ndarray,
-    bearing_H3: list[float] | np.ndarray,
-) -> np.ndarray:
-    """
-    Per ogni tripla di bearing, calcola il punto che minimizza la distanza
-    dalle tre semirette geodetiche emesse da H1, H2, H3.
-
-    Parametri
-    ---------
-    H1, H2, H3 : (lat, lon) dei tre idrofoni, in gradi decimali.
-    bearing_H1/H2/H3 : array di N angoli (gradi), convenzione CCW da EST.
-
-    Ritorna
-    -------
-    np.ndarray di forma (N, 2) con colonne [latitudine, longitudine].
+    np.ndarray di forma (M, 2) con colonne [latitudine, longitudine].
     Le righe senza soluzione valida contengono [NaN, NaN].
     """
-    bearing_H1 = np.asarray(bearing_H1, dtype=float)
-    bearing_H2 = np.asarray(bearing_H2, dtype=float)
-    bearing_H3 = np.asarray(bearing_H3, dtype=float)
+    hydrophones = np.asarray(hydrophones, dtype=float)
+    bearings = np.asarray(bearings, dtype=float)
 
-    if not (bearing_H1.shape == bearing_H2.shape == bearing_H3.shape):
+    if hydrophones.ndim != 2 or hydrophones.shape[1] != 2:
         raise ValueError(
-            f"I tre array di bearing devono avere la stessa dimensione, "
-            f"ma sono {bearing_H1.shape}, {bearing_H2.shape}, {bearing_H3.shape}."
+            f"hydrophones deve avere forma (N, 2), ma ha forma {hydrophones.shape}."
+        )
+    if bearings.ndim != 2:
+        raise ValueError(
+            f"bearings deve avere forma (N, M), ma ha forma {bearings.shape}."
         )
 
-    n = bearing_H1.size
-    result = np.full((n, 2), np.nan)
+    n_hydro = hydrophones.shape[0]
+    if bearings.shape[0] != n_hydro:
+        raise ValueError(
+            f"bearings deve avere {n_hydro} righe (una per idrofono), "
+            f"ma ne ha {bearings.shape[0]}."
+        )
+    if n_hydro < 2:
+        raise ValueError("Servono almeno 2 idrofoni.")
 
-    lat1, lon1 = float(H1[0]), float(H1[1])
-    lat2, lon2 = float(H2[0]), float(H2[1])
-    lat3, lon3 = float(H3[0]), float(H3[1])
+    n_events = bearings.shape[1]
+    result = np.full((n_events, 2), np.nan)
 
-    for k in range(n):
-        brg1 = math_to_bearing(bearing_H1[k])
-        brg2 = math_to_bearing(bearing_H2[k])
-        brg3 = math_to_bearing(bearing_H3[k])
+    # Pre-converti tutti i bearing in convenzione geografica
+    brgs = np.vectorize(math_to_bearing)(bearings)  # (N, M)
 
-        # Triangolo di errore
-        candidates = []
-        for (la, loa, ba), (lb, lob, bb) in [
-            ((lat1, lon1, brg1), (lat2, lon2, brg2)),
-            ((lat1, lon1, brg1), (lat3, lon3, brg3)),
-            ((lat2, lon2, brg2), (lat3, lon3, brg3)),
-        ]:
-            lat_i, lon_i = _flat_earth_intersection(la, loa, ba, lb, lob, bb)
+    lats = hydrophones[:, 0]
+    lons = hydrophones[:, 1]
+
+    for m in range(n_events):
+        brg_m = brgs[:, m]  # (N,) bearing per l'evento m
+
+        if n_hydro == 2:
+            # Caso esatto: intersezione di due rette
+            lat_i, lon_i = _flat_earth_intersection(
+                lats[0], lons[0], brg_m[0],
+                lats[1], lons[1], brg_m[1],
+            )
             if not np.isnan(lat_i):
-                candidates.append((lat_i, lon_i))
+                result[m, 0] = lat_i
+                result[m, 1] = lon_i
+            continue
 
-        # RMS error
-        opt = _least_squares_point(
-            lat1, lon1, brg1,
-            lat2, lon2, brg2,
-            lat3, lon3, brg3,
-        )
+        # Caso N >= 3: triangolo/poligono di errore + least squares
+        # Raccogli tutti i vertici del poligono di errore (intersezioni a coppie)
+        candidates = []
+        for i in range(n_hydro):
+            for j in range(i + 1, n_hydro):
+                lat_i, lon_i = _flat_earth_intersection(
+                    lats[i], lons[i], brg_m[i],
+                    lats[j], lons[j], brg_m[j],
+                )
+                if not np.isnan(lat_i):
+                    candidates.append((lat_i, lon_i))
+
+        # Least squares generalizzato su tutti gli N idrofoni
+        opt = _least_squares_point_n(lats, lons, brg_m)
 
         if opt is None:
             if len(candidates) >= 2:
-                lats = [p[0] for p in candidates]
-                lons = [p[1] for p in candidates]
-                opt = (float(np.mean(lats)), float(np.mean(lons)))
+                opt = (
+                    float(np.mean([p[0] for p in candidates])),
+                    float(np.mean([p[1] for p in candidates])),
+                )
+            elif len(candidates) == 1:
+                opt = candidates[0]
             else:
                 continue
 
-        lat_opt, lon_opt = opt
-        result[k, 0] = lat_opt
-        result[k, 1] = lon_opt
-        
-        '''
-        # Accetta solo se il punto cade su tutte e tre le semirette
-        on1 = _point_is_on_semiretta(lat1, lon1, brg1, lat_opt, lon_opt)
-        on2 = _point_is_on_semiretta(lat2, lon2, brg2, lat_opt, lon_opt)
-        on3 = _point_is_on_semiretta(lat3, lon3, brg3, lat_opt, lon_opt)
+        result[m, 0] = opt[0]
+        result[m, 1] = opt[1]
 
-        
-        if on1 and on2 and on3:
-            result[k, 0] = lat_opt
-            result[k, 1] = lon_opt
-   
-        checks = [on1, on2, on3]
-        if sum(checks) >= 1:          # maggioranza
-            result[k, 0] = lat_opt
-            result[k, 1] = lon_opt
-        '''
     return result
 
-
-def _least_squares_point(
-    lat1: float, lon1: float, brg1: float,
-    lat2: float, lon2: float, brg2: float,
-    lat3: float, lon3: float, brg3: float,
+def _least_squares_point_n(
+    lats: np.ndarray,
+    lons: np.ndarray,
+    brgs: np.ndarray,
 ) -> tuple[float, float] | None:
     """
-    Trova il punto (lat, lon) che minimizza la somma dei quadrati delle
-    distanze dalle tre rette nel piano locale.
+    Trova il punto che minimizza la somma delle distanze al quadrato
+    dalle N semirette geodetiche (approssimazione flat-earth).
 
-    Ogni retta è definita da un punto (latN, lonN) e un bearing brgN.
-    La distanza di un punto P = (x, y) da una retta passante per
-    Q = (qx, qy) con direzione unitaria d = (dx, dy) è:
+    Parametri
+    ---------
+    lats, lons : array (N,) di coordinate degli idrofoni in gradi.
+    brgs       : array (N,) di bearing geografici in gradi (CW da Nord).
 
-        dist = | (P - Q) × d |  =  | (x-qx)·dy - (y-qy)·dx |
-
-    Minimizzare la somma dei quadrati di queste distanze è un problema
-    lineare ai minimi quadrati: A^T A x = A^T b, con soluzione analitica.
+    Ritorna
+    -------
+    (lat, lon) del punto ottimale, oppure None se il sistema è singolare.
     """
-    cos_lat = math.cos(math.radians((lat1 + lat2 + lat3) / 3))
+    # Direzioni unitarie delle rette in coordinate (dx=Est, dy=Nord)
+    brgs_rad = np.deg2rad(brgs)
+    dx = np.sin(brgs_rad)  # componente Est
+    dy = np.cos(brgs_rad)  # componente Nord
 
-    rows_a = []
-    rows_b = []
+    # Sistema ai minimi quadrati: minimizza sum_i dist(P, retta_i)^2
+    # La distanza dal punto P=(x,y) alla retta passante per (x0,y0)
+    # con direzione (dx,dy) è: |(P - H) x d| = (dy*(x-x0) - dx*(y-y0))
+    # Matrice A e vettore b del sistema normale A^T A p = A^T b
+    # con proiezione ortogonale: (I - d d^T) P = (I - d d^T) H
 
-    for lat, lon, brg in [(lat1, lon1, brg1), (lat2, lon2, brg2), (lat3, lon3, brg3)]:
-        r = math.radians(brg)
-        dx, dy = math.sin(r), math.cos(r)          # direzione unitaria
+    # Usa coordinate metriche approssimate centrate sulla media degli idrofoni
+    lat0 = np.mean(lats)
+    lon0 = np.mean(lons)
+    R = 6371000.0  # raggio terrestre in metri
+    lat0_rad = np.deg2rad(lat0)
 
-        qx = lon * cos_lat                          # piano locale scalato
-        qy = lat
+    # Converte lat/lon -> metri relativi al centro
+    x0 = np.deg2rad(lons - lon0) * R * np.cos(lat0_rad)
+    y0 = np.deg2rad(lats - lat0) * R
 
-        # Coefficienti della distanza: dy·x - dx·y = dy·qx - dx·qy
-        rows_a.append([dy, -dx])
-        rows_b.append(dy * qx - dx * qy)
+    # Proiettori ortogonali: per ogni retta i, (I - d_i d_i^T)
+    # A x = b  =>  sum_i (I - d_i d_i^T) @ p = sum_i (I - d_i d_i^T) @ h_i
+    A = np.zeros((2, 2))
+    b = np.zeros(2)
+    for i in range(len(lats)):
+        d = np.array([dx[i], dy[i]])
+        P_orth = np.eye(2) - np.outer(d, d)
+        h = np.array([x0[i], y0[i]])
+        A += P_orth
+        b += P_orth @ h
 
-    A = np.array(rows_a)                            # (3, 2)
-    b = np.array(rows_b)                            # (3,)
-
-    # Soluzione ai minimi quadrati: (A^T A)^{-1} A^T b
-    ATA = A.T @ A                                   # (2, 2)
-    ATb = A.T @ b                                   # (2,)
-
-    if abs(np.linalg.det(ATA)) < 1e-20:            # sistema degenere
+    try:
+        p = np.linalg.solve(A, b)
+    except np.linalg.LinAlgError:
         return None
 
-    x_opt, y_opt = np.linalg.solve(ATA, ATb)
+    if not np.all(np.isfinite(p)):
+        return None
 
-    lon_opt = x_opt / cos_lat
-    lat_opt = y_opt
+    # Riconverte metri -> gradi
+    lon_opt = lon0 + np.rad2deg(p[0] / (R * np.cos(lat0_rad)))
+    lat_opt = lat0 + np.rad2deg(p[1] / R)
 
-    return lat_opt, lon_opt
+    return float(lat_opt), float(lon_opt)
 
-
-# ---------------------------------------------------------------------------
-# Demo
-# ---------------------------------------------------------------------------
 def smooth_aoa(
     angles: np.ndarray,
     method: str = "savgol",
@@ -570,82 +355,51 @@ def smooth_aoa(
  
     return smoothed
 
-
+def filter_coordinates(coords: np.ndarray, f: int) -> np.ndarray:
+    """
+    Rimuove da un array di coordinate (LAT, LON) tutte le coppie
+    che compaiono meno di F volte.
+ 
+    Parametri
+    ----------
+    coords : np.ndarray, shape (K, 2)
+        Array di coordinate dove la colonna 0 è la latitudine
+        e la colonna 1 è la longitudine.
+    f : int
+        Frequenza minima: vengono mantenute solo le coppie (LAT, LON)
+        che compaiono almeno F volte.
+ 
+    Ritorna
+    -------
+    np.ndarray, shape (M, 2)
+        Array filtrato contenente solo le righe la cui coppia
+        (LAT, LON) compare almeno F volte nell'input.
+    """
+    if coords.ndim != 2 or coords.shape[1] != 2:
+        raise ValueError(f"L'array deve avere forma (K, 2), ricevuto: {coords.shape}")
+    if f < 1:
+        raise ValueError(f"La frequenza minima F deve essere >= 1, ricevuto: {f}")
+ 
+    # Converte ogni riga in una tupla hashable per contarle
+    tuples = [tuple(row) for row in coords]
+    counts = Counter(tuples)
+ 
+    # Maschera booleana: True dove la coppia compare almeno F volte
+    mask = np.array([counts[t] >= f for t in tuples])
+ 
+    return coords[mask]
 
 if __name__ == "__main__":
-    with open("Synth/simulation_coordinates.txt", "r") as f:
-        numer_of_floaters = f.readline()
-        lat_tmp,lon_tmp = f.readline().split(' ')
-        H1 = (float(lat_tmp),float(lon_tmp))
-        lat_tmp,lon_tmp = f.readline().split(' ')
-        H2 = (float(lat_tmp),float(lon_tmp))
-        lat_tmp,lon_tmp = f.readline().split(' ')
-        H3 = (float(lat_tmp),float(lon_tmp))
-
+    RX_Coordinates = np.load("Synth/RX_Coordinates.npy")
+    '''
     bearing_H1 = np.load("Synth/H1.npy")
     bearing_H2 = np.load("Synth/H2.npy")
     bearing_H3 = np.load("Synth/H3.npy")
-    bearing_H1 = bearing_H1[0:len(bearing_H1)-1]
-    bearing_H2 = bearing_H2[0:len(bearing_H2)-1]
-    bearing_H3 = bearing_H3[0:len(bearing_H3)-1]
+    bearing_H4 = np.load("Synth/H4.npy")
+    bearing_H5 = np.load("Synth/H5.npy")
 
-    #intersections = find_points(H1, H2, bearing_H1, bearing_H2)
-    intersection_points = find_points_3(H1,H2,H3,
-                                  bearing_H1,
-                                  bearing_H2,
-                                  bearing_H3)
+    bearing_arrays = np.asarray([bearing_H1,bearing_H2,bearing_H3,bearing_H4,bearing_H5])
+    intersection_points = find_points(RX_Coordinates,bearing_arrays)
+        
     np.save("Synth/Intersection_coordinates.npy",intersection_points)
-
-    method = "gaussian" 
-    #method = "savgol"    
-    #method = "median"
-    window = 15
-
-    filt_bearing_H1 = smooth_aoa(
-            bearing_H1,
-            method=method,     # algoritmo
-            window=window,           # 10 campioni = 550 ms di finestra
-            poly_order=3,        # grado del polinomio locale
-            outlier_sigma=3,   # soglia outlier (abbassa per essere più aggressivo)
-            wrap_degrees=True,   # True se angoli in [0,360), False se già unwrappati
-        )
-    
-    filt_bearing_H2 = smooth_aoa(
-            bearing_H2,
-            method=method,     # algoritmo
-            window=window,           # 10 campioni = 550 ms di finestra
-            poly_order=3,        # grado del polinomio locale
-            outlier_sigma=3,   # soglia outlier (abbassa per essere più aggressivo)
-            wrap_degrees=True,   # True se angoli in [0,360), False se già unwrappati
-        )
-    
-    filt_bearing_H3 = smooth_aoa(
-            bearing_H3,
-            method=method,     # algoritmo
-            window=window,           # 10 campioni = 550 ms di finestra
-            poly_order=3,        # grado del polinomio locale
-            outlier_sigma=3,   # soglia outlier (abbassa per essere più aggressivo)
-            wrap_degrees=True,   # True se angoli in [0,360), False se già unwrappati
-        )
-    
-    #filtered_intersections = find_points(H1, H2, filt_bearing_H1, filt_bearing_H2)
-    intersection_points = find_points_3(H1,H2,H3,
-                                  filt_bearing_H1,
-                                  filt_bearing_H2,
-                                  filt_bearing_H3)
-
-    filt_bearing_H1 = filt_bearing_H1[0:len(filt_bearing_H1)-4]
-    filt_bearing_H2 = filt_bearing_H2[0:len(filt_bearing_H2)-4]
-    filt_bearing_H3 = filt_bearing_H3[0:len(filt_bearing_H3)-4]
-
-    intersection_points = find_points_3(H1,H2,H3,
-                                  filt_bearing_H1,
-                                  filt_bearing_H2,
-                                  filt_bearing_H3)
-    
-    print(bearing_H1)
-    print()
-    print(bearing_H2)
-    print()
-    print(bearing_H3)
-    np.save("Synth/Filtered_Intersection_coordinates.npy",intersection_points)
+    '''

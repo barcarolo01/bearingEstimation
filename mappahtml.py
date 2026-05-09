@@ -103,7 +103,6 @@ def _is_valid(*values):
     """Restituisce True solo se nessuno dei valori è NaN o None."""
     return all(v is not None and not np.isnan(float(v)) for v in values)
 
-
 def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_coordinates, output_file):
     """
     Costruisce, salva e restituisce la mappa Folium con:
@@ -214,40 +213,13 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
 # =============================================================================
 # MAIN
 # =============================================================================
-
 if __name__ == "__main__":
-    with open("Synth/simulation_coordinates.txt", "r") as f:
-        numer_of_floaters = int(f.readline())
-        
-        # Reading floaters coordinates from file
-        floaters_coordinates = np.zeros([numer_of_floaters,2])
-        for i in range(numer_of_floaters):
-            lat_tmp, lon_tmp = f.readline().split(' ')
-            floaters_coordinates[i,0] = lat_tmp
-            floaters_coordinates[i,1] = lon_tmp
-
-        numer_of_steps = int(f.readline())
-
-        # Reading the interpediate "sampled" coordinates of the transmitter
-        TX_positions_coordinates = np.zeros([numer_of_steps,2])
-        for i in range(numer_of_steps):
-            lat_tmp, lon_tmp = f.readline().split(' ')
-            TX_positions_coordinates[i,0] = lat_tmp
-            TX_positions_coordinates[i,1] = lon_tmp
-
-    
-    intersection_points = np.load("Synth/Intersection_coordinates.npy")
+    TX_positions_coordinates = np.load("Synth/TX_Coordinates.npy")
+    floaters_coordinates = np.load("Synth/RX_Coordinates.npy")
+    Estimated_positions = np.load("Synth/Estimated_positions.npy")
     build_map(
         floaters_coordinates = floaters_coordinates,
         TX_positions_coordinates = TX_positions_coordinates,
-        estimated_vessel_coordinates = intersection_points,
+        estimated_vessel_coordinates = Estimated_positions,
         output_file="map.html"
-    )
-    
-    intersection_points = np.load("Synth/Filtered_Intersection_coordinates.npy")
-    build_map(
-        floaters_coordinates = floaters_coordinates,
-        TX_positions_coordinates = TX_positions_coordinates,
-        estimated_vessel_coordinates = intersection_points,
-        output_file="map_filtered.html"
     )

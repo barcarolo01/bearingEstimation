@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib
-#matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import scipy.io.wavfile as wav
 from utils_filters import *
@@ -12,12 +10,12 @@ MAX_SAMPLE_DELAY = 25
 
 d = 0.31 # Meters
 c = 1500 # Meters/second
-tau_thr = 5 * 10**(-9)
+tau_thr = 10
 
 if __name__ == "__main__":
     precompute_bearing_angles(d)
-    
-    
+
+    '''
     fs, data = wav.read('AudioFiles/0958_crop.wav')
     # Secondi di inizio e fine lettura
     start = 0
@@ -32,11 +30,14 @@ if __name__ == "__main__":
 
     '''
     # Reading synth tracks
-    fs,sig1 = wav.read('Synth/H1_RX1.wav')
-    _,sig2 = wav.read('Synth/H1_RX2.wav')
-    _,sig3 = wav.read('Synth/H1_RX3.wav')
-    '''
+    fs,sig1 = wav.read('Synth/F1_H1.wav')
+    _,sig2 = wav.read('Synth/F1_H2.wav')
+    _,sig3 = wav.read('Synth/F1_H3.wav')
+    #print(f"{len(sig1)}")
+    #print(f"{len(sig2)}")
+    #print(f"{len(sig3)}")
     
+
     #wav.write('sig1afterFilt.wav',fs,sig1)
     # ==================== Filtering (?) ====================
     fc = 10
@@ -62,16 +63,11 @@ if __name__ == "__main__":
     print(f"FREQUENZA DI CAMPIONAMENTO: {fs}")
     print(f"FINESTRA: {durata_finestra*1000} ms - {campioni_finestra} samples")
 
-    '''
-    sample_delay_21, times = compute_sample_delay(sig2,sig1,fs,campioni_finestra)
-    sample_delay_32, _ = compute_sample_delay(sig3,sig2,fs,campioni_finestra)
-    sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
-    '''
 
     quality_threshold = 0.0
-    delay_arr21,sample_delay_21, times, tau_percentile_21  = compute_sample_delay_colormap(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    delay_arr32,sample_delay_32, _, tau_percentile_32 = compute_sample_delay_colormap(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    delay_arr31,sample_delay_31, _, tau_percentile_31 = compute_sample_delay_colormap(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    delay_arr21,sample_delay_21, times  = compute_sample_delay_colormap(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    delay_arr32,sample_delay_32, _ = compute_sample_delay_colormap(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    delay_arr31,sample_delay_31, _ = compute_sample_delay_colormap(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
 
 
     colormap_datasets = [delay_arr21,delay_arr32,delay_arr31]
@@ -81,7 +77,6 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, 4, figsize=(12, 6), sharey=True)
     fig.subplots_adjust(left=0.2, right=0.95, wspace=0.3)
     
-
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
     time_delay_31 = sample_delay_31 / fs

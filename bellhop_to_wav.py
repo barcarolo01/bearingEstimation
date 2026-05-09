@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.signal import fftconvolve, resample_poly
+from scipy.signal import convolve, resample_poly
 from math import gcd
 import soundfile as sf
 
@@ -166,6 +166,7 @@ def from_arr_to_wav(
     rr_rx3 = max(rr3_vals)
 
     # ── Risposta impulsiva ─────────────────────────────────────────────
+    
     h1, used1 = build_ir(arr1, rd1_vals, rr_rx1, fs, n_arrivals=n_arr)
     h2, used2 = build_ir(arr2, rd2_vals, rr_rx2, fs, n_arrivals=n_arr)
     h3, used3 = build_ir(arr3, rd3_vals, rr_rx3, fs, n_arrivals=n_arr)
@@ -173,9 +174,16 @@ def from_arr_to_wav(
 
     # ── Convoluzione ──────────────────────────────────────────────────
     transient = np.max([len(h1),len(h2),len(h3)]) - 1
-    rx1_out = fftconvolve(src, h1)[transient:transient+len(src)].astype(np.float32)
-    rx2_out = fftconvolve(src, h2)[transient:transient+len(src)].astype(np.float32)
-    rx3_out = fftconvolve(src, h3)[transient:transient+len(src)].astype(np.float32)
+
+    # "Colvole by definition" (quick)
+    # Good results with [transient:transient+fs]
+    src = src[:96000*3]
+    #rx1_out = convolve(src, h1, mode='full', method='direct').astype(np.float32)
+    #rx2_out = convolve(src, h2, mode='full', method='direct').astype(np.float32)
+    #rx3_out = convolve(src, h3, mode='full', method='direct').astype(np.float32)
+    rx1_out = convolve(src, h1, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
+    rx2_out = convolve(src, h2, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
+    rx3_out = convolve(src, h3, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
         
     signals = [rx1_out, rx2_out, rx3_out]
     gmax = max(np.max(np.abs(s)) for s in signals)

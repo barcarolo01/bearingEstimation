@@ -32,10 +32,12 @@ def decimate_envelope(envelope, sr, target_sf=1000):
     return env_dec.astype(np.float32), new_fs
 
 if __name__ == "__main__":
-    fs, data = wav.read('AudioFiles/0958_crop.wav')
-    sig0 = data[:,1]
+    #fs, data = wav.read('AudioFiles/0958_crop.wav')
+    fs, sig0 = wav.read('Synth/F1_H1.wav')
+    
+    #sig0 = data[:,1]
     f1 = 200
-    f2 = 45000
+    f2 = 40000
 
     # Envelope and decimation
     envelope = np.abs(hilbert(sig0))
@@ -45,7 +47,6 @@ if __name__ == "__main__":
     Calcolando il modulo si calola l'inviluppo del segnale.
     '''
 
-
     envelope_dec, env_fs = decimate_envelope(envelope, fs, target_sf=1000)
 
     '''
@@ -54,7 +55,7 @@ if __name__ == "__main__":
 
     # Passa alto
     hpf = 4.0 #Hz
-    envelope_dec = FIR_bandpass_filter(envelope_dec,hpf,env_fs//2,env_fs)
+    #envelope_dec = FIR_bandpass_filter(envelope_dec,hpf,env_fs//2,env_fs)
 
     # 1. FFT
     N = len(envelope_dec)
