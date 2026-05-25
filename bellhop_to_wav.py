@@ -1,23 +1,18 @@
+import os
+
 import numpy as np
 from scipy.signal import convolve, resample_poly
 from math import gcd
 import soundfile as sf
 
-# ═══════════════════════════════════════════════════════════════════════
-# PARAMETRI CONFIGURABILI
-# ═══════════════════════════════════════════════════════════════════════
-
-FS_OUT = 96000     # Hz — frequenza di campionamento output
-
-# ═══════════════════════════════════════════════════════════════════════
+FS_OUT = 96000     # Sampling frequency of output files (Hz)
 
 def read_arr(filename):
     with open(filename) as f:
         lines = [l.strip() for l in f.readlines()]
 
-    i = 0
-    i += 1  # '2D'
-    i += 1  # frequenza
+    i = 2 # Skipping header rows ('2D' and frequency value)
+    
     parts = lines[i].split(); i += 1  # NSD + SD
 
     rd_parts = lines[i].split()
@@ -122,76 +117,65 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
 
 # ===============================================================================================
 def from_arr_to_wav(
-    rx1: str,
-    rx2: str,
-    rx3: str,
+    input_folder: str,
+    number_mic: int,
     source: str,
-    out1: str,
-    out2: str,
-    out3: str,
-    fs: int = FS_OUT,
-    n_arrivals: int = 1,
+    out_folder: str,
+    n_arrivals: int = 0,
+    duration: int = 1,
 ):
     """
-    Genera file .wav simulati per RX1/RX2/RX3 da file .arr di Bellhop.
+    Genera file .wav simulati per N microfoni da file .arr di Bellhop.
 
     Parametri
     ---------
-    rx1        : percorso al file .arr per RX1
-    rx2        : percorso al file .arr per RX2
-    rx3        : percorso al file .arr per RX3
-    source     : percorso al file audio sorgente
-    out1/2/3   : percorsi di output per i .wav
-    fs         : sample rate output
-    dur        : durata sorgente sintetica in secondi
-    fc         : frequenza centrale motore in Hz
-    n_arrivals : arrivi per RD ordinati per tempo 
+    input_folder : cartella contenente i file .arr (rx1.arr, rx2.arr, ...)
+    number_mic   : numero di file .arr da leggere
+    source       : percorso al file audio sorgente
+    out_folder   : cartella dove salvare i file .wav di output
+    n_arrivals   : numero di arrivi per RD ordinati per tempo (0 = tutti)
+    fs           : sample rate output
     """
-    n_arr = n_arrivals
-    label = str(n_arr) if n_arr > 0 else "tutti"
+    os.makedirs(out_folder, exist_ok=True)
 
-    src = load_audio_source(source, fs)
+    src = load_audio_source(source, FS_OUT)
 
     # ── Lettura .arr ──────────────────────────────────────────────────
-    print(f"\n📖 Lettura {rx1}...")
-    rr1_vals, rd1_vals, arr1 = read_arr(rx1)
-    rr_rx1 = max(rr1_vals)
+    arr_list  = []   # dizionari con i dati di ogni microfono
+    for i in range(1, number_mic + 1):
+        arr_path = os.path.join(input_folder, f"H{i}.arr")
+        #arr_path = f"{input_folder}/{i}.arr"
+        #print(f"\nLettura {arr_path}...")
 
-    print(f"📖 Lettura {rx2}...")
-    rr2_vals, rd2_vals, arr2 = read_arr(rx2)
-    rr_rx2 = max(rr2_vals)
+        rr_vals, rd_vals, arr = read_arr(arr_path)
+        arr_list.append({
+            "rr_vals": rr_vals,
+            "rd_vals": rd_vals,
+            "arr":     arr,
+            "rr_max":  max(rr_vals),
+        })
 
-    print(f"📖 Lettura {rx3}...")
-    rr3_vals, rd3_vals, arr3 = read_arr(rx3)
-    rr_rx3 = max(rr3_vals)
-
-    # ── Risposta impulsiva ─────────────────────────────────────────────
-    
-    h1, used1 = build_ir(arr1, rd1_vals, rr_rx1, fs, n_arrivals=n_arr)
-    h2, used2 = build_ir(arr2, rd2_vals, rr_rx2, fs, n_arrivals=n_arr)
-    h3, used3 = build_ir(arr3, rd3_vals, rr_rx3, fs, n_arrivals=n_arr)
-
+    # ── Risposta impulsiva ────────────────────────────────────────────
+    ir_list = []
+    for i, mic in enumerate(arr_list, start=1):
+        h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"],FS_OUT, n_arrivals=n_arrivals)
+        ir_list.append(h)
 
     # ── Convoluzione ──────────────────────────────────────────────────
-    transient = np.max([len(h1),len(h2),len(h3)]) - 1
+    transient = max(len(h) for h in ir_list) - 1
 
-    # "Colvole by definition" (quick)
-    # Good results with [transient:transient+fs]
-    src = src[:96000*3]
-    #rx1_out = convolve(src, h1, mode='full', method='direct').astype(np.float32)
-    #rx2_out = convolve(src, h2, mode='full', method='direct').astype(np.float32)
-    #rx3_out = convolve(src, h3, mode='full', method='direct').astype(np.float32)
-    rx1_out = convolve(src, h1, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
-    rx2_out = convolve(src, h2, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
-    rx3_out = convolve(src, h3, mode='full', method='direct')[transient:transient+fs].astype(np.float32)
-        
-    signals = [rx1_out, rx2_out, rx3_out]
-    gmax = max(np.max(np.abs(s)) for s in signals)
-    rx1_out = (rx1_out / gmax).astype(np.float32)
-    rx2_out = (rx2_out / gmax).astype(np.float32)
-    rx3_out = (rx3_out / gmax).astype(np.float32)
+    rx_out_list = []
+    for h in ir_list:
+        rx_out = convolve(src, h, mode='full', method='direct')[transient:transient + FS_OUT].astype(np.float32)
+        #rx_out = convolve(src, h, mode='full', method='direct')[:FS_OUT].astype(np.float32)
+        rx_out_list.append(rx_out)
+
+    # Normalizzazione globale
+    gmax = max(np.max(np.abs(s)) for s in rx_out_list)
+    rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
     # ── Salvataggio ───────────────────────────────────────────────────
-    sf.write(out1, rx1_out, fs, subtype='PCM_16')
-    sf.write(out2, rx2_out, fs, subtype='PCM_16')
-    sf.write(out3, rx3_out, fs, subtype='PCM_16')
+    out_paths = []
+    for i, rx_out in enumerate(rx_out_list, start=1):
+        out_path = os.path.join(out_folder, f"H{i}.npy")
+        np.save(out_path,rx_out)

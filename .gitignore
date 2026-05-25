@@ -1,3 +1,4 @@
 AudioFiles
 __pycache__
 TMP
+.env

@@ -32,8 +32,9 @@ def decimate_envelope(envelope, sr, target_sf=1000):
     return env_dec.astype(np.float32), new_fs
 
 if __name__ == "__main__":
-    #fs, data = wav.read('AudioFiles/0958_crop.wav')
-    fs, sig0 = wav.read('Synth/F1_H1.wav')
+    #fs, sig0 = wav.read('AudioFiles/0958_crop.wav')
+    #fs, sig0 = wav.read('Synth/F1_H1.wav')
+    fs, sig0 = wav.read('barca.wav')
     
     #sig0 = data[:,1]
     f1 = 200

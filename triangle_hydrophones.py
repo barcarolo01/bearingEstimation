@@ -5,6 +5,8 @@ from utils_filters import *
 import numpy as np
 from utils_filters import *
 from utils import *
+from precompute_LUTs import *
+from bearing_calculation import *
 
 MAX_SAMPLE_DELAY = 25
 
@@ -13,7 +15,7 @@ c = 1500 # Meters/second
 tau_thr = 5 * 10**(-7)
 
 if __name__ == "__main__":
-    precompute_bearing_angles(d)
+    precompute_bearing_angles_triangle(d)
     fs, data = wav.read('AudioFiles/0958.wav')
 
     # Secondi di inizio e fine lettura
@@ -43,17 +45,10 @@ if __name__ == "__main__":
     print(f"FREQUENZA DI CAMPIONAMENTO: {fs}")
     print(f"FINESTRA: {durata_finestra*1000} ms - {campioni_finestra} samples")
 
-    '''
-    sample_delay_21, times = compute_sample_delay(sig2,sig1,fs,campioni_finestra)
-    sample_delay_32, _ = compute_sample_delay(sig3,sig2,fs,campioni_finestra)
-    sample_delay_31, _ = compute_sample_delay(sig3,sig1,fs,campioni_finestra)
-
-    '''
-
     quality_threshold = 0.2
-    sample_delay_21, times  = compute_sample_delay_d_aware(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    sample_delay_32, _ = compute_sample_delay_d_aware(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
-    sample_delay_31, _ = compute_sample_delay_d_aware(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold)
+    sample_delay_31, _ = compute_sample_delay_value(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold)
 
 
     datasets_sample_delay = [sample_delay_21,sample_delay_32,sample_delay_31]
@@ -69,7 +64,7 @@ if __name__ == "__main__":
     tau_fit_error = np.zeros(len(times))
     estimated_bearing = np.zeros(len(times))
     for i in range(len(estimated_bearing)):
-        estimated_bearing[i],tau_fit_error[i] = find_bearing(time_delay_32[i],time_delay_21[i],time_delay_31[i])
+        estimated_bearing[i],tau_fit_error[i] = find_bearing_triangle(time_delay_32[i],time_delay_21[i],time_delay_31[i])
 
     mask_tau = (tau_fit_error < tau_thr) # Mask to consider only tau estimation with low error
 
@@ -86,7 +81,7 @@ if __name__ == "__main__":
     axes[0].set_ylabel('Time (s)', fontsize=10)
 
     # Plot Bearing angle
-    estimated_bearing = (estimated_bearing + 30) % 360
+    #estimated_bearing = (estimated_bearing + 30) % 360
 
     ax = axes[3]
     ax.scatter(estimated_bearing[mask_tau],times[mask_tau],color='red',s=0.5) #Masked

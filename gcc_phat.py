@@ -6,8 +6,18 @@ def gcc_phat(sig_A, sig_B):
     Xa = np.fft.rfft(sig_A, n=N)
     Xb = np.fft.rfft(sig_B, n=N)
 
-    numerator = Xa * np.conj(Xb)
     denumerator = np.abs(Xa * np.conj(Xb))
+    numerator = Xa * np.conj(Xb)
+
+    # Azzeramento coefficienti oltre FH
+    FH = 20000
+    FL = 10
+    fs = 96000
+    '''
+    freqs = np.fft.rfftfreq(N, d=1/fs)
+    numerator[freqs > FH] = 0
+    numerator[freqs < FL] = 0
+    '''
     rms_numerator = np.sqrt(np.mean(np.abs(numerator)**2))
     R = numerator / (denumerator + 1e-10 + beta * rms_numerator)
 

@@ -1,8 +1,11 @@
+import datetime as DT
+
 import folium
 import folium.plugins
 import numpy as np
 from folium import MacroElement
 from jinja2 import Template
+import csv
 
 class ScaleBar(MacroElement):
     """Barra di scala fissa che si aggiorna automaticamente con lo zoom."""
@@ -102,34 +105,58 @@ class ScaleBar(MacroElement):
 def _is_valid(*values):
     """Restituisce True solo se nessuno dei valori è NaN o None."""
     return all(v is not None and not np.isnan(float(v)) for v in values)
-
 def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_coordinates, output_file):
     """
     Costruisce, salva e restituisce la mappa Folium con:
-      - H1, H2 come marker con etichetta colorata
+      - Floaters (H1, H2, ...) come marker con etichetta rossa
       - Punti TX in giallo  (NaN ignorati)
       - Punti stimati in verde (NaN ignorati)
+
+    Per tutti e tre gli array di coordinate, la profondità è opzionale:
+    se presente come terza colonna viene mostrata nel popup, altrimenti "N/A".
+    I valori -999 sono trattati come profondità non disponibile.
+
+    Parametri
+    ---------
+    floaters_coordinates : array-like di forma (N, 2) o (N, 3)
+    TX_positions_coordinates : array-like di forma (M, 2) o (M, 3)
+    estimated_vessel_coordinates : array-like di forma (K, 2) o (K, 3)
+    output_file : str
     """
 
-    lat_tx  = TX_positions_coordinates[:,0]
-    lon_tx = TX_positions_coordinates[:,1]
-    lat_estimated = estimated_vessel_coordinates[:,0]
-    lon_estimated = estimated_vessel_coordinates[:,1]
+    def _extract_coords(arr):
+        """Restituisce (lats, lons, depths) dove depths è NaN se non disponibile."""
+        arr = np.asarray(arr, dtype=float)
+        lats = arr[:, 0]
+        lons = arr[:, 1]
+        if arr.shape[1] >= 3:
+            depths = arr[:, 2]
+            depths = np.where(depths == -999, np.nan, depths)
+        else:
+            depths = np.full(len(lats), np.nan)
+        return lats, lons, depths
 
-    # Elimina i NaN dagli array
-    tx_valid  = [(lat, lon) for lat, lon in zip(lat_tx, lon_tx)
+    def _depth_str(depth):
+        """Formatta la profondità per il popup."""
+        return f"{depth:.1f} m" if not np.isnan(depth) else "N/A"
+
+    lats_fl,  lons_fl,  depths_fl  = _extract_coords(floaters_coordinates)
+    lats_tx,  lons_tx,  depths_tx  = _extract_coords(TX_positions_coordinates)
+    lats_est, lons_est, depths_est = _extract_coords(estimated_vessel_coordinates)
+
+    tx_valid  = [(lat, lon, depth)
+                 for lat, lon, depth in zip(lats_tx, lons_tx, depths_tx)
                  if _is_valid(lat, lon)]
-    est_valid = [(lat, lon) for lat, lon in zip(lat_estimated, lon_estimated)
+
+    est_valid = [(lat, lon, depth)
+                 for lat, lon, depth in zip(lats_est, lons_est, depths_est)
                  if _is_valid(lat, lon)]
 
-    
-    # Creazione mapap (centrata su H1)
-    m = folium.Map(location=floaters_coordinates[0], zoom_start=15, tiles="OpenStreetMap")
+    # Creazione mappa (centrata su H1)
+    m = folium.Map(location=(lats_fl[0], lons_fl[0]), zoom_start=15, tiles="OpenStreetMap")
 
-    # Aggiungi scala
     ScaleBar().add_to(m)
 
-    # Aggiungi strumento di misura
     folium.plugins.MeasureControl(
         position="bottomleft",
         primary_length_unit="meters",
@@ -139,22 +166,24 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
     ).add_to(m)
 
     # --- Punti TX (gialli) ---
-    for i, (lat, lon) in enumerate(tx_valid):
-        print(i)
+    for i, (lat, lon, depth) in enumerate(tx_valid):
         folium.CircleMarker(
             location=(lat, lon),
-            radius=7,
+            radius=10,
             color="#FFD700",
             fill=True,
             fill_color="#FFD700",
             fill_opacity=0.9,
             weight=2,
-            popup=folium.Popup(f"<b>TX {i+1}</b><br>Lat: {lat}<br>Lon: {lon}", max_width=180),
+            popup=folium.Popup(
+                f"<b>TX {i+1}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
+                max_width=180
+            ),
             tooltip=f"TX {i+1}"
         ).add_to(m)
 
     # --- Punti stimati (verdi) ---
-    for i, (lat, lon) in enumerate(est_valid):
+    for i, (lat, lon, depth) in enumerate(est_valid):
         folium.CircleMarker(
             location=(lat, lon),
             radius=7,
@@ -163,31 +192,27 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
             fill_color="#00CC66",
             fill_opacity=0.9,
             weight=2,
-            popup=folium.Popup(f"<b>Stimato {i+1}</b><br>Lat: {lat}<br>Lon: {lon}", max_width=180),
+            popup=folium.Popup(
+                f"<b>Stimato {i+1}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
+                max_width=180
+            ),
             tooltip=f"Stimato {i+1}"
         ).add_to(m)
 
-    # Floaters
-    floaters = []
-    for i in range(len(floaters_coordinates)):
-        floaters.append({"point": floaters_coordinates[i], "label": f"H{i+1}", "color": "#FF0000"})
-
-    for s in floaters:
-        pt    = s["point"]
-        color = s["color"]
-        label = s["label"]
-
+    # --- Floaters ---
+    for i, (lat, lon, depth) in enumerate(zip(lats_fl, lons_fl, depths_fl)):
+        label = f"H{i+1}"
         folium.Marker(
-            location=pt,
+            location=(lat, lon),
             popup=folium.Popup(
-                f"<b>{label}</b><br>Lat: {pt[0]}<br>Lon: {pt[1]}",
+                f"<b>{label}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
                 max_width=200
             ),
             tooltip=label,
             icon=folium.DivIcon(
                 html=f"""
                 <div style="
-                    background:{color};
+                    background:#FF0000;
                     color:white;
                     font-weight:bold;
                     font-family:monospace;
@@ -214,12 +239,50 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
 # MAIN
 # =============================================================================
 if __name__ == "__main__":
-    TX_positions_coordinates = np.load("Synth/TX_Coordinates.npy")
-    floaters_coordinates = np.load("Synth/RX_Coordinates.npy")
-    Estimated_positions = np.load("Synth/Estimated_positions.npy")
+    # Step 1: filtra e scrive output.csv
+    '''
+    with open('C:/Users/Nicola/Downloads/ais-2025-01-01/ais-2025-01-01.csv', newline='', encoding='utf-8') as f_in, \
+         open('output.csv', 'w', newline='', encoding='utf-8') as f_out:
+        
+        reader = csv.DictReader(f_in)
+        writer = csv.DictWriter(f_out, fieldnames=reader.fieldnames)
+        writer.writeheader()
+        for row in reader:
+            if row['mmsi'] == '636018800':
+                writer.writerow(row)
+    '''
+    # Step 2: legge output.csv, ordina per base_date_time e popola lat/lon
+    with open('output.csv', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        
+        rows = sorted(reader, key=lambda r: DT.datetime.strptime(r['base_date_time'], '%Y-%m-%d %H:%M:%S'))
+
+    lat = [row['latitude'] for row in rows]
+    lon = [row['longitude'] for row in rows]
+
+    print(lat[0],lon[0])
+    j = np.asarray([lat,lon])
+    TX_positions_coordinates = np.transpose(j)
+    print(TX_positions_coordinates.shape)
+
+    np.save("Synth/TX_Coordinates.npy",TX_positions_coordinates)
+
+    fake_floater_lat = float(lat[0])+0.001
+    fake_floater_lon = float(lon[0])+0.001
+    fake_estimated_lat = float(lat[0])-0.001
+    fake_estimated_lon = float(lon[0])-0.001
+
+    RX_Coordinates = np.load("Synth/RX_Coordinates.npy")
     build_map(
-        floaters_coordinates = floaters_coordinates,
+        floaters_coordinates = RX_Coordinates,
         TX_positions_coordinates = TX_positions_coordinates,
-        estimated_vessel_coordinates = Estimated_positions,
-        output_file="map.html"
+        estimated_vessel_coordinates = [(fake_estimated_lat,fake_estimated_lon)],
+        output_file="mappaAIS.html"
     )
+
+    # GOOD: 
+    #636017837
+    #316013215 #LAKE USA
+    #367324580 #Back and forth
+    #319469000
+    #636018800 #Batimora see

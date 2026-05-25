@@ -2,40 +2,9 @@ import numpy as np
 from gcc_phat import *
 from utils_filters import *
 import numpy as np
-import scipy.io.wavfile as wav
-
-c = 1500 # Meters/second
-
-lut_tau32 = np.zeros(360)
-lut_tau21 = np.zeros(360)
-lut_tau31 = np.zeros(360)
- 
-def precompute_bearing_angles(d):
-    '''
-    This function precomputes the time delay expected for each pair of hydrophones
-    for each angle between 0° and 359°
-    '''
-    for angle in range(360):
-        theta = angle * np.pi / 180 # Converione gradi --> radianti
-        lut_tau32[angle] = -d/c * np.cos(theta)
-        lut_tau21[angle] = d/c * np.sin(theta + np.pi/6)
-        lut_tau31[angle] = d/c * np.sin(theta - np.pi/6)
-
-def find_bearing(measured_tau32, measured_tau21, measured_tau31):
-    """
-    This function estimates the angle of arrival (0°-359°) by minimizing the least square error.
-    """
-    E = ((measured_tau32 - lut_tau32)**2 + (measured_tau21 - lut_tau21)**2 + (measured_tau31 - lut_tau31)**2)
-    #E = np.abs(measured_tau32 - lut_tau32) + np.abs(measured_tau21 - lut_tau21) + np.abs(measured_tau31 - lut_tau31)
-
-    estimated_angle = np.argmin(E)
-
-    error = (lut_tau21[estimated_angle]-measured_tau21)**2 + (lut_tau32[estimated_angle]-measured_tau32)**2 + (lut_tau31[estimated_angle]-measured_tau31)**2
-    #error = np.abs(lut_tau21[estimated_angle]-measured_tau21) + np.abs(lut_tau32[estimated_angle]-measured_tau32) + np.abs(lut_tau31[estimated_angle]-measured_tau31)
-
-    return estimated_angle,error
-
-def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1500, overlap=0.5, quality_threshold=0.1):
+from precompute_LUTs import *
+        
+def compute_sample_delay_value(sig_A, sig_B, fs, campioni_finestra, d, c=1500, overlap=0.5, quality_threshold=0.1):
     step = int(campioni_finestra * (1 - overlap))
     n_finestre = 1 + (len(sig_A) - campioni_finestra) // step
     sample_delay = np.zeros(n_finestre)
@@ -66,7 +35,7 @@ def compute_sample_delay_d_aware(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1
 
     return sample_delay, times
 
-def compute_sample_delay_colormap(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=1500, overlap=0.5, quality_threshold=0.1):
+def compute_sample_delay_array(sig_A, sig_B, fs, campioni_finestra, d, c=1500, overlap=0.5, quality_threshold=0.1):
     step = int(campioni_finestra * (1 - overlap))
     n_finestre = 1 + (len(sig_A) - campioni_finestra) // step
     sample_delay = np.zeros(n_finestre)
@@ -99,16 +68,3 @@ def compute_sample_delay_colormap(sig_A, sig_B, fs, campioni_finestra, d=0.1, c=
 
     searches_np = np.array(searches)
     return searches_np, sample_delay, times
-
-
-# This method concatenates two .wav files and save the result in out_file
-def join_audio_files(file1, file2, out_file):
-    fs_A, signal_A = wav.read(file1)
-    fs_B, signal_B = wav.read(file2)
-    
-    if(fs_A != fs_B):
-        print("Warning: Files have different sampling frequency.")
-
-
-    conc = np.concatenate((signal_A, signal_B))
-    wav.write(out_file,fs_A,conc.astype(np.int16))
