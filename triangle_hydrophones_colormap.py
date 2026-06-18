@@ -18,6 +18,7 @@ c = 1500 # Meters/second
 if __name__ == "__main__":
     precompute_bearing_angles_triangle(d)
 
+    '''
     # Reading 3-tracks file
     fs, data = wav.read('AudioFiles/0958_crop.wav')
 
@@ -28,28 +29,22 @@ if __name__ == "__main__":
     sig1 = data[start*fs:end*fs, 0]
     sig2 = data[start*fs:end*fs, 1]
     sig3 = data[start*fs:end*fs, 2]
+    '''
+    fs, sig1 = wav.read('Synth/F1_H1.wav')
+    _, sig2 = wav.read('Synth/F1_H2.wav')
+    _, sig3 = wav.read('Synth/F1_H3.wav')
 
-    '''
-    # Reading synth tracks
-    fs,sig1 = wav.read('Synth/F1_H1.wav')
-    _,sig2 = wav.read('Synth/F1_H2.wav')
-    _,sig3 = wav.read('Synth/F1_H3.wav')
-    '''
 
     # Window parameters
     durata_finestra = 0.05 # Seconds
     overlap = 0
-    quality_threshold = 0.0
+    quality_threshold = 0.01
     campioni_finestra = int(durata_finestra * fs)
 
     delay_arr21,sample_delay_21, times  = compute_sample_delay_array(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
     delay_arr32,sample_delay_32, _ = compute_sample_delay_array(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
     delay_arr31,sample_delay_31, _ = compute_sample_delay_array(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
     
-    print(delay_arr21)
-    print()
-    print(sample_delay_21)
-
     # Conversion: number of samples --> seconds
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -127,5 +122,5 @@ if __name__ == "__main__":
     ax.set_xlabel(f'Degrees (°)', fontsize=10)
     ax.grid(True, linestyle='--', alpha=0.5)
 
-    #plt.savefig("delay_bearing_estimation.png")
+    plt.savefig("delay_bearing_estimation.png")
     plt.show()

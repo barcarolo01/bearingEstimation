@@ -21,7 +21,7 @@ def compute_sample_delay_value(sig_A, sig_B, fs, campioni_finestra, d, c=1500, o
         cc     = gcc_phat(finestra1, finestra2)
         center = len(cc) // 2
 
-        # Cerca SOLO nel range fisico ±tau_max_samples
+        # Cerca SOLO nel range fisico +-tau_max_samples
         search = cc[center - tau_max_samples : center + tau_max_samples + 1]
         peak   = np.max(search)
 
@@ -52,6 +52,7 @@ def compute_sample_delay_array(sig_A, sig_B, fs, campioni_finestra, d, c=1500, o
         finestra2 = sig_B[inizio:fine]
 
         cc     = gcc_phat(finestra1, finestra2)
+        #cc     = gcc_phat_lowpass(finestra1, finestra2, fc=25000)
         center = len(cc) // 2
 
         # Cerca SOLO nel range fisico ±tau_max_samples

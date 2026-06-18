@@ -2,8 +2,8 @@ PATH = "C:/Users/Nicola/Desktop/TESI/HYDROMATE/hm_code/gebco_2024_sub_ice_topo/G
 
 import xarray as xr
 
-lon_query = -73.546610
-lat_query = 39.839150
+lon_query = 55.141862749665
+lat_query = 25.903322371762606
 
 ds = xr.open_dataset(PATH, engine="netcdf4")
 

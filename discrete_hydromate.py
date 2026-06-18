@@ -38,7 +38,7 @@ def run_discrete_hydromate(Lat_TXs, Lon_TXs, depth_TXs, Lat_RX, Lon_RX, depth_RX
         # By convolution, obtain a signal for each of the arrival files
         from_arr_to_wav(input_folder='TMP',
                         number_mic=NUMBER_OF_HYDROPHONES,
-                        source = 'barca.wav',
+                        source = 'AudioFiles/barca.wav',
                         out_folder = 'TMP',
                         n_arrivals=0)
                  

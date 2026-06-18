@@ -108,7 +108,7 @@ def compute_bearing_angle_array_square(H_index):
     return estimated_bearing[:-1]
 
 def compute_bearing_angle_array_complete(H_index):
-    d = 0.3
+    d = 0.4
     precompute_bearing_angles_complete(d)
 
     fs, sig1 = wav.read(f'Synth/F{H_index}_H1.wav')
@@ -136,20 +136,6 @@ def compute_bearing_angle_array_complete(H_index):
     sample_delay_52, _ = compute_sample_delay_value(sig5, sig2, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
     sample_delay_53, _ = compute_sample_delay_value(sig5, sig3, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
     sample_delay_54, _ = compute_sample_delay_value(sig5, sig4, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
-
-    '''
-    if H_index == 1:
-        print("TAU_4_1:")
-        print(sample_delay_41)
-        print("TAU_5_4:")
-        print(sample_delay_54)
-        print("TAU_5_3:")
-        print(sample_delay_53)
-        print("TAU_5_2:")
-        print(sample_delay_52)
-        print("TAU_5_1:")
-        print(sample_delay_51)
-    '''
     
     # Conversione in secondi
     time_delay_21 = sample_delay_21 / fs
@@ -262,3 +248,11 @@ def clean_temporary_files(dir_path):
             if os.path.isfile(file_path):
                 os.remove(file_path)
         os.rmdir(dir_path)
+
+
+if __name__ == "__main__":
+    # Esempio di utilizzo
+
+    Lat_TX = 25.903322371762606
+    Lon_TX = 55.141862749665
+    print(sposta(Lat_TX, Lon_TX, 1000, 90))  # Sposta di 1000 metri verso est

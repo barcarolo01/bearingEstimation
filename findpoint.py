@@ -1,17 +1,12 @@
 import numpy as np
-from scipy.signal import savgol_filter
-from scipy.ndimage import median_filter
-from collections import Counter
 import math
-
+from itertools import combinations
 
 def math_to_bearing(math_angle_deg: float) -> float:
     """
-    Converte un angolo matematico (antiorario da EST, in gradi)
-    nel bearing geografico (orario da NORD, in gradi) usato internamente
-    per i calcoli geodetici.
-
-    Relazione:  bearing = 90 - math_angle   (mod 360)
+    This function convert an angle expressed in the mathematical convention
+    (0° = EAST, angles increasing in anti-clockwise sense) into an angle measured
+    in geographical convention (0° = NORTH, angles increasing in clockwise sense)
     """
     return (90.0 - math_angle_deg) % 360.0
 
@@ -20,55 +15,51 @@ def _flat_earth_intersection(
     lat2: float, lon2: float, brg2: float,
 ) -> tuple[float, float]:
     """
-    Punto di intersezione tra due semirette, approssimazione piana.
+    This function compute the intersection between two lines assuming the Earth to be flat.
 
-    Valida per distanze < ~10 km (errore < qualche metro).
-    Per distanze maggiori usa _great_circle_intersection.
-
-    Parametri
+    Parameters
     ---------
-    lat1, lon1 : coordinate del primo punto (gradi decimali)
-    brg1       : bearing geografico (°N, orario)
-    lat2, lon2 : coordinate del secondo punto (gradi decimali)
-    brg2       : bearing geografico (°N, orario)
+    lat1, lon1 : coordinates of the starting point of the first line
+    brg1       : first line direction
+    lat2, lon2 : coordinates of the starting point of the second line
+    brg2       : second line direction
 
-    Ritorna
+    Returns
     -------
-    (lat, lon) del punto di intersezione, oppure (nan, nan) se non esiste.
+    Coordintes (lat, lon) of the intersection point, or (nan, nan) if no intersection point is found.
     """
-    # Fattore di scala per la longitudine nel piano locale
+    # Longitude scaling factor in the local plane
     cos_lat = math.cos(math.radians((lat1 + lat2) / 2))
 
-    # Bearing → vettore direzione nel piano (x=Est, y=Nord)
-    def brg_to_vec(brg_deg):
-        r = math.radians(brg_deg)
-        return math.sin(r), math.cos(r)   # (dx, dy)
+    # Compute the direction vector in the plane (x=East, y=North)
+    r = math.radians(brg1)
+    dx1, dy1 = math.sin(r), math.cos(r)
+    r = math.radians(brg2)
+    dx2, dy2 = math.sin(r), math.cos(r)
 
-    dx1, dy1 = brg_to_vec(brg1)
-    dx2, dy2 = brg_to_vec(brg2)
 
-    # Coordinate nel piano locale (gradi, con longitudine scalata)
+    # Coordinates in the local plane (degrees, with scaled longitude)
     x1, y1 = lon1 * cos_lat, lat1
     x2, y2 = lon2 * cos_lat, lat2
 
-    # Intersezione di due rette parametriche:
+    # Intersection of two parametric lines:
     #   P1 + t * d1 = P2 + s * d2
-    # Risolto per t con la regola di Cramer
-    denom = dx1 * dy2 - dy1 * dx2 # Determinante
+    # Solved for t using Cramer's rule
+    denom = dx1 * dy2 - dy1 * dx2 # Determinant
 
-    if abs(denom) < 1e-12:      # rette parallele o coincidenti
+    if abs(denom) < 1e-12:      # Lines are parallel or coincident lines
         return math.nan, math.nan
 
     t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / denom
 
-    if t < 0:                   # intersezione dietro la semiretta 1
+    if t < 0:                   # Line intersection is behind half-line 1
         return math.nan, math.nan
 
     s = ((x2 - x1) * dy1 - (y2 - y1) * dx1) / denom
-    if s < 0:                   # intersezione dietro la semiretta 2
+    if s < 0:                   # Line intersection is behind half-line 2
         return math.nan, math.nan
 
-    # Coordinate geografiche del punto di intersezione
+    # Geographic coordinates of the intersection point
     lon_out = (x1 + t * dx1) / cos_lat
     lat_out =  y1 + t * dy1
 
@@ -80,40 +71,40 @@ def _least_squares_point_n(
     brgs: np.ndarray,
 ) -> tuple[float, float] | None:
     """
-    Trova il punto che minimizza la somma delle distanze al quadrato
-    dalle N semirette geodetiche (approssimazione flat-earth).
+    Finds the point that minimizes the sum of squared distances
+    from the N geodetic half-lines (flat-earth approximation).
 
-    Parametri
+    Parameters
     ---------
-    lats, lons : array (N,) di coordinate degli idrofoni in gradi.
-    brgs       : array (N,) di bearing geografici in gradi (CW da Nord).
+    lats, lons : array (N,) of floater coordinates in degrees.
+    brgs       : array (N,) of geographic bearings in degrees (clockwise from North).
 
-    Ritorna
+    Returns
     -------
-    (lat, lon) del punto ottimale, oppure None se il sistema è singolare.
+    (lat, lon) of the optimal point, or None if the system is singular.
     """
-    # Direzioni unitarie delle rette in coordinate (dx=Est, dy=Nord)
+    # Unit directions of the lines in (dx=East, dy=North) coordinates
     brgs_rad = np.deg2rad(brgs)
-    dx = np.sin(brgs_rad)  # componente Est
-    dy = np.cos(brgs_rad)  # componente Nord
+    dx = np.sin(brgs_rad)  # East component
+    dy = np.cos(brgs_rad)  # North component
 
-    # Sistema ai minimi quadrati: minimizza sum_i dist(P, retta_i)^2
-    # La distanza dal punto P=(x,y) alla retta passante per (x0,y0)
-    # con direzione (dx,dy) è: |(P - H) x d| = (dy*(x-x0) - dx*(y-y0))
-    # Matrice A e vettore b del sistema normale A^T A p = A^T b
-    # con proiezione ortogonale: (I - d d^T) P = (I - d d^T) H
+    # Least squares system: minimize sum_i dist(P, line_i)^2
+    # The distance from point P=(x,y) to the line passing through (x0,y0)
+    # with direction (dx,dy) is: |(P - H) x d| = (dy*(x-x0) - dx*(y-y0))
+    # Matrix A and vector b of the normal system A^T A p = A^T b
+    # with orthogonal projection: (I - d d^T) P = (I - d d^T) H
 
-    # Usa coordinate metriche approssimate centrate sulla media degli idrofoni
+    # Use approximate metric coordinates centred on the floaters position
     lat0 = np.mean(lats)
     lon0 = np.mean(lons)
-    R = 6371000.0  # raggio terrestre in metri
+    R = 6371000.0  # Earth radius in metres
     lat0_rad = np.deg2rad(lat0)
 
-    # Converte lat/lon -> metri relativi al centro
+    # Converts lat/lon -> metres relative to the centre
     x0 = np.deg2rad(lons - lon0) * R * np.cos(lat0_rad)
     y0 = np.deg2rad(lats - lat0) * R
 
-    # Proiettori ortogonali: per ogni retta i, (I - d_i d_i^T)
+    # Orthogonal projectors: for each line i, (I - d_i d_i^T)
     # A x = b  =>  sum_i (I - d_i d_i^T) @ p = sum_i (I - d_i d_i^T) @ h_i
     A = np.zeros((2, 2))
     b = np.zeros(2)
@@ -132,14 +123,14 @@ def _least_squares_point_n(
     if not np.all(np.isfinite(p)):
         return None
 
-    # Riconverte metri -> gradi
+    # Converts metres -> degrees
     lon_opt = lon0 + np.rad2deg(p[0] / (R * np.cos(lat0_rad)))
     lat_opt = lat0 + np.rad2deg(p[1] / R)
 
     return float(lat_opt), float(lon_opt)
 
 def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Distanza in metri tra due punti vicini, approssimazione flat-earth."""
+    """Distance in metres between two nearby points, flat-earth approximation."""
     meters_per_deg_lat = 111_319.9
     meters_per_deg_lon = 111_319.9 * np.cos(np.deg2rad((lat1 + lat2) / 2))
     dy = (lat2 - lat1) * meters_per_deg_lat
@@ -148,87 +139,81 @@ def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def find_points(
-    hydrophones: np.ndarray,
+    floaters: np.ndarray,
     bearings: np.ndarray,
     elevation_array: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Per ogni colonna di bearing, calcola il punto che minimizza la distanza
-    dalle N semirette geodetiche emesse dagli N idrofoni.
-    Se hydrophones ha una terza colonna (profondità) ed elevation_array non è None,
-    stima anche la profondità del target.
+    For each bearing column, computes the point that minimizes the distance
+    from the N geodetic half-lines emitted by the N floaters.
+    If floaters has a third column (depth) and elevation_array is not None,
+    also estimates the target depth.
 
-    Parametri
+    Parameters
     ---------
-    hydrophones : np.ndarray di forma (N, 2) o (N, 3)
-        Coordinate [lat, lon] o [lat, lon, depth_m] in gradi decimali (depth in metri,
-        positivo = sotto la superficie).
-    bearings : np.ndarray di forma (N, M)
-        M set di N angoli (gradi), convenzione CCW da EST.
-        Ogni colonna m contiene i bearing dei N idrofoni per l'evento m.
-    elevation_array : np.ndarray di forma (N, M), opzionale
-        Angoli di elevazione in gradi per ogni idrofono e ogni evento.
-        Positivo = sopra l'orizzonte, negativo = sotto.
-        Ignorato se hydrophones non contiene la profondità.
+    floaters : np.ndarray of shape (N, 2) or (N, 3)
+        Coordinates [lat, lon] or [lat, lon, depth_m] in decimal degrees (depth in metres,
+        positive = below the surface).
+    bearings : np.ndarray of shape (N, M)
+        M sets of N angles (degrees), CCW from East convention.
+        Each column m contains the bearings of the N floater for event m.
+    elevation_array : np.ndarray of shape (N, M), optional
+        Elevation angles in degrees for each floater and each event.
+        Positive = above the horizon, negative = below.
+        Ignored if floater does not contain depth.
 
-    Ritorna
+    Returns
     -------
-    positions : np.ndarray di forma (M, 2)
-        Colonne [latitudine, longitudine]. Righe senza soluzione → [NaN, NaN].
-    depths : np.ndarray di forma (M,)
-        Profondità stimata in metri (positivo = sotto superficie) se
-        hydrophones ha 3 colonne ed elevation_array non è None,
-        altrimenti array di -999.
+    positions : np.ndarray of shape (M, 2)
+        Columns [latitude, longitude]. Rows without a solution → [NaN, NaN].
+    depths : np.ndarray of shape (M,)
+        Estimated depth in metres (positive = below surface) if
+        floater has 3 columns and elevation_array is not None,
+        otherwise array of -999.
     """
-    hydrophones = np.asarray(hydrophones, dtype=float)
+    floaters = np.asarray(floaters, dtype=float)
     bearings    = np.asarray(bearings,    dtype=float)
 
-    if hydrophones.ndim != 2 or hydrophones.shape[1] not in (2, 3):
+    if floaters.ndim != 2 or floaters.shape[1] not in (2, 3):
         raise ValueError(
-            f"hydrophones deve avere forma (N, 2) o (N, 3), ma ha forma {hydrophones.shape}."
+            f"floaters must be in shape (N, 2) or (N, 3), while it has {floaters.shape}."
         )
     if bearings.ndim != 2:
         raise ValueError(
-            f"bearings deve avere forma (N, M), ma ha forma {bearings.shape}."
+            f"bearings must be in shape (N, M), while it has {bearings.shape}."
         )
 
-    n_hydro  = hydrophones.shape[0]
+    n_floaters  = floaters.shape[0]
     n_events = bearings.shape[1]
 
-    if bearings.shape[0] != n_hydro:
-        raise ValueError(
-            f"bearings deve avere {n_hydro} righe (una per idrofono), "
-            f"ma ne ha {bearings.shape[0]}."
-        )
-    if n_hydro < 2:
-        raise ValueError("Servono almeno 2 idrofoni.")
+    if bearings.shape[0] != n_floaters:
+        raise ValueError(f"bearings must ahve {n_floaters} rows (one for each floater), while it hase {bearings.shape[0]}.")
+    if n_floaters < 2:
+        raise ValueError("At least 2 floaters must be provided")
 
-    # ── Controlla se è disponibile la profondità degli idrofoni ──────────
-    has_depth = hydrophones.shape[1] == 3
+    # ── Check if floater depth data is available
+    has_depth = floaters.shape[1] == 3
     use_elevation = has_depth and elevation_array is not None
 
-    lats = hydrophones[:, 0]
-    lons = hydrophones[:, 1]
-    hydrophone_depths = hydrophones[:, 2] if has_depth else None
+    lats = floaters[:, 0]
+    lons = floaters[:, 1]
+    floater_depths = floaters[:, 2] if has_depth else None
 
     if use_elevation:
         elevation_array = np.asarray(elevation_array, dtype=float)
         if elevation_array.shape != bearings.shape:
-            raise ValueError(
-                f"elevation_array deve avere la stessa forma di bearings {bearings.shape}, "
-                f"ma ha forma {elevation_array.shape}."
-            )
+            raise ValueError(f"elevation_array must have the same same shape of bearings {bearings.shape},while it has {elevation_array.shape}.")
 
     positions = np.full((n_events, 3), np.nan)
 
-
     brgs = np.vectorize(math_to_bearing)(bearings)  # (N, M)
-
     for m in range(n_events):
-        brg_m = brgs[:, m]  # (N,) bearing per l'evento m
+        brg_m = brgs[:, m]  # (N,) bearings for event m
 
-        # ── Stima lat/lon ─────────────────────────────────────────────────
-        if n_hydro == 2:
+        # ── Estimate lat/lon
+
+        # If only 2 floaters are provided, then the optimal point is the intersection of bearing lines
+        if n_floaters == 2:
             lat_i, lon_i = _flat_earth_intersection(
                 lats[0], lons[0], brg_m[0],
                 lats[1], lons[1], brg_m[1],
@@ -238,8 +223,9 @@ def find_points(
                 positions[m, 1] = lon_i
         else:
             candidates = []
-            for i in range(n_hydro):
-                for j in range(i + 1, n_hydro):
+            # Compute the intersection for each computer of bearing lines
+            for i in range(n_floaters):
+                for j in range(i + 1, n_floaters):
                     lat_i, lon_i = _flat_earth_intersection(
                         lats[i], lons[i], brg_m[i],
                         lats[j], lons[j], brg_m[j],
@@ -249,6 +235,7 @@ def find_points(
 
             opt = _least_squares_point_n(lats, lons, brg_m)
 
+            
             if opt is None:
                 if len(candidates) >= 2:
                     opt = (
@@ -263,15 +250,129 @@ def find_points(
             positions[m, 0] = opt[0]
             positions[m, 1] = opt[1]
 
-        # ── Stima profondità (solo se use_elevation e posizione valida) ───
+        # ── Depth estimation (only if use_elevation and valid position) ───
         if use_elevation and not np.isnan(positions[m, 0]):
             depth_estimates = []
-            for i in range(n_hydro):
+            for i in range(n_floaters):
                 el_rad  = np.deg2rad(elevation_array[i, m])
+
+                # Compute the 2D distance between the floater and the previously estiamted point
                 dist_h  = _flat_dist_m(lats[i], lons[i], positions[m, 0], positions[m, 1])
+                
+                # Compute the difference of elevation
                 delta_z = dist_h * np.tan(el_rad)
-                # el < 0 → target più in basso dell'idrofono → profondità maggiore
-                depth_estimates.append(hydrophone_depths[i] - delta_z)
+
+                depth_estimates.append(floater_depths[i] - delta_z)
             positions[m,2] = float(np.mean(depth_estimates))
 
     return positions
+
+
+def find_points_weighted(
+    floaters: np.ndarray,
+    bearings: np.ndarray,
+    elevation_array: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    For each event, computes the estimated position as a weighted average
+    of all combinations of K floaters (K from 3 to N), with weight 1/error.
+    """
+    floaters = np.asarray(floaters, dtype=float)
+    bearings    = np.asarray(bearings,    dtype=float)
+
+    n_floaters   = floaters.shape[0]
+    n_events  = bearings.shape[1]
+    has_depth = floaters.shape[1] == 3
+    use_elevation = has_depth and elevation_array is not None
+
+    best_positions = np.full((n_events, 3), np.nan)
+
+    # Pre-compute all estimates for all combinations
+    all_combos = []
+    for k in range(3, n_floaters + 1):
+        for indices in combinations(range(n_floaters), k):
+            idx = list(indices)
+            floater_subset   = floaters[idx, :]
+            bearing_subset = bearings[idx, :]
+            elev_sub    = elevation_array[idx, :] if use_elevation else None
+
+            pos = find_points(floater_subset, bearing_subset, elev_sub)  # (n_events, 3)
+            all_combos.append((idx, pos))
+
+    for m in range(n_events):
+        weights   = []
+        lats_acc  = []
+        lons_acc  = []
+        depth_acc = []
+
+        for idx, intersection in all_combos:
+            pos_m = intersection[m]  # (3,)
+
+            if np.isnan(pos_m[0]):
+                continue
+
+            brgs_m = np.vectorize(math_to_bearing)(bearings[idx, m])
+
+            error = _residual_error(floaters[idx, 0], floaters[idx, 1],brgs_m,pos_m[0], pos_m[1])
+            
+            if error <= 0 or not np.isfinite(error):
+                continue
+
+            weights.append(1.0 / error)
+            lats_acc.append(pos_m[0])
+            lons_acc.append(pos_m[1])
+            depth_acc.append(pos_m[2])
+
+        if not weights:
+            continue
+
+        w = np.array(weights)
+        w /= w.sum()
+
+        best_positions[m, 0] = np.dot(w, lats_acc)
+        best_positions[m, 1] = np.dot(w, lons_acc)
+        if use_elevation:
+            best_positions[m, 2] = np.dot(w, depth_acc)
+
+    return best_positions
+
+
+def _residual_error(lats, lons, bearings_deg, lat_est, lon_est) -> float:
+    total = 0.0
+    n = 0
+    for i in range(len(lats)):
+        # Compute distance between i-th floater and estimated point
+        d = _flat_dist_m(lats[i], lons[i], lat_est, lon_est)
+
+        # Skip distances very close to zero
+        if d < 1e-6:
+            continue
+
+        az = _flat_azimuth(lats[i], lons[i], lat_est, lon_est)
+        delta_angle = np.deg2rad(az - bearings_deg[i])
+        total += np.sin(delta_angle) ** 2  # dimensionless, independent of d
+        n += 1
+    return total / n if n > 0 else np.inf
+
+def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Computes the geographic bearing (Clockwise from North, in degrees [0, 360))
+    from point 1 to point 2, flat-earth approximation.
+
+    Parameters
+    ---------
+    lat1, lon1 : coordinates of the starting point (decimal degrees)
+    lat2, lon2 : coordinates of the destination point (decimal degrees)
+
+    Returns
+    -------
+    Bearing in degrees, CW from North, in the range [0, 360).
+    """
+    R = 6371000.0
+    lat0_rad = np.deg2rad((lat1 + lat2) / 2)  # mean latitude for the correction
+
+    dx = np.deg2rad(lon2 - lon1) * R * np.cos(lat0_rad)  # East component
+    dy = np.deg2rad(lat2 - lat1) * R                      # North component
+
+    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) → CW from North
+    return float(bearing % 360)

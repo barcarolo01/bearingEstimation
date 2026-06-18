@@ -1,5 +1,4 @@
 import datetime as DT
-
 import folium
 import folium.plugins
 import numpy as np
@@ -105,12 +104,14 @@ class ScaleBar(MacroElement):
 def _is_valid(*values):
     """Restituisce True solo se nessuno dei valori è NaN o None."""
     return all(v is not None and not np.isnan(float(v)) for v in values)
-def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_coordinates, output_file):
+
+def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_coordinates, output_file, track_trajectory=False):
     """
     Costruisce, salva e restituisce la mappa Folium con:
       - Floaters (H1, H2, ...) come marker con etichetta rossa
       - Punti TX in giallo  (NaN ignorati)
       - Punti stimati in verde (NaN ignorati)
+      - Traiettoria opzionale che collega i punti stimati sequenzialmente
 
     Per tutti e tre gli array di coordinate, la profondità è opzionale:
     se presente come terza colonna viene mostrata nel popup, altrimenti "N/A".
@@ -122,6 +123,8 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
     TX_positions_coordinates : array-like di forma (M, 2) o (M, 3)
     estimated_vessel_coordinates : array-like di forma (K, 2) o (K, 3)
     output_file : str
+    track_trajectory : bool, opzionale (default=False)
+        Se True, mostra una linea che collega i punti stimati in ordine cronologico/sequenziale.
     """
 
     def _extract_coords(arr):
@@ -182,6 +185,19 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
             tooltip=f"TX {i+1}"
         ).add_to(m)
 
+    # --- Traiettoria (opzionale) ---
+    # Viene disegnata prima dei punti stimati in modo che i marker rimangano visivamente "sopra" la linea
+    if track_trajectory and len(est_valid) > 1:
+        trajectory_coords = [(lat, lon) for lat, lon, _ in est_valid]
+        folium.PolyLine(
+            locations=trajectory_coords,
+            color="#00CC66",
+            weight=5,
+            opacity=0.7,
+            dash_array="5, 10", # Stile tratteggiato elegante, rimuovilo se preferisci la linea continua
+            tooltip="Traiettoria Stimata Vessel"
+        ).add_to(m)
+
     # --- Punti stimati (verdi) ---
     for i, (lat, lon, depth) in enumerate(est_valid):
         folium.CircleMarker(
@@ -228,61 +244,7 @@ def build_map(floaters_coordinates, TX_positions_coordinates, estimated_vessel_c
             )
         ).add_to(m)
 
-    # --- Salvataggio ---
     m.save(output_file)
-    print(f"🗺️  Mappa salvata in: {output_file}")
+    print(f"Map saved in: {output_file}")
 
     return m
-
-
-# =============================================================================
-# MAIN
-# =============================================================================
-if __name__ == "__main__":
-    # Step 1: filtra e scrive output.csv
-    '''
-    with open('C:/Users/Nicola/Downloads/ais-2025-01-01/ais-2025-01-01.csv', newline='', encoding='utf-8') as f_in, \
-         open('output.csv', 'w', newline='', encoding='utf-8') as f_out:
-        
-        reader = csv.DictReader(f_in)
-        writer = csv.DictWriter(f_out, fieldnames=reader.fieldnames)
-        writer.writeheader()
-        for row in reader:
-            if row['mmsi'] == '636018800':
-                writer.writerow(row)
-    '''
-    # Step 2: legge output.csv, ordina per base_date_time e popola lat/lon
-    with open('output.csv', newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        
-        rows = sorted(reader, key=lambda r: DT.datetime.strptime(r['base_date_time'], '%Y-%m-%d %H:%M:%S'))
-
-    lat = [row['latitude'] for row in rows]
-    lon = [row['longitude'] for row in rows]
-
-    print(lat[0],lon[0])
-    j = np.asarray([lat,lon])
-    TX_positions_coordinates = np.transpose(j)
-    print(TX_positions_coordinates.shape)
-
-    np.save("Synth/TX_Coordinates.npy",TX_positions_coordinates)
-
-    fake_floater_lat = float(lat[0])+0.001
-    fake_floater_lon = float(lon[0])+0.001
-    fake_estimated_lat = float(lat[0])-0.001
-    fake_estimated_lon = float(lon[0])-0.001
-
-    RX_Coordinates = np.load("Synth/RX_Coordinates.npy")
-    build_map(
-        floaters_coordinates = RX_Coordinates,
-        TX_positions_coordinates = TX_positions_coordinates,
-        estimated_vessel_coordinates = [(fake_estimated_lat,fake_estimated_lon)],
-        output_file="mappaAIS.html"
-    )
-
-    # GOOD: 
-    #636017837
-    #316013215 #LAKE USA
-    #367324580 #Back and forth
-    #319469000
-    #636018800 #Batimora see

@@ -157,21 +157,33 @@ def from_arr_to_wav(
 
     # ── Risposta impulsiva ────────────────────────────────────────────
     ir_list = []
+    first_non_zero_at = []
     for i, mic in enumerate(arr_list, start=1):
         h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"],FS_OUT, n_arrivals=n_arrivals)
         ir_list.append(h)
+        first_non_zero_at.append(np.nonzero(h)[0][0])
+        #print(f"  Idrofono {i}: {len(used)} arrivi usati, lunghezza IR = {len(h)} campioni")
+        #np.save("H.npy", h)
 
     # ── Convoluzione ──────────────────────────────────────────────────
-    transient = max(len(h) for h in ir_list) - 1
-
+    transient = max((len(h) for h in ir_list if h.size > 0),default=FS_OUT)
+    maximum_length = max((len(h) for h in ir_list if h.size > 0))
+    to_clip = np.max(first_non_zero_at)
+    
     rx_out_list = []
     for h in ir_list:
-        rx_out = convolve(src, h, mode='full', method='direct')[transient:transient + FS_OUT].astype(np.float32)
+        #h_bis = h[minimum_length-FS_OUT:minimum_length]
+        rx_out = convolve(src[0:FS_OUT], h, mode='full', method='direct').astype(np.float32)
+        #rx_out = convolve(src, h, mode='full', method='direct')[transient:transient + FS_OUT].astype(np.float32)
         #rx_out = convolve(src, h, mode='full', method='direct')[:FS_OUT].astype(np.float32)
+        
+        rx_out = rx_out[to_clip: to_clip + FS_OUT].astype(np.float32)
         rx_out_list.append(rx_out)
 
-    # Normalizzazione globale
+    # global normalization
     gmax = max(np.max(np.abs(s)) for s in rx_out_list)
+    #gmax = max((np.max(np.abs(s)) for s in rx_out_list if s.size > 0),default=1.0)
+    
     rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
     # ── Salvataggio ───────────────────────────────────────────────────

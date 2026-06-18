@@ -2,3 +2,4 @@ AudioFiles
 __pycache__
 TMP
 .env
+AIS_DATA
