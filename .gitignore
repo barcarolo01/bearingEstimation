@@ -1,8 +1,8 @@
 AudioFiles
 __pycache__
 TMP
+Synth
 .env
 AIS_DATA
 .vscode
 FiguresAndPlots
-Synth
