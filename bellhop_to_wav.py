@@ -27,7 +27,7 @@ def read_arr(filename):
     while len(rr_values) < nr:
         rr_values += list(map(float, lines[i].split())); i += 1
 
-    i += 1  # salta intero header globale
+    i += 1  # skip entire global header
 
     arrivals = {}
     for rd in rd_values:
@@ -45,40 +45,40 @@ def load_audio_source(filepath, fs_target):
     data, fs_orig = sf.read(filepath, dtype='float32')
     if data.ndim > 1:
         data = data.mean(axis=1)
-        print(f"  Convertito da stereo a mono")
+        print(f"  Converted from stereo to mono")
     if fs_orig != fs_target:
         g = gcd(fs_target, fs_orig)
         up = fs_target // g
         down = fs_orig // g
         data = resample_poly(data, up, down).astype(np.float32)
-        print(f"  Ricampionato da {fs_orig} Hz a {fs_target} Hz")
+        print(f"  Resampled from {fs_orig} Hz to {fs_target} Hz")
     else:
-        print(f"  Frequenza di campionamento: {fs_orig} Hz (nessun resample)")
+        print(f"  Sampling frequency: {fs_orig} Hz (no resampling)")
     data /= np.max(np.abs(data))
-    print(f"  Durata: {len(data)/fs_target:.2f} s ({len(data)} campioni)")
+    print(f"  Duration: {len(data)/fs_target:.2f} s ({len(data)} samples)")
     return data
 
 def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
     """
-    Costruisce la risposta impulsiva dagli arrivi Bellhop.
+    Builds the impulse response from Bellhop arrivals.
 
-    Per ogni RD, seleziona i primi N arrivi in ordine temporale
-    e li somma nella IR come spike (ampiezza * cos(fase)) al loro
-    campione corrispondente.
+    For each RD, selects the first N arrivals in chronological order
+    and sums them into the IR as spikes (amplitude * cos(phase)) at their
+    corresponding sample.
 
-    Parametri
-    ─────────
+    Parameters
+    ----------
     arrivals_dict : dict {(rd, rr): [(amp, phase, time), ...]}
-    rd_values     : lista delle profondità ricevitori
-    rr_target     : range del ricevitore di interesse (m)
-    fs            : frequenza di campionamento (Hz)
-    n_arrivals    : numero di arrivi da usare per RD, ordinati per tempo.
-                    0 = usa tutti gli arrivi disponibili.
+    rd_values     : list of receiver depths
+    rr_target     : receiver range of interest (m)
+    fs            : sampling frequency (Hz)
+    n_arrivals    : number of arrivals to use per RD, sorted by time.
+                    0 = use all available arrivals.
 
-    Ritorna
-    ───────
-    h             : risposta impulsiva (float32)
-    used_arrivals : lista totale di (amp, phase, time) inseriti nella IR
+    Returns
+    -------
+    h             : impulse response (float32)
+    used_arrivals : total list of (amp, phase, time) inserted into the IR
     """
     used_arrivals = []
 
@@ -88,10 +88,10 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
         if not arr_list:
             continue
 
-        # Ordina per tempo crescente
+        # Sort by ascending time
         sorted_arr = sorted(arr_list, key=lambda a: a[2])
 
-        # Seleziona i primi N (0 = tutti)
+        # Select the first N (0 = all)
         if n_arrivals > 0:
             selected = sorted_arr[:n_arrivals]
         else:
@@ -100,7 +100,7 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
         used_arrivals.extend(selected)
 
     if not used_arrivals:
-        print("Nessun arrivo trovato per questo range!")
+        print("No arrivals found for this range!")
         return np.zeros(int(0.01 * fs), dtype=np.float32), []
 
     max_time = max(a[2] for a in used_arrivals)
@@ -125,27 +125,27 @@ def from_arr_to_wav(
     duration: int = 1,
 ):
     """
-    Genera file .wav simulati per N microfoni da file .arr di Bellhop.
+    Generates simulated .wav files for N microphones from Bellhop .arr files.
 
-    Parametri
-    ---------
-    input_folder : cartella contenente i file .arr (rx1.arr, rx2.arr, ...)
-    number_mic   : numero di file .arr da leggere
-    source       : percorso al file audio sorgente
-    out_folder   : cartella dove salvare i file .wav di output
-    n_arrivals   : numero di arrivi per RD ordinati per tempo (0 = tutti)
-    fs           : sample rate output
+    Parameters
+    ----------
+    input_folder : folder containing the .arr files (rx1.arr, rx2.arr, ...)
+    number_mic   : number of .arr files to read
+    source       : path to the source audio file
+    out_folder   : folder where output .wav files will be saved
+    n_arrivals   : number of arrivals per RD sorted by time (0 = all)
+    fs           : output sample rate
     """
     os.makedirs(out_folder, exist_ok=True)
 
     src = load_audio_source(source, FS_OUT)
 
-    # ── Lettura .arr ──────────────────────────────────────────────────
-    arr_list  = []   # dizionari con i dati di ogni microfono
+    # ── Reading .arr ──────────────────────────────────────────────────
+    arr_list  = []   # dictionaries with data from each microphone
     for i in range(1, number_mic + 1):
         arr_path = os.path.join(input_folder, f"H{i}.arr")
         #arr_path = f"{input_folder}/{i}.arr"
-        #print(f"\nLettura {arr_path}...")
+        #print(f"\nReading {arr_path}...")
 
         rr_vals, rd_vals, arr = read_arr(arr_path)
         arr_list.append({
@@ -155,18 +155,18 @@ def from_arr_to_wav(
             "rr_max":  max(rr_vals),
         })
 
-    # ── Risposta impulsiva ────────────────────────────────────────────
+    # ── Impulse response ────────────────────────────────────────────
     ir_list = []
     first_non_zero_at = []
     for i, mic in enumerate(arr_list, start=1):
-        h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"],FS_OUT, n_arrivals=n_arrivals)
+        h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"], FS_OUT, n_arrivals=n_arrivals)
         ir_list.append(h)
         first_non_zero_at.append(np.nonzero(h)[0][0])
-        #print(f"  Idrofono {i}: {len(used)} arrivi usati, lunghezza IR = {len(h)} campioni")
+        #print(f"  Hydrophone {i}: {len(used)} arrivals used, IR length = {len(h)} samples")
         #np.save("H.npy", h)
 
-    # ── Convoluzione ──────────────────────────────────────────────────
-    transient = max((len(h) for h in ir_list if h.size > 0),default=FS_OUT)
+    # ── Convolution ──────────────────────────────────────────────────
+    transient = max((len(h) for h in ir_list if h.size > 0), default=FS_OUT)
     maximum_length = max((len(h) for h in ir_list if h.size > 0))
     to_clip = np.max(first_non_zero_at)
     
@@ -182,12 +182,12 @@ def from_arr_to_wav(
 
     # global normalization
     gmax = max(np.max(np.abs(s)) for s in rx_out_list)
-    #gmax = max((np.max(np.abs(s)) for s in rx_out_list if s.size > 0),default=1.0)
+    #gmax = max((np.max(np.abs(s)) for s in rx_out_list if s.size > 0), default=1.0)
     
     rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
-    # ── Salvataggio ───────────────────────────────────────────────────
+    # ── Saving ───────────────────────────────────────────────────
     out_paths = []
     for i, rx_out in enumerate(rx_out_list, start=1):
         out_path = os.path.join(out_folder, f"H{i}.npy")
-        np.save(out_path,rx_out)
+        np.save(out_path, rx_out)

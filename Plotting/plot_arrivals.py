@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    h = np.load("H.npy")
+    h = np.load("H.py")
     
     fs = 96000  # Frequenza di campionamento
     

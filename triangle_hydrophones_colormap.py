@@ -1,11 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io.wavfile as wav
-from utils_filters import *
 import numpy as np
-from utils_filters import *
 from utils import *
-from precompute_LUTs import *
+from LUTs_computation import *
 from bearing_calculation import *
 
 MAX_SAMPLE_DELAY = 25

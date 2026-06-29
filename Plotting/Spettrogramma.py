@@ -1,10 +1,13 @@
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from scipy.io import wavfile
-from scipy.signal import welch
 import numpy as np
 font_size = 13
-filename = '../AudioFiles/0958_crop.wav'
+filename = 'AudioFiles/0958_crop.wav'
 
 samplingFrequency, signalData = wavfile.read(filename)
 signalData = signalData[:, 0]
@@ -24,5 +27,5 @@ ax.tick_params(axis='both', which='major', labelsize=font_size)
 ax.set_xlabel('Time (s)',fontsize=font_size)
 ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x/1000)}'))
 ax.set_ylabel('Frequency (kHz)',labelpad=15,fontsize=font_size)
-plt.savefig(f'spectrogram_real.png', bbox_inches='tight')
+plt.savefig(f'FiguresAndPlots/spectrogram.png', bbox_inches='tight')
 plt.show()

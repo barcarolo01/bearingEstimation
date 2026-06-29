@@ -1,5 +1,5 @@
 import numpy as np
-from precompute_LUTs import *
+from LUTs_computation import *
 
 def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
     """

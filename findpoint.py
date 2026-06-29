@@ -137,6 +137,45 @@ def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dx = (lon2 - lon1) * meters_per_deg_lon
     return np.sqrt(dx**2 + dy**2)
 
+def _residual_error(lats, lons, bearings_deg, lat_est, lon_est) -> float:
+    total = 0.0
+    n = 0
+    for i in range(len(lats)):
+        # Compute distance between i-th floater and estimated point
+        d = _flat_dist_m(lats[i], lons[i], lat_est, lon_est)
+
+        # Skip distances very close to zero
+        if d < 1e-6:
+            continue
+
+        az = _flat_azimuth(lats[i], lons[i], lat_est, lon_est)
+        delta_angle = np.deg2rad(az - bearings_deg[i])
+        total += np.sin(delta_angle) ** 2  # dimensionless, independent of d
+        n += 1
+    return total / n if n > 0 else np.inf
+
+def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Computes the geographic bearing (Clockwise from North, in degrees [0, 360))
+    from point 1 to point 2, flat-earth approximation.
+
+    Parameters
+    ---------
+    lat1, lon1 : coordinates of the starting point (decimal degrees)
+    lat2, lon2 : coordinates of the destination point (decimal degrees)
+
+    Returns
+    -------
+    Bearing in degrees, CW from North, in the range [0, 360).
+    """
+    R = 6371000.0
+    lat0_rad = np.deg2rad((lat1 + lat2) / 2)  # mean latitude for the correction
+
+    dx = np.deg2rad(lon2 - lon1) * R * np.cos(lat0_rad)  # East component
+    dy = np.deg2rad(lat2 - lat1) * R                      # North component
+
+    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) → CW from North
+    return float(bearing % 360)
 
 def find_points(
     floaters: np.ndarray,
@@ -335,44 +374,3 @@ def find_points_weighted(
             best_positions[m, 2] = np.dot(w, depth_acc)
 
     return best_positions
-
-
-def _residual_error(lats, lons, bearings_deg, lat_est, lon_est) -> float:
-    total = 0.0
-    n = 0
-    for i in range(len(lats)):
-        # Compute distance between i-th floater and estimated point
-        d = _flat_dist_m(lats[i], lons[i], lat_est, lon_est)
-
-        # Skip distances very close to zero
-        if d < 1e-6:
-            continue
-
-        az = _flat_azimuth(lats[i], lons[i], lat_est, lon_est)
-        delta_angle = np.deg2rad(az - bearings_deg[i])
-        total += np.sin(delta_angle) ** 2  # dimensionless, independent of d
-        n += 1
-    return total / n if n > 0 else np.inf
-
-def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Computes the geographic bearing (Clockwise from North, in degrees [0, 360))
-    from point 1 to point 2, flat-earth approximation.
-
-    Parameters
-    ---------
-    lat1, lon1 : coordinates of the starting point (decimal degrees)
-    lat2, lon2 : coordinates of the destination point (decimal degrees)
-
-    Returns
-    -------
-    Bearing in degrees, CW from North, in the range [0, 360).
-    """
-    R = 6371000.0
-    lat0_rad = np.deg2rad((lat1 + lat2) / 2)  # mean latitude for the correction
-
-    dx = np.deg2rad(lon2 - lon1) * R * np.cos(lat0_rad)  # East component
-    dy = np.deg2rad(lat2 - lat1) * R                      # North component
-
-    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) → CW from North
-    return float(bearing % 360)

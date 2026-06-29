@@ -1,33 +1,11 @@
 import os
-from dotenv import load_dotenv
 import numpy as np
 import math
 import scipy.io.wavfile as wav
-from utils_filters import *
 import numpy as np
-from utils_filters import *
 from utils import *
-from precompute_LUTs import *
+from LUTs_computation import *
 from bearing_calculation import *
-
-'''
-This method receives as input the initial and final coordinates of the transmitter (vessel)
-and an integer n_steps. It returns a list of coordinates equally spaced that connects 
-initial coordinates to final ones on a straight line.
-'''
-def compute_TX_trajectory(Lat_TX_init,Lon_TX_init,Lat_TX_end,Lon_TX_end,constant_depth,n_steps):
-    Lat_TXs = np.zeros(n_steps)
-    Lon_TXs = np.zeros(n_steps)
-    depths = np.ones(n_steps)*constant_depth
-    Lat_TXs[0] = Lat_TX_init
-    Lon_TXs[0] = Lon_TX_init
-
-    for i in range(1,n_steps):
-        Lat_TXs[i] = Lat_TX_init + i*(Lat_TX_end - Lat_TX_init) / (n_steps - 1)
-        Lon_TXs[i] = Lon_TX_init + i*(Lon_TX_end - Lon_TX_init) / (n_steps - 1)
-
-    # Returns the array of coordinates in form of [n_steps,2]
-    return np.asarray([Lat_TXs, Lon_TXs, depths]).T
 
 
 '''
@@ -108,7 +86,7 @@ def compute_bearing_angle_array_square(H_index):
     return estimated_bearing[:-1]
 
 def compute_bearing_angle_array_complete(H_index):
-    d = 0.4
+    d = 0.228 / math.sqrt(2)
     precompute_bearing_angles_complete(d)
 
     fs, sig1 = wav.read(f'Synth/F{H_index}_H1.wav')
@@ -168,78 +146,6 @@ def compute_bearing_angle_array_complete(H_index):
     return estimated_azimuth[:-1], estimated_elevation[:-1]
 
 
-def sposta(lat, lon, distanza, dir):
-    # Converti i gradi in radianti
-    angolo_rad = math.radians(dir)
-    
-    # Componenti Nord/Sud ed Est/Ovest usando seno e coseno
-    delta_lat = distanza * math.cos(angolo_rad) / 111320
-    delta_lon = distanza * math.sin(angolo_rad) / (111320 * math.cos(math.radians(lat)))
-    
-    new_lat = lat + delta_lat
-    new_lon = lon + delta_lon
-    
-    return new_lat, new_lon
-
-def random_points_within_distance(lat, lon, constant_depth, N, max_distance, seed=42):
-    """
-    Genera N punti casuali entro una distanza D da (lat, lon).
-
-    Args:
-        lat:  Latitudine del punto centrale (gradi)
-        lon:  Longitudine del punto centrale (gradi)
-        N:    Numero di punti da generare
-        max_distance:    Distanza massima in metri
-        seed: Seed per riproducibilità
-
-    Returns:
-        np.ndarray di shape (N, 2) con colonne [lat, lon]
-    """
-    rng = np.random.default_rng(seed)
-
-    # Converti D in gradi (approssimazione locale)
-    # 1 grado di latitudine ≈ 111_320 m ovunque
-    # 1 grado di longitudine ≈ 111_320 * cos(lat) m
-    lat_rad = np.radians(lat)
-    delta_lat_deg = max_distance / 111_320
-    delta_lon_deg = max_distance / (111_320 * np.cos(lat_rad))
-
-    # Campionamento uniforme in un disco tramite coordinate polari
-    # r = sqrt(u) garantisce densità uniforme nell'area
-    u = rng.uniform(0, 1, N)
-    theta = rng.uniform(0, 2 * np.pi, N)
-
-    r_lat = np.sqrt(u) * delta_lat_deg
-    r_lon = np.sqrt(u) * delta_lon_deg
-
-    lats = lat + r_lat * np.cos(theta)
-    lons = lon + r_lon * np.sin(theta)
-    depths = np.ones(len(lons)) * constant_depth
-
-    return np.column_stack((lats, lons, depths))
-
-
-def random_points_within_distance_recursive(lat, lon, constant_depth, N, max_distance, seed=42):
-    rng = np.random.default_rng(seed)
-
-    points = []
-    current_lat, current_lon = lat, lon
-
-    for _ in range(N):
-        lat_rad = np.radians(current_lat)
-        delta_lat_deg = max_distance / 111_320
-        delta_lon_deg = max_distance / (111_320 * np.cos(lat_rad))
-
-        u = rng.uniform(0, 1)
-        theta = rng.uniform(0, 2 * np.pi)
-
-        new_lat = current_lat + np.sqrt(u) * delta_lat_deg * np.cos(theta)
-        new_lon = current_lon + np.sqrt(u) * delta_lon_deg * np.sin(theta)
-
-        points.append((new_lat, new_lon, constant_depth))
-        current_lat, current_lon = new_lat, new_lon
-
-    return np.array(points)
 
 def clean_temporary_files(dir_path):
     if os.path.isdir(dir_path):
@@ -248,11 +154,3 @@ def clean_temporary_files(dir_path):
             if os.path.isfile(file_path):
                 os.remove(file_path)
         os.rmdir(dir_path)
-
-
-if __name__ == "__main__":
-    # Esempio di utilizzo
-
-    Lat_TX = 25.903322371762606
-    Lon_TX = 55.141862749665
-    print(sposta(Lat_TX, Lon_TX, 1000, 90))  # Sposta di 1000 metri verso est

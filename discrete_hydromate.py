@@ -1,9 +1,7 @@
-import io
 import os
 import shutil
 from dotenv import load_dotenv
 import numpy as np
-import scipy.io.wavfile as wav
 import matlab.engine
 from bellhop_to_wav import from_arr_to_wav
 

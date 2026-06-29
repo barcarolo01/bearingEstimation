@@ -1,8 +1,7 @@
 import numpy as np
 from gcc_phat import *
-from utils_filters import *
 import numpy as np
-from precompute_LUTs import *
+from LUTs_computation import *
         
 def compute_sample_delay_value(sig_A, sig_B, fs, campioni_finestra, d, c=1500, overlap=0.5, quality_threshold=0.1):
     step = int(campioni_finestra * (1 - overlap))
