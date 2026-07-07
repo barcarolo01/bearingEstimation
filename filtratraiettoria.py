@@ -1,21 +1,64 @@
 import numpy as np
-from scipy.ndimage import median_filter as nd_medfilt
+import pyproj
+from scipy.ndimage import median_filter
 
-def remove_outliers_median(coordinate, dimensione_finestra=11):
-    dati_puliti = np.zeros_like(coordinate)
+
+
+def remove_outliers_median(coordinate, WIN_LEN=7):
+    '''
+    Removes outliers by applying a median filtering of specified WIN_LEN to latitude,
+    longitude and depth (if available).
+    
+    Inputs:
+        coordinate: numpy array of size (N,2) or (N,3)
+        WIN_LEN: length of the median filter window
+    Output:
+        filtered_coordinates: numpy array of filited coordinates with shape of 'coordinate'
+    '''
+    filtered_coordinates = np.zeros_like(coordinate)
+    for i in range(coordinate.shape[1]):
+        filtered_coordinates[:, i] = median_filter(coordinate[:, i], size=WIN_LEN, mode='nearest')
+        
+    return filtered_coordinates
+
+def replace_outliers_mean(coordinate, WIN_LEN=7):
+    '''
+    Replaces outliers/points by substituting them with the mean of the M previous 
+    and M subsequent samples (excluding the central point itself).
+    
+    Inputs:
+        coordinate: numpy array of size (N,2) or (N,3)
+        WIN_LEN: length of the neighborhood window (must be an odd integer)
+    Output:
+        filtered_coordinates: numpy array of filtered coordinates with shape of 'coordinate'
+    '''
+    # M è il numero di campioni prima e dopo
+    M = WIN_LEN // 2
+    
+    # Creiamo un kernel per la convoluzione che esclude il centro.
+    # Es: se WIN_LEN=7, il kernel sarà [1, 1, 1, 0, 1, 1, 1] / 6
+    kernel = np.ones(WIN_LEN)
+    kernel[M] = 0
+    kernel = kernel / (WIN_LEN - 1)
+    
+    filtered_coordinates = np.zeros_like(coordinate)
     
     for i in range(coordinate.shape[1]):
-        # 'reflect' specchia i dati sul bordo, 'nearest' ripete l'ultimo valore.
-        # Entrambi evitano l'effetto distorsivo degli zeri alla fine della traiettoria.
-        dati_puliti[:, i] = nd_medfilt(coordinate[:, i], size=dimensione_finestra, mode='nearest')
+        # Utilizziamo 'same' per mantenere la stessa lunghezza e 'edge' (o 'nearest') 
+        # per gestire i bordi in modo coerente con la funzione originale
+        padded_col = np.pad(coordinate[:, i], M, mode='edge')
         
-    return dati_puliti
+        # La convoluzione 'valid' sul vettore con padding restituisce la stessa lunghezza di partenza
+        filtered_coordinates[:, i] = np.convolve(padded_col, kernel, mode='valid')
+        
+    return filtered_coordinates
 
 def group_close_points(dati, tolleranza_metri=2.0):
-    """
-    Raggruppa i punti consecutivi troppo vicini tra loro, 
-    sostituendoli con la media geometrica del gruppo.
-    """
+    '''
+    Groups consecutive points that are closer than 'tolerance_meter',
+    substituting them with their geometric mean.
+    '''
+
     if len(dati) == 0:
         return dati
         
@@ -46,42 +89,118 @@ def group_close_points(dati, tolleranza_metri=2.0):
     return np.array(punti_filtrati)
 
 
-def compute_geometric_rmse(ground_truth, stime):
-    """
-    Calcola l'errore RMS (in metri) tra Ground Truth equispaziata e punti stimati
-    trovando la minima distanza geometrica per ogni punto stimato.
-    
-    :param ground_truth: Array numpy (M, 2) [Lat, Lon] della traiettoria reale
-    :param stime: Array numpy (N, 2) [Lat, Lon] dei punti stimati (filtrati o grezzi)
-    :return: Valore float dell'RMSE espresso in metri
-    """
-    # Fattori di conversione locali in metri (assumendo ~20°N)
-    METRI_PER_GRADO_LAT = 111320.0
-    METRI_PER_GRADO_LON = 104600.0
-    
-    # 1. Convertiamo l'intera Ground Truth in coordinate metriche locali (es. relative al primo punto)
-    # Questo serve per calcolare le distanze euclidee reali in metri
-    gt_lat_m = ground_truth[:, 0] * METRI_PER_GRADO_LAT
-    gt_lon_m = ground_truth[:, 1] * METRI_PER_GRADO_LON
-    
-    stime_lat_m = stime[:, 0] * METRI_PER_GRADO_LAT
-    stime_lon_m = stime[:, 1] * METRI_PER_GRADO_LON
-    
-    min_distanze_metri = []
-    
-    # 2. Per ogni punto stimato, trova la minima distanza dal perimetro della GT
-    for i in range(len(stime)):
-        # Distanza tra il punto stimato i-esimo e TUTTI i punti della GT
-        diff_lat = gt_lat_m - stime_lat_m[i]
-        diff_lon = gt_lon_m - stime_lon_m[i]
-        distanze_all_gt = np.sqrt(diff_lat**2 + diff_lon**2)
-        
-        # Prendiamo solo la distanza dal punto della GT più vicino
-        min_distanze_metri.append(np.min(distanze_all_gt))
-        
-    min_distanze_metri = np.array(min_distanze_metri)
-    
-    # 3. Calcolo del Root Mean Square Error (RMSE)
-    rmse = np.sqrt(np.mean(min_distanze_metri**2))
-    
+def compute_RMSE_same_size(st, gt, lat_rad, lon_rad):
+    METRI_PER_GRADO_LAT = (
+        111132.92
+        - 559.82 * np.cos(2 * lat_rad)
+        + 1.175 * np.cos(4 * lat_rad)
+        - 0.0023 * np.cos(6 * lat_rad)
+    )
+    METRI_PER_GRADO_LON = (
+        111412.84 * np.cos(lat_rad)
+        - 93.5 * np.cos(3 * lat_rad)
+        + 0.118 * np.cos(5 * lat_rad)
+    )
+
+    # maschera comune sui NaN, per mantenere l'allineamento point-wise
+    mask = ~(np.isnan(gt).any(axis=1) | np.isnan(st).any(axis=1))
+    gt = gt[mask]
+    st = st[mask]
+
+    if gt.shape[0] == 0:
+        return np.nan  # nessun punto valido in comune
+
+    gt_m = gt * [METRI_PER_GRADO_LAT, METRI_PER_GRADO_LON]
+    st_m = st * [METRI_PER_GRADO_LAT, METRI_PER_GRADO_LON]
+
+    diff = gt_m - st_m
+    dist2 = np.sum(diff**2, axis=1)   # distanza euclidea al quadrato, per ogni punto
+
+    rmse = np.sqrt(np.mean(dist2))    # un solo numero, in metri
     return rmse
+
+def compute_depth_rmse(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+
+    mask = ~np.isnan(y_true) & ~np.isnan(y_pred)
+    if not np.any(mask):
+        return np.nan
+
+    diff = y_true[mask] - y_pred[mask]
+    return np.sqrt(np.mean(diff ** 2))
+
+
+
+
+
+
+
+
+
+
+
+
+
+def clean_trajectory_3d(
+    lat: np.ndarray,
+    lon: np.ndarray,
+    depth: np.ndarray,
+    window_size: int = 5,
+    threshold_xy_meters: float = 80.0,
+    threshold_z_meters: float = 5.0,
+):
+    """Filtra gli outlier da traiettorie 3D (Lat, Lon, Depth) usando una mediana mobile
+
+    e sostituendo i picchi anomali con il valore mediano locale.
+    """
+    # 1. CONVERSIONE IN METRI (WGS84 -> UTM)
+    # Identifichiamo la zona UTM ottimale partendo dal centro del dataset
+    mean_lat, mean_lon = np.nanmean(lat), np.nanmean(lon)
+    utm_zone = int((mean_lon + 180) / 6) + 1
+    hemisphere = "north" if mean_lat >= 0 else "south"
+
+    # Inizializziamo il transformer (reversibile)
+    proj_wgs84 = pyproj.CRS("EPSG:4326")
+    proj_utm = pyproj.CRS(
+        f"+proj=utm +zone={utm_zone} +{hemisphere} +datum=WGS84 +units=m +no_defs"
+    )
+    transformer_to_meters = pyproj.Transformer.from_crs(
+        proj_wgs84, proj_utm, always_xy=True
+    )
+    transformer_to_deg = pyproj.Transformer.from_crs(
+        proj_utm, proj_wgs84, always_xy=True
+    )
+
+    # Convertiamo Lat/Lon in X/Y metrici
+    x, y = transformer_to_meters.transform(lon, lat)
+    x = np.array(x)
+    y = np.array(y)
+    z = np.copy(depth)  # La profondità è già in metri
+
+    # 2. CALCOLO DELLA MEDIANA MOBILE (La nostra "combinazione dei vicini")
+    # Il median_filter di scipy mantiene la stessa lunghezza dell'array
+    x_med = median_filter(x, size=window_size, mode="nearest")
+    y_med = median_filter(y, size=window_size, mode="nearest")
+    z_med = median_filter(z, size=window_size, mode="nearest")
+
+    # 3. IDENTIFICAZIONE E SOSTITUZIONE OUTLIER
+    # Calcoliamo la distanza euclidea planare (2D) dalla mediana
+    distance_xy = np.sqrt((x - x_med) ** 2 + (y - y_med) ** 2)
+    outliers_xy = distance_xy > threshold_xy_meters
+
+    # Calcoliamo lo scostamento sulla profondità (1D)
+    distance_z = np.abs(z - z_med)
+    outliers_z = distance_z > threshold_z_meters
+
+    # Sostituiamo i valori anomali con il rispettivo valore mediano
+    x_cleaned = np.where(outliers_xy, x_med, x)
+    y_cleaned = np.where(outliers_xy, y_med, y)
+    z_cleaned = np.where(outliers_z, z_med, z)
+
+    # 4. RICONVERSIONE IN GRADI
+    lon_cleaned, lat_cleaned = transformer_to_deg.transform(
+        x_cleaned, y_cleaned
+    )
+
+    return np.array(lat_cleaned), np.array(lon_cleaned), np.array(z_cleaned)

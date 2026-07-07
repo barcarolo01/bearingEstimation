@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import math
+from scipy import stats
 import scipy.io.wavfile as wav
 import numpy as np
 from utils import *
@@ -22,16 +23,19 @@ def compute_bearing_angle_array(H_index):
     _, sig2 = wav.read(f'Synth/F{H_index}_H2.wav')
     _, sig3 = wav.read(f'Synth/F{H_index}_H3.wav')
 
+    
     # Parametri finestra
     durata_finestra = 0.05 # Secondi
+
     campioni_finestra = int(durata_finestra * fs)
     print(f"FREQUENZA DI CAMPIONAMENTO: {fs}")
     print(f"FINESTRA: {durata_finestra*1000} ms - {campioni_finestra} samples")
     
     quality_threshold = 0.0
-    sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_31, _ = compute_sample_delay_value(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    overlap = 0.0
+    sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    sample_delay_31, _ = compute_sample_delay_value(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
 
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -98,23 +102,22 @@ def compute_bearing_angle_array_complete(H_index):
     # Parametri finestra
     durata_finestra = 0.05  # Secondi
     campioni_finestra = int(durata_finestra * fs)
-
     quality_threshold = 0.0
-
+    
     # Ritardi tra H1–H4 (invariati)
-    sample_delay_21, times = compute_sample_delay_value(sig2, sig1, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_32, _     = compute_sample_delay_value(sig3, sig2, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_31, _     = compute_sample_delay_value(sig3, sig1, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_41, _     = compute_sample_delay_value(sig4, sig1, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_42, _     = compute_sample_delay_value(sig4, sig2, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_43, _     = compute_sample_delay_value(sig4, sig3, fs, campioni_finestra, d, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_21, times = compute_sample_delay_value(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_32, _     = compute_sample_delay_value(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_31, _     = compute_sample_delay_value(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_41, _     = compute_sample_delay_value(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_42, _     = compute_sample_delay_value(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_43, _     = compute_sample_delay_value(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
 
     # Ritardi con H5 → informazione sull'angolo verticale
-    sample_delay_51, _ = compute_sample_delay_value(sig5, sig1, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_52, _ = compute_sample_delay_value(sig5, sig2, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_53, _ = compute_sample_delay_value(sig5, sig3, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_54, _ = compute_sample_delay_value(sig5, sig4, fs, campioni_finestra, d*10, quality_threshold=quality_threshold, overlap=0)
-    
+    sample_delay_51, _ = compute_sample_delay_value(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_52, _ = compute_sample_delay_value(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_53, _ = compute_sample_delay_value(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    sample_delay_54, _ = compute_sample_delay_value(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
     # Conversione in secondi
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -131,19 +134,56 @@ def compute_bearing_angle_array_complete(H_index):
     estimated_azimuth   = np.zeros(len(times))
     estimated_elevation = np.zeros(len(times))
 
+    USE_FIXED_VERSION = True
     for i in range(len(times)):
-        az, el = find_bearing_complete(
-            time_delay_32[i], time_delay_21[i], time_delay_31[i],
-            time_delay_41[i], time_delay_42[i], time_delay_43[i],
-            time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
-        )
+        if USE_FIXED_VERSION:
+            az, el = find_bearing_complete_fixed(
+                time_delay_32[i], time_delay_21[i], time_delay_31[i],
+                time_delay_41[i], time_delay_42[i], time_delay_43[i],
+                time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
+            )
+        else:
+            az, el = find_bearing_complete(
+                time_delay_32[i], time_delay_21[i], time_delay_31[i],
+                time_delay_41[i], time_delay_42[i], time_delay_43[i],
+                time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
+            )
         estimated_azimuth[i]   = az
         estimated_elevation[i] = el
+        
 
-    np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
-    np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
+    '''
+    estimated_elevation = estimated_elevation[:-1]
+    estimated_azimuth = estimated_azimuth[:-1]
+    '''
 
-    return estimated_azimuth[:-1], estimated_elevation[:-1]
+    perc_to_tim_out = 0.25
+    N_finale = int(1/durata_finestra)
+    estimated_azimuth += 360
+    N_adjusted = (len(estimated_azimuth) // N_finale) * N_finale
+    dati_regolari = estimated_azimuth[:N_adjusted]
+    matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
+    azimuth_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
+    azimuth_tagliato -= 360
+
+    N_adjusted = (len(estimated_elevation) // N_finale) * N_finale
+    dati_regolari = estimated_elevation[:N_adjusted]
+    matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
+    elevation_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
+    #print("VALORI RESTITUITI:")
+    #print(azimuth_tagliato)
+    #print(elevation_tagliato)
+    
+
+    estimated_elevation = elevation_tagliato
+    estimated_azimuth = azimuth_tagliato
+    
+
+    
+
+    #np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
+    #np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
+    return estimated_azimuth, estimated_elevation
 
 
 

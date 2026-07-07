@@ -1,10 +1,8 @@
-import datetime as DT
 import folium
 import folium.plugins
 import numpy as np
 from folium import MacroElement
 from jinja2 import Template
-import csv
 
 class ScaleBar(MacroElement):
     """Barra di scala fissa che si aggiorna automaticamente con lo zoom."""

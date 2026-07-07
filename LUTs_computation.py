@@ -41,7 +41,7 @@ def precompute_bearing_angles_complete(d):
     H2 = np.array([d,   d,  0])
     H3 = np.array([d,   0,  0])
     H4 = np.array([0,   0,  0])
-    H5 = np.array([0, d/2, -0.236])
+    H5 = np.array([d/2, 0, -0.236])
 
     for az_idx in range(360):
         theta = az_idx * np.pi / 180          # azimuth  [0°, 359°]

@@ -21,7 +21,7 @@ sig2 = data[start*fs:end*fs, 1]
 
 FS = 96000
 campioni_finestra = int(0.05 * FS)
-d= 0.3
+d = 0.3
 quality_threshold = 0.0
 overlap = 0.5
 

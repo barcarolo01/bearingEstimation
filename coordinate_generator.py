@@ -41,7 +41,6 @@ def calculate_distance(point1: np.ndarray, point2: np.ndarray) -> float:
 
     return R * np.sqrt(x**2 + y**2)
 
-
 def generate_TX_trajectory(Lat_TX_init,Lon_TX_init,Lat_TX_end,Lon_TX_end,constant_depth,n_steps):
     '''
     This method receives as input the initial and final coordinates of the transmitter (vessel)
@@ -60,7 +59,6 @@ def generate_TX_trajectory(Lat_TX_init,Lon_TX_init,Lat_TX_end,Lon_TX_end,constan
 
     # Returns the array of coordinates in form of [n_steps,2]
     return np.asarray([Lat_TXs, Lon_TXs, depths]).T
-
 
 def generate_grid_of_samples(lat_orig, lon_orig, W, N):
     """
@@ -95,7 +93,6 @@ def generate_grid_of_samples(lat_orig, lon_orig, W, N):
     coordinate_coppie = np.column_stack((LAT.ravel(), LON.ravel()))
     
     return coordinate_coppie
-
 
 def compute_TX_circle_trajectory(
     Lat_center: float,
@@ -156,24 +153,3 @@ def compute_TX_circle_trajectory(
     depths = np.full(n_steps, constant_depth)
     
     return np.column_stack((lats, lons, depths))
-def random_points_within_distance_recursive(lat, lon, constant_depth, N, max_distance, seed=42):
-    rng = np.random.default_rng(seed)
-
-    points = []
-    current_lat, current_lon = lat, lon
-
-    for _ in range(N):
-        lat_rad = np.radians(current_lat)
-        delta_lat_deg = max_distance / 111_320
-        delta_lon_deg = max_distance / (111_320 * np.cos(lat_rad))
-
-        u = rng.uniform(0, 1)
-        theta = rng.uniform(0, 2 * np.pi)
-
-        new_lat = current_lat + np.sqrt(u) * delta_lat_deg * np.cos(theta)
-        new_lon = current_lon + np.sqrt(u) * delta_lon_deg * np.sin(theta)
-
-        points.append((new_lat, new_lon, constant_depth))
-        current_lat, current_lon = new_lat, new_lon
-
-    return np.array(points)
