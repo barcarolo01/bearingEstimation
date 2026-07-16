@@ -127,7 +127,7 @@ def build_local_cartesian_map_3d(
     
     
     
-    plt.savefig("aa.png",bbox_inches='tight',pad_inches=0.5, dpi=600)
+    plt.savefig("map_3D.png",bbox_inches='tight',pad_inches=0.5, dpi=600)
     plt.show()
 
     
@@ -135,7 +135,7 @@ def build_local_cartesian_map_3d(
     PIXEL_DA_TAGLIARE_SOPRA = 800
     PIXEL_DA_TAGLIARE_SOTTO = 500  # Sostituisci con il numero esatto di pixel da rimuovere
 
-    img = Image.open("aa.png")
+    img = Image.open("map_3D.png")
     larghezza, altezza = img.size
 
     # Definiamo la scatola di ritaglio (box): (sinistra, alto, destra, basso)
@@ -144,7 +144,7 @@ def build_local_cartesian_map_3d(
     img_ritagliata = img.crop(box_ritaglio)
 
     # 3. Salva il file finale definitivo
-    img_ritagliata.save("aa.png")
+    img_ritagliata.save("map_3D.png")
 
 
 if __name__ == "__main__":

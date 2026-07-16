@@ -89,7 +89,7 @@ def compute_bearing_angle_array_square(H_index):
 
     return estimated_bearing[:-1]
 
-def compute_bearing_angle_array_complete(H_index):
+def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     d = 0.228 / math.sqrt(2)
     precompute_bearing_angles_complete(d)
 
@@ -99,6 +99,15 @@ def compute_bearing_angle_array_complete(H_index):
     _, sig4 = wav.read(f'Synth/F{H_index}_H4.wav')
     _, sig5 = wav.read(f'Synth/F{H_index}_H5.wav')
 
+    
+    if DESIRED_SNR < 999:
+        sig1 = add_white_noise(sig1,snr_db=DESIRED_SNR,seed=1)
+        sig2 = add_white_noise(sig2,snr_db=DESIRED_SNR,seed=2)
+        sig3 = add_white_noise(sig3,snr_db=DESIRED_SNR,seed=3)
+        sig4 = add_white_noise(sig4,snr_db=DESIRED_SNR,seed=4)
+        sig5 = add_white_noise(sig5,snr_db=DESIRED_SNR,seed=5)
+        
+    
     # Parametri finestra
     durata_finestra = 0.05  # Secondi
     campioni_finestra = int(durata_finestra * fs)
@@ -157,12 +166,15 @@ def compute_bearing_angle_array_complete(H_index):
     estimated_azimuth = estimated_azimuth[:-1]
     '''
 
-    perc_to_tim_out = 0.25
+
+    perc_to_tim_out = 0.1
     N_finale = int(1/durata_finestra)
     estimated_azimuth += 360
     N_adjusted = (len(estimated_azimuth) // N_finale) * N_finale
     dati_regolari = estimated_azimuth[:N_adjusted]
     matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
+    #print("##########")
+    #print(matrice_spezzoni)
     azimuth_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
     azimuth_tagliato -= 360
 
@@ -177,9 +189,13 @@ def compute_bearing_angle_array_complete(H_index):
 
     estimated_elevation = elevation_tagliato
     estimated_azimuth = azimuth_tagliato
-    
-
-    
+    '''
+    print(estimated_elevation)
+    print(f"STDelevation: {np.std(estimated_elevation)}")
+    print()
+    print(estimated_azimuth)
+    print(f"STDazimuth: {np.std(estimated_azimuth)}")
+    '''
 
     #np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
     #np.save(f"Synth/F{H_index}_elevation", estimated_elevation)

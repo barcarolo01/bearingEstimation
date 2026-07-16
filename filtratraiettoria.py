@@ -24,34 +24,35 @@ def remove_outliers_median(coordinate, WIN_LEN=7):
 def replace_outliers_mean(coordinate, WIN_LEN=7):
     '''
     Replaces outliers/points by substituting them with the mean of the M previous 
-    and M subsequent samples (excluding the central point itself).
-    
-    Inputs:
-        coordinate: numpy array of size (N,2) or (N,3)
-        WIN_LEN: length of the neighborhood window (must be an odd integer)
-    Output:
-        filtered_coordinates: numpy array of filtered coordinates with shape of 'coordinate'
+    and M subsequent samples (excluding the central point itself), ignorando i NaN
+    presenti nella finestra invece di propagarli.
     '''
-    # M è il numero di campioni prima e dopo
     M = WIN_LEN // 2
     
-    # Creiamo un kernel per la convoluzione che esclude il centro.
-    # Es: se WIN_LEN=7, il kernel sarà [1, 1, 1, 0, 1, 1, 1] / 6
     kernel = np.ones(WIN_LEN)
-    kernel[M] = 0
-    kernel = kernel / (WIN_LEN - 1)
+    kernel[M] = 0  # esclude il campione centrale
     
-    filtered_coordinates = np.zeros_like(coordinate)
+    filtered_coordinates = np.full_like(coordinate, np.nan, dtype=float)
     
     for i in range(coordinate.shape[1]):
-        # Utilizziamo 'same' per mantenere la stessa lunghezza e 'edge' (o 'nearest') 
-        # per gestire i bordi in modo coerente con la funzione originale
-        padded_col = np.pad(coordinate[:, i], M, mode='edge')
+        col = coordinate[:, i].astype(float)
+        padded_col = np.pad(col, M, mode='edge')
         
-        # La convoluzione 'valid' sul vettore con padding restituisce la stessa lunghezza di partenza
-        filtered_coordinates[:, i] = np.convolve(padded_col, kernel, mode='valid')
+        valid_mask = ~np.isnan(padded_col)
+        padded_filled = np.where(valid_mask, padded_col, 0.0)
         
+        # somma pesata dei soli valori validi nella finestra
+        weighted_sum = np.convolve(padded_filled, kernel, mode='valid')
+        # numero di valori validi pesati nella finestra (denominatore "adattivo")
+        weighted_count = np.convolve(valid_mask.astype(float), kernel, mode='valid')
+        
+        with np.errstate(invalid='ignore', divide='ignore'):
+            filtered_coordinates[:, i] = weighted_sum / weighted_count
+    
     return filtered_coordinates
+
+
+
 
 def group_close_points(dati, tolleranza_metri=2.0):
     '''

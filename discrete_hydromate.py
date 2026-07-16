@@ -9,7 +9,7 @@ load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 HYDROMATE_PATH = os.getenv('HYDROMATE_PATH')
 
-def run_discrete_hydromate(Lat_TXs, Lon_TXs, depth_TXs, Lat_RX, Lon_RX, depth_RX, H_index):
+def run_discrete_hydromate(Lat_TXs, Lon_TXs, depth_TXs, Lat_RXs, Lon_RXs, depth_RXs, H_index):
     eng = matlab.engine.start_matlab()
     eng.cd(HYDROMATE_PATH, nargout=0)
 
@@ -17,7 +17,7 @@ def run_discrete_hydromate(Lat_TXs, Lon_TXs, depth_TXs, Lat_RX, Lon_RX, depth_RX
     if not os.path.isdir("TMP"):
         os.makedirs("TMP")
 
-    for i,(Lat_TX,Lon_TX,depth_TX) in enumerate(zip(Lat_TXs,Lon_TXs,depth_TXs)):
+    for i,(Lat_TX,Lon_TX,depth_TX,Lat_RX,Lon_RX,depth_RX) in enumerate(zip(Lat_TXs,Lon_TXs,depth_TXs,Lat_RXs, Lon_RXs, depth_RXs)):
         print(f" == TX step number {i+1} ==")
 
         if NUMBER_OF_HYDROPHONES == 3:

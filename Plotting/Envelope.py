@@ -14,7 +14,7 @@ from utils import *
 
 def compute_welch(envelope_dec,env_fs):
     nperseg = min(len(envelope_dec), int(env_fs / 0.1))
-    nperseg = max(nperseg, 1024)
+    nperseg = max(nperseg, 128)
     noverlap = nperseg // 2
     nfft = nperseg * 2
     freqs, psd = welch(envelope_dec, fs=env_fs, nperseg=nperseg,
@@ -34,8 +34,13 @@ def decimate_envelope(envelope, sr, target_sf=1000):
     return env_dec.astype(np.float32), new_fs
 
 if __name__ == "__main__":
-    fs, signal = wav.read('AudioFiles/0958_crop.wav')    
-    sig0 = signal[:,1]
+    #fs, signal = wav.read('AudioFiles/0958_crop.wav')    
+    #sig0 = signal[:,1]
+
+    fs, sig0 = wav.read('Synth/F1_H1.wav')    
+    #fs, sig0 = wav.read('AudioFiles/barca.wav')    
+
+    sig0 = sig0[:96000]
     f1 = 200
     f2 = 40000
 
@@ -83,6 +88,7 @@ if __name__ == "__main__":
     ax.set_title("FFT(envelope_dec)",size=10)
     
     ax = axes[2]
+    #psd[:10] = 0
     ax.plot(freqs[mask], psd[mask], color='green', linewidth=0.5)
     ax.grid(True, linestyle='--', alpha=0.5)
     ax.set_xlabel("Hz")

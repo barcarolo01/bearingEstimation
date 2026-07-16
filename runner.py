@@ -10,7 +10,7 @@ from build_local_map import build_local_cartesian_map
 from utils_runner import *
 
 SIMULATE = True
-ANALYZE_WAVS = False
+ANALYZE_WAVS = True
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
@@ -20,31 +20,37 @@ if not os.path.isdir("Synth"):
         os.makedirs("Synth")
 
 # ========== Coordinate generation ==========
-Lat_center, Lon_center = 20.832813, 88.698390
+#Lat_center, Lon_center = 20.832813, 88.698390
+Lat_center, Lon_center = 34.7328758990156,-42.736186368656746
 d_RX1 = 10
 d_RX2 = 10
 d_RX3 = 10
 d_TX = 50
 #TX_Coordinates = np.asarray([[Lat_center,Lon_center,d_TX]])
-TX_Coordinates = compute_TX_circle_trajectory(Lat_center, Lon_center,d_TX,0,350,4,200,clockwise=True)
+#TX_Coordinates = compute_TX_circle_trajectory(Lat_center, Lon_center,d_TX,0,350,10,200,clockwise=True)
 
-'''
-depths = np.zeros(TX_Coordinates.shape[0])
-depth_init = 90
-depth_end = 10
+#la1,lo1 = sposta(Lat_center,Lon_center,100,0)
 
-depths[0] = depth_init
-for i in range(1,depths.shape[0]):
-        depths[i] = depth_init - i*(np.abs(depth_end-depth_init)/(depths.shape[0]-1))
+TX_Coordinates = np.asarray([[Lat_center,Lon_center]])
+print(TX_Coordinates)
 
-TX_Coordinates[:,2] = depths
-'''
+SIMULATION_STEPS = TX_Coordinates.shape[0]
+print(f"SIMU {SIMULATION_STEPS}")
 
-lat1,lon1 = sposta(Lat_center,Lon_center,115,0)
-lat2,lon2 = sposta(Lat_center,Lon_center,115,120)
-lat3,lon3 = sposta(Lat_center,Lon_center,115,240)
-RX_Coordinates = np.asarray([[lat1,lon1,d_RX1],[lat2,lon2,d_RX2],[lat3,lon3,d_RX3]])
-NUMBER_OF_FLOATERS = RX_Coordinates.shape[0]
+lat1,lon1 = sposta(Lat_center,Lon_center,1000,270)
+lat2,lon2 = sposta(Lat_center,Lon_center,1000,180)
+
+STATIC_RX = np.asarray([[lat1,lon1,d_RX1],[lat2,lon2,d_RX2]])
+#STATIC_RX = np.asarray([[lat1,lon1,d_RX1],[lat2,lon2,d_RX2]])
+RX_Coordinates = np.zeros([SIMULATION_STEPS,STATIC_RX.shape[0],3])
+print(STATIC_RX.shape[0])
+
+for i in range (SIMULATION_STEPS): # i = timestamp
+        for j in range(STATIC_RX.shape[0]): # j = floater
+                RX_Coordinates[i,j,:] = STATIC_RX[j]
+
+print(RX_Coordinates)
+NUMBER_OF_FLOATERS = RX_Coordinates.shape[1]
 
 np.save("Synth/TX_Coordinates.npy",TX_Coordinates)
 np.save("Synth/Center_Coordinates.npy",[Lat_center,Lon_center])
@@ -55,11 +61,12 @@ if TX_Coordinates.shape[1] == 2:
     TX_Coordinates = np.hstack((TX_Coordinates, filler))
     print(f"Transmitter array do not have a depth value. Filled with default value of of 10 meters")
 
+'''
 if RX_Coordinates.shape[1] == 2:
     filler = np.ones(RX_Coordinates.shape[0]).reshape(-1, 1) * 10
     RX_Coordinates = np.hstack((RX_Coordinates, filler))
     print("Floaters array do not have a depth value. Filled with default value of 10 meters")
-
+'''
         
 # Hydromate is launched from python: this produces three tracks for each floater of "Synth" folder
 if SIMULATE:
@@ -68,9 +75,9 @@ if SIMULATE:
                 run_discrete_hydromate(TX_Coordinates[:,0],
                                         TX_Coordinates[:,1],
                                         TX_Coordinates[:,2],
-                                        np.float64(RX_Coordinates[i,0]),
-                                        np.float64(RX_Coordinates[i,1]),
-                                        np.float64(RX_Coordinates[i,2]),
+                                        RX_Coordinates[:,i,0],
+                                        RX_Coordinates[:,i,1],
+                                        RX_Coordinates[:,i,2],
                                         (i+1))
                 
                 # Write for each hydrophone the .wav track generated
@@ -131,9 +138,12 @@ else:
 
 
 
-estimated_points = find_points_fixed(RX_Coordinates,bearing_arrays,elevation_arrays)
+print(RX_Coordinates.shape)
+estimated_points = find_points(RX_Coordinates,bearing_arrays,elevation_arrays)
+
 
 #estimated_points = replace_outliers_mean(estimated_points,WIN_LEN=7)
+
 #estimated_points = group_close_points(estimated_points,tolleranza_metri=1)
 #estimated_points = remove_outliers_median(estimated_points,3)
 #estimated_points = np.asarray(clean_trajectory_3d(estimated_points[:,0],estimated_points[:,1],estimated_points[:,2])).T
@@ -144,7 +154,7 @@ np.save("Synth/Estimated_Coordinates",estimated_points)
 
 # Plotting points on the map
 build_map(
-        floaters_coordinates = RX_Coordinates,
+        floaters_coordinates = RX_Coordinates[0,:,:],
         TX_positions_coordinates = TX_Coordinates,
         estimated_vessel_coordinates = estimated_points,
         output_file="map_folium.html",
@@ -155,9 +165,8 @@ build_map(
 
 center = np.load("Synth/Center_Coordinates.npy")
 
-# Finestra di 1000 metri di larghezza e 800 metri di altezza
 build_local_cartesian_map(
-RX_Coordinates, 
+RX_Coordinates[0,:,:], 
 TX_Coordinates, 
 estimated_points, 
 center_coordinates=center,
@@ -169,9 +178,9 @@ track_estimated=True
 )
 
 
-if RX_Coordinates.shape[1] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
+if RX_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
         build_local_cartesian_map_3d(
-                RX_Coordinates, 
+                RX_Coordinates[0,:,:], 
                 TX_Coordinates, 
                 estimated_points, 
                 center, 
@@ -180,6 +189,8 @@ if RX_Coordinates.shape[1] == 3 and TX_Coordinates.shape[1] == 3 and estimated_p
                 max_depth_m=100.0, # Limite dell'asse Z per la visualizzazione
                 track_TX=True, 
                 track_estimated=True)
+        
 
-print(f"Average estimated TX depth: {np.average(estimated_points[:,2]):1f}")
-print(compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center))
+
+print(f"RMSE lat-lon: {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center)}")
+print(f"RMSE depth: {compute_depth_rmse(TX_Coordinates[:,2],estimated_points[:,2])}")
