@@ -1,5 +1,5 @@
 import numpy as np
-from LUTs_computation import *
+from floater_geometry import *
 
 def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
     """
@@ -25,59 +25,27 @@ def find_bearing_square(measured_tau32, measured_tau21, measured_tau31,measured_
     return estimated_angle
 
 
+
 def find_bearing_complete(measured_tau32, measured_tau21, measured_tau31,
                           measured_tau41, measured_tau42, measured_tau43,
                           measured_tau51, measured_tau52, measured_tau53, measured_tau54):
-    """
-    Restituisce (azimuth_deg, elevation_deg).
-    - azimuth   in [0°, 359°]  → stimato da find_bearing_square
-    - elevation in [-90°, +90°] → ricerca 1D lungo la colonna dell'azimuth stimato
-    """
-    # Azimuth is computed using only the information of the planar hydrophones
-    az_idx = find_bearing_square(measured_tau32, measured_tau21, measured_tau31,
-                                 measured_tau41, measured_tau42, measured_tau43)
-    # Estimates the depth starting from the aximuth computed before
-    E_el  = (measured_tau51 - lut_tau51[az_idx, :]) ** 2
-    E_el += (measured_tau52 - lut_tau52[az_idx, :]) ** 2
-    E_el += (measured_tau53 - lut_tau53[az_idx, :]) ** 2
-    E_el += (measured_tau54 - lut_tau54[az_idx, :]) ** 2
 
-    el_idx = np.argmin(E_el)
-
-    # Converting [0 : 180] to [-90 : +90]
-    elevation_deg = el_idx - 90  
-    return az_idx, elevation_deg
-
-
-def find_bearing_complete_fixed(measured_tau32, measured_tau21, measured_tau31,
-                          measured_tau41, measured_tau42, measured_tau43,
-                          measured_tau51, measured_tau52, measured_tau53, measured_tau54):
-    """
-    Risolve simultaneamente Azimuth ed Elevazione calcolando l'errore quadratico
-    su tutta la matrice 2D della LUT (360x181).
-    """
-    
-    # Inizializziamo la matrice dell'errore (360 righe x 181 colonne)
-    # Usiamo tutte e 10 le coppie contemporaneamente per rompere l'ambiguità sopra/sotto
     E =  (measured_tau21 - lut_tau21) ** 2
     E += (measured_tau32 - lut_tau32) ** 2
     E += (measured_tau31 - lut_tau31) ** 2
     E += (measured_tau41 - lut_tau41) ** 2
     E += (measured_tau42 - lut_tau42) ** 2
     E += (measured_tau43 - lut_tau43) ** 2
-    
-    # Le coppie con H5 sono FONDAMENTALI qui dentro per decidere l'elevazione corretta
     E += (measured_tau51 - lut_tau51) ** 2
     E += (measured_tau52 - lut_tau52) ** 2
     E += (measured_tau53 - lut_tau53) ** 2
     E += (measured_tau54 - lut_tau54) ** 2
 
-    # Troviamo l'indice del minimo assoluto nella matrice 2D
-    # np.argmin su matrice flat restituisce un indice singolo, lo convertiamo in coordinate (row, col)
+    # Find the index of the absolute minimum of the 2D matrix
     flat_min_idx = np.argmin(E)
     az_idx, el_idx = np.unravel_index(flat_min_idx, E.shape)
 
-    # Convertiamo l'indice di elevazione [0 : 180] in gradi [-90 : +90]
+    # Elevation convertion: from [0 : 180] to [-90 : +90]
     elevation_deg = el_idx - 90  
 
     return az_idx, elevation_deg

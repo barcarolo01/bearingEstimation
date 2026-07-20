@@ -128,7 +128,7 @@ sensor2_x, sensor2_y = B/2, 0
 ax.scatter(sensor1_x, sensor1_y, color='red', marker='s', s=150, edgecolor='black', zorder=5)
 ax.scatter(sensor2_x, sensor2_y, color='red', marker='s', s=150, edgecolor='black', zorder=5)
 
-ax.set_xlabel('East-West [meters]')
+ax.set_xlabel('West-East [meters]')
 ax.set_ylabel('North distance [meters]')
 
 plt.tight_layout()

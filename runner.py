@@ -3,14 +3,15 @@ from dotenv import load_dotenv
 from build_local_3D import build_local_cartesian_map_3d
 from coordinate_generator import compute_TX_circle_trajectory, sposta
 from discrete_hydromate import run_discrete_hydromate
-from filtratraiettoria import *
+from filter_trajectory import *
 from findpoint import *
 from build_folium_map import build_map
 from build_local_map import build_local_cartesian_map
+from floater_mobility import computer_RX_mobility
 from utils_runner import *
 
-SIMULATE = True
-ANALYZE_WAVS = True
+SIMULATE = False
+ANALYZE_WAVS = False
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
@@ -20,38 +21,41 @@ if not os.path.isdir("Synth"):
         os.makedirs("Synth")
 
 # ========== Coordinate generation ==========
-#Lat_center, Lon_center = 20.832813, 88.698390
-Lat_center, Lon_center = 34.7328758990156,-42.736186368656746
+Lat_center, Lon_center = 20.832813, 88.698390
+
 d_RX1 = 10
 d_RX2 = 10
-d_RX3 = 10
 d_TX = 50
-#TX_Coordinates = np.asarray([[Lat_center,Lon_center,d_TX]])
-#TX_Coordinates = compute_TX_circle_trajectory(Lat_center, Lon_center,d_TX,0,350,10,200,clockwise=True)
 
-#la1,lo1 = sposta(Lat_center,Lon_center,100,0)
-
-TX_Coordinates = np.asarray([[Lat_center,Lon_center]])
-print(TX_Coordinates)
-
+TX_Coordinates = compute_TX_circle_trajectory(Lat_center, Lon_center, d_TX ,
+                                              start_deg=0,end_deg=350,n_steps=35,
+                                              radius_m=200,clockwise=True)
 SIMULATION_STEPS = TX_Coordinates.shape[0]
-print(f"SIMU {SIMULATION_STEPS}")
 
-lat1,lon1 = sposta(Lat_center,Lon_center,1000,270)
-lat2,lon2 = sposta(Lat_center,Lon_center,1000,180)
 
-STATIC_RX = np.asarray([[lat1,lon1,d_RX1],[lat2,lon2,d_RX2]])
-#STATIC_RX = np.asarray([[lat1,lon1,d_RX1],[lat2,lon2,d_RX2]])
-RX_Coordinates = np.zeros([SIMULATION_STEPS,STATIC_RX.shape[0],3])
-print(STATIC_RX.shape[0])
+lat1,lon1 = sposta(Lat_center,Lon_center,100,270)
+lat2,lon2 = sposta(Lat_center,Lon_center,100,90)
 
-for i in range (SIMULATION_STEPS): # i = timestamp
-        for j in range(STATIC_RX.shape[0]): # j = floater
-                RX_Coordinates[i,j,:] = STATIC_RX[j]
+# Compute coordinates of 1st receiver with constant initial velocity component
+v_x_init = 2
+v_y_init = 2
+RX_Coordinates = np.zeros([SIMULATION_STEPS,2,3])
+RX_Coordinates [:,0,:] = computer_RX_mobility(Lat_init=lat1,Lon_init=lon1,constant_depth=d_RX1,
+                                              N_STEPS=SIMULATION_STEPS,
+                                              v_x_init=v_x_init, v_y_init=v_y_init,
+                                              sigma_x=0.2,sigma_y=0.3,rho=0.8)
 
-print(RX_Coordinates)
+# Compute coordinates of 2nd receiver with random initial velocity component
+v_x_init = 0
+v_y_init = -5
+RX_Coordinates [:,1,:] = computer_RX_mobility(Lat_init=lat2,Lon_init=lon2,constant_depth=d_RX2,
+                                              N_STEPS=SIMULATION_STEPS,
+                                              v_x_init=v_x_init, v_y_init=v_y_init,
+                                              sigma_x=0.2,sigma_y=0.3,rho=0.8)
+
+
+
 NUMBER_OF_FLOATERS = RX_Coordinates.shape[1]
-
 np.save("Synth/TX_Coordinates.npy",TX_Coordinates)
 np.save("Synth/Center_Coordinates.npy",[Lat_center,Lon_center])
 np.save("Synth/RX_Coordinates.npy",RX_Coordinates)
@@ -97,7 +101,6 @@ if SIMULATE or ANALYZE_WAVS:
                 elevation_arrays = np.zeros((NUMBER_OF_FLOATERS,len(first_bearing)))   
         else:
                 first_bearing,first_elevation = compute_bearing_angle_array_complete(1)
-                np.save(f"Synth/F1_elevation.npy",first_elevation)
 
         # Creating bearing and elevation arrays on the base of the number of event previously fetched
         N_events = len(first_bearing)
@@ -106,7 +109,6 @@ if SIMULATE or ANALYZE_WAVS:
         bearing_arrays[0,:] = first_bearing
         np.save(f"Synth/F1_azimuth.npy",first_bearing)
         
- 
         if NUMBER_OF_HYDROPHONES == 5:
                 elevation_arrays[0,:] = first_elevation
 
@@ -122,7 +124,7 @@ if SIMULATE or ANALYZE_WAVS:
                 np.save(f"Synth/F{i+1}_elevation.npy",elevation_arrays[i,:])
                 
         # Deleting the temporary files and folder
-        clean_temporary_files('TMP')
+        clean_temporary_files()
 
 else:
         fist_azimuth = np.load(f"Synth/F1_azimuth.npy")
@@ -137,24 +139,14 @@ else:
                         elevation_arrays[i,:] = np.load(f"Synth/F{i+1}_elevation.npy")
 
 
-
-print(RX_Coordinates.shape)
 estimated_points = find_points(RX_Coordinates,bearing_arrays,elevation_arrays)
-
-
 #estimated_points = replace_outliers_mean(estimated_points,WIN_LEN=7)
-
-#estimated_points = group_close_points(estimated_points,tolleranza_metri=1)
-#estimated_points = remove_outliers_median(estimated_points,3)
-#estimated_points = np.asarray(clean_trajectory_3d(estimated_points[:,0],estimated_points[:,1],estimated_points[:,2])).T
-
 
 np.save("Synth/Estimated_Coordinates",estimated_points)
 
-
 # Plotting points on the map
 build_map(
-        floaters_coordinates = RX_Coordinates[0,:,:],
+        floaters_coordinates = RX_Coordinates,
         TX_positions_coordinates = TX_Coordinates,
         estimated_vessel_coordinates = estimated_points,
         output_file="map_folium.html",
@@ -163,34 +155,30 @@ build_map(
     )
 
 
-center = np.load("Synth/Center_Coordinates.npy")
-
 build_local_cartesian_map(
-RX_Coordinates[0,:,:], 
-TX_Coordinates, 
-estimated_points, 
-center_coordinates=center,
-window_width_m=600, 
-window_height_m=600,
-output_file="map_local.png",
-track_TX=True,
-track_estimated=True
-)
-
+        RX_Coordinates, 
+        TX_Coordinates, 
+        estimated_points, 
+        center_coordinates=[Lat_center,Lon_center],
+        window_width_m=600, 
+        window_height_m=600,
+        output_file="map_local.png",
+        track_TX=True,
+        track_estimated=True
+        )
 
 if RX_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
         build_local_cartesian_map_3d(
-                RX_Coordinates[0,:,:], 
+                RX_Coordinates, 
                 TX_Coordinates, 
                 estimated_points, 
-                center, 
+                [Lat_center,Lon_center], 
                 500, 
                 500, 
                 max_depth_m=100.0, # Limite dell'asse Z per la visualizzazione
                 track_TX=True, 
                 track_estimated=True)
         
-
 
 print(f"RMSE lat-lon: {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center)}")
 print(f"RMSE depth: {compute_depth_rmse(TX_Coordinates[:,2],estimated_points[:,2])}")

@@ -1,0 +1,12 @@
+folium==0.20.0
+Jinja2==3.1.6
+matlab==0.1
+matplotlib
+numpy
+pandas
+Pillow
+pyproj
+python-dotenv
+scipy
+soundfile
+xarray

@@ -1,30 +1,13 @@
 import numpy as np
 from gcc_phat import *
-import numpy as np
-from LUTs_computation import *
-
-import numpy as np
 
 def check_snr(sig, noisy_sig):
     """
-    Calcola l'SNR effettivo tra segnale originale e segnale rumoroso.
-
-    Parametri
-    ----------
-    sig : np.ndarray
-        Segnale originale (pulito).
-    noisy_sig : np.ndarray
-        Segnale con rumore aggiunto.
-
-    Ritorna
-    -------
-    float
-        SNR misurato in dB.
+    Check the SNR between the original singal 'sig' and a noisy version of it 'noisy_sig'
     """
     sig_float = sig.astype(np.float64)
     noisy_float = noisy_sig.astype(np.float64)
 
-    # Il rumore è la differenza tra segnale rumoroso e originale
     noise = noisy_float - sig_float
 
     sig_power = np.mean(sig_float ** 2)
@@ -37,41 +20,18 @@ def check_snr(sig, noisy_sig):
     return snr_db
 
 def add_white_noise(sig, snr_db, seed=None):
-    """
-    Aggiunge rumore bianco gaussiano a un segnale per ottenere un SNR desiderato.
-
-    Parametri
-    ----------
-    sig : np.ndarray
-        Segnale audio in ingresso (mono o multicanale).
-    snr_db : float
-        SNR desiderato in dB.
-    seed : int, opzionale
-        Seed per il generatore casuale (per riproducibilità).
-
-    Ritorna
-    -------
-    np.ndarray
-        Segnale con rumore aggiunto, stesso dtype dell'originale.
-    """
     rng = np.random.default_rng(seed)
 
-    # Lavora in float per evitare overflow/clipping durante i calcoli
     sig_float = sig.astype(np.float64)
-
-    # Potenza del segnale
     sig_power = np.mean(sig_float ** 2)
-
-    # Potenza del rumore necessaria per ottenere l'SNR desiderato
     snr_linear = 10 ** (snr_db / 10)
     noise_power = sig_power / snr_linear
 
-    # Genera rumore bianco gaussiano con la potenza calcolata
+
     noise = rng.normal(0, np.sqrt(noise_power), size=sig_float.shape)
 
     noisy_sig = sig_float + noise
 
-    # Se il segnale originale era intero (es. int16), riporta al range e dtype originali
     if np.issubdtype(sig.dtype, np.integer):
         info = np.iinfo(sig.dtype)
         noisy_sig = np.clip(noisy_sig, info.min, info.max)

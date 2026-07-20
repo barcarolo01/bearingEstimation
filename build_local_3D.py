@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 # Definizione di una costante FONTSIZE di fallback (visto che era presente nel tuo codice)
 FONTSIZE = 18
 
+
 def _is_valid(*values):
     """Restituisce True solo se nessuno dei valori è NaN o None."""
     return all(v is not None and not np.isnan(float(v)) for v in values)
@@ -19,11 +20,22 @@ def build_local_cartesian_map_3d(
     window_height_m, 
     max_depth_m=100.0, # Limite dell'asse Z per la visualizzazione
     track_TX=False, 
-    track_estimated=False
+    track_estimated=False,
+    track_floaters=True,
 ):
     """
     Genera una visualizzazione 3D interattiva cartesiana locale in metri.
     Mantiene gli stessi colori e la logica di proiezione della mappa 2D.
+
+    Parametri
+    ---------
+    floaters_coordinates : array-like di forma (N, M, 3) o (N, M, 2), oppure None
+        N = numero di posizioni temporali, M = numero di floater.
+        Se fornito un array (M, 3) o (M, 2), viene trattato come singolo istante (N=1).
+    TX_positions_coordinates : array-like di forma (K, 2/3), oppure None
+    estimated_vessel_coordinates : array-like di forma (K, 2/3), oppure None
+    track_floaters : bool, opzionale (default=True)
+        Se True, mostra la traiettoria tratteggiata di ciascun floater.
     """
     
     # Raggio della Terra in metri
@@ -32,29 +44,46 @@ def build_local_cartesian_map_3d(
     lon_ref = np.radians(center_coordinates[1])
 
     def _geo_to_local(arr):
-        """Converte coordinate [Lat, Lon, (Depth)] in [X, Y, Z] in metri rispetto al centro."""
+        """
+        Converte coordinate [Lat, Lon, (Depth)] in [X, Y, Z] in metri rispetto al centro.
+        Supporta array di forma arbitraria (..., 2) o (..., 3): l'ultima dimensione
+        deve contenere [lat, lon, (depth)], tutte le dimensioni precedenti vengono preservate.
+        """
+        if arr is None:
+            return np.empty((0, 3))
+
         arr = np.asarray(arr, dtype=float)
         if arr.size == 0:
-            return np.empty((0, 3 if arr.shape[1] >= 3 else 2))
-        
-        lats = np.radians(arr[:, 0])
-        lons = np.radians(arr[:, 1])
-        
+            return np.empty((0,) + arr.shape[1:-1] + (3,))
+
+        orig_shape = arr.shape
+        flat = arr.reshape(-1, orig_shape[-1])
+
+        lats = np.radians(flat[:, 0])
+        lons = np.radians(flat[:, 1])
+
         # Proiezione locale (Equirettangolare)
         x = R * (lons - lon_ref) * np.cos(lat_ref)
         y = R * (lats - lat_ref)
-        
-        if arr.shape[1] >= 3:
-            depths = arr[:, 2]
+
+        if orig_shape[-1] >= 3:
+            depths = flat[:, 2]
             # Sostituisce il valore di fallback -999 con NaN
             depths = np.where(depths == -999, np.nan, depths)
-            return np.column_stack((x, y, depths))
-        
-        # Se la profondità non è presente nell'input, assumiamo sia 0 (superficie)
-        return np.column_stack((x, y, np.zeros_like(x)))
+            out = np.column_stack((x, y, depths))
+        else:
+            # Se la profondità non è presente nell'input, assumiamo sia 0 (superficie)
+            out = np.column_stack((x, y, np.zeros_like(x)))
+
+        return out.reshape(orig_shape[:-1] + (3,))
+
+    # --- Normalizzazione floaters a forma (N, M, 3) ---
+    xyz_fl = _geo_to_local(floaters_coordinates)
+    if xyz_fl.size > 0 and xyz_fl.ndim == 2:
+        # Input (M, C) -> singolo istante temporale, aggiunge asse N=1
+        xyz_fl = xyz_fl[np.newaxis, :, :]
 
     # Conversione in coordinate locali (metri)
-    xyz_fl = _geo_to_local(floaters_coordinates)
     xyz_tx = _geo_to_local(TX_positions_coordinates)
     xyz_est = _geo_to_local(estimated_vessel_coordinates)
 
@@ -70,33 +99,73 @@ def build_local_cartesian_map_3d(
     ax.set_facecolor('#ffffff')
 
     # --- Traiettoria TX (Gialla) ---
-    if track_TX and len(tx_valid) > 1:
+    if TX_positions_coordinates is not None and track_TX and len(tx_valid) > 1:
         # Invertiamo Z (-pt[2]) per fare in modo che la profondità vada verso il basso nel plot grafico
         ax.plot(tx_valid[:, 0], tx_valid[:, 1], -tx_valid[:, 2], color="#FFD700", linewidth=3, alpha=0.7, zorder=1)
 
     # --- Punti TX / Ground Truth (Gialli) ---
-    if len(tx_valid) > 0:
+    if TX_positions_coordinates is not None and len(tx_valid) > 0:
         ax.scatter(tx_valid[:, 0], tx_valid[:, 1], -tx_valid[:, 2], 
                    color="#FFD700", s=60, edgecolors='black', depthshade=False, zorder=3, label='Ground truth')
 
     # --- Traiettoria Stimata (Verde) ---
-    if track_estimated and len(est_valid) > 1:
+    if estimated_vessel_coordinates is not None and track_estimated and len(est_valid) > 1:
         ax.plot(est_valid[:, 0], est_valid[:, 1], -est_valid[:, 2], 
                 color="#00CC66", linewidth=3, linestyle='--', alpha=0.7, zorder=2)
 
     # --- Punti Stimati (Verdi) ---
-    if len(est_valid) > 0:
+    if estimated_vessel_coordinates is not None and len(est_valid) > 0:
         ax.scatter(est_valid[:, 0], est_valid[:, 1], -est_valid[:, 2], 
                    color="#00CC66", s=50, edgecolors='black', depthshade=False, zorder=4, label='Estimated positions')
 
-    # --- Floaters (Rossi) ---
-    # Usiamo scatter3D disegnando dei quadrati (marker='s') rossi come nel rettangolo 2D
-    ax.scatter(xyz_fl[:, 0], xyz_fl[:, 1], -xyz_fl[:, 2], 
-               color='#FF0000', marker='s', s=80, edgecolors='black', depthshade=False, zorder=5, label='Floaters')
-    
-    # Aggiungiamo le etichette di testo "F1, F2..." accanto ai quadratini rossi
-    for i, pt in enumerate(xyz_fl):
-        ax.text(pt[0] + 8, pt[1] + 8, -pt[2] - 8, f"F{i+1}", color='black', weight='bold', fontsize=8, zorder=1000)
+    # --- Floaters: traiettoria tratteggiata per ciascun floater + etichetta sulla prima posizione ---
+    if floaters_coordinates is not None and xyz_fl.size > 0:
+        n_positions, n_floaters = xyz_fl.shape[0], xyz_fl.shape[1]
+
+        # Fake plot per la legenda ordinata (un'unica voce "Floaters")
+        ax.scatter([], [], [], color='#FF0000', marker='o', s=50, edgecolors='black', depthshade=False, label='Floaters')
+
+        for mi in range(n_floaters):
+            floater_traj = xyz_fl[:, mi, :]  # (N, 3)
+            valid_mask = [_is_valid(pt[0], pt[1], pt[2]) for pt in floater_traj]
+            valid_traj = floater_traj[valid_mask]
+
+            if len(valid_traj) == 0:
+                continue
+
+            # --- Traiettoria tratteggiata (posizioni consecutive) ---
+            if track_floaters and len(valid_traj) > 1:
+                ax.plot(
+                    valid_traj[:, 0], valid_traj[:, 1], -valid_traj[:, 2],
+                    color='#FF0000', linewidth=1.5, linestyle='--', alpha=0.6, zorder=4
+                )
+
+            # --- Marker circolari su tutte le posizioni tranne la prima (che ha già l'etichetta) ---
+            if len(valid_traj) > 1:
+                ax.scatter(
+                    valid_traj[1:, 0], valid_traj[1:, 1], -valid_traj[1:, 2],
+                    color='#FF0000', marker='o', s=50, edgecolors='black', depthshade=False, zorder=5
+                )
+
+            # --- Etichetta circolare sulla prima posizione nota ---
+            first_pt = valid_traj[0]
+            label = f"F{mi+1}"
+            ax.text(
+                first_pt[0], first_pt[1], -first_pt[2], label,
+                color='white',
+                weight='bold',
+                fontsize=8,
+                fontfamily='monospace',
+                ha='center',
+                va='center',
+                zorder=1000,
+                bbox=dict(
+                    facecolor='#FF0000',
+                    edgecolor='black',
+                    boxstyle='circle,pad=0.2',
+                    linewidth=1.5,
+                )
+            )
 
     # --- Configurazione Limiti Assi Finestra ---
     half_w = window_width_m / 2.0
@@ -108,8 +177,8 @@ def build_local_cartesian_map_3d(
     ax.set_zlim(-max_depth_m, 5)
 
     # Etichette assi
-    ax.set_xlabel("East-West [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
-    ax.set_ylabel("North-South [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
+    ax.set_xlabel("West-East [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
+    ax.set_ylabel("South-North [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
     ax.set_zlabel("Depth [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
     
     # Origin marker (Centro mappa)
@@ -145,7 +214,6 @@ def build_local_cartesian_map_3d(
 
     # 3. Salva il file finale definitivo
     img_ritagliata.save("map_3D.png")
-
 
 if __name__ == "__main__":
     RX_Coordinates = np.load("Synth/RX_Coordinates.npy")

@@ -3,11 +3,9 @@ import numpy as np
 import math
 from scipy import stats
 import scipy.io.wavfile as wav
-import numpy as np
 from utils import *
-from LUTs_computation import *
+from floater_geometry import *
 from bearing_calculation import *
-
 
 '''
 This method receives as input the index of a floater.
@@ -143,20 +141,13 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     estimated_azimuth   = np.zeros(len(times))
     estimated_elevation = np.zeros(len(times))
 
-    USE_FIXED_VERSION = True
+
     for i in range(len(times)):
-        if USE_FIXED_VERSION:
-            az, el = find_bearing_complete_fixed(
-                time_delay_32[i], time_delay_21[i], time_delay_31[i],
-                time_delay_41[i], time_delay_42[i], time_delay_43[i],
-                time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
-            )
-        else:
-            az, el = find_bearing_complete(
-                time_delay_32[i], time_delay_21[i], time_delay_31[i],
-                time_delay_41[i], time_delay_42[i], time_delay_43[i],
-                time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
-            )
+        az, el = find_bearing_complete(
+            time_delay_32[i], time_delay_21[i], time_delay_31[i],
+            time_delay_41[i], time_delay_42[i], time_delay_43[i],
+            time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
+        )
         estimated_azimuth[i]   = az
         estimated_elevation[i] = el
         
@@ -173,8 +164,6 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     N_adjusted = (len(estimated_azimuth) // N_finale) * N_finale
     dati_regolari = estimated_azimuth[:N_adjusted]
     matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
-    #print("##########")
-    #print(matrice_spezzoni)
     azimuth_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
     azimuth_tagliato -= 360
 
@@ -182,31 +171,30 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     dati_regolari = estimated_elevation[:N_adjusted]
     matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
     elevation_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
-    #print("VALORI RESTITUITI:")
-    #print(azimuth_tagliato)
-    #print(elevation_tagliato)
-    
-
     estimated_elevation = elevation_tagliato
     estimated_azimuth = azimuth_tagliato
-    '''
-    print(estimated_elevation)
-    print(f"STDelevation: {np.std(estimated_elevation)}")
-    print()
-    print(estimated_azimuth)
-    print(f"STDazimuth: {np.std(estimated_azimuth)}")
-    '''
 
-    #np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
-    #np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
+    np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
+    np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
     return estimated_azimuth, estimated_elevation
 
 
 
-def clean_temporary_files(dir_path):
+def clean_temporary_files():
+    dir_path = "TMP"
     if os.path.isdir(dir_path):
         for filename in os.listdir(dir_path):
             file_path = os.path.join(dir_path, filename)
             if os.path.isfile(file_path):
                 os.remove(file_path)
         os.rmdir(dir_path)
+
+    dir_path_base = "HM_out_"
+    for i in range(5):
+        dir_path = dir_path_base + str(i+1)
+        if os.path.isdir(dir_path):
+            for filename in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(dir_path)

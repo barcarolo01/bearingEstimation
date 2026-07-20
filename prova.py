@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from build_local_3D import build_local_cartesian_map_3d
 from coordinate_generator import compute_TX_circle_trajectory, sposta
 from discrete_hydromate import run_discrete_hydromate
-from filtratraiettoria import *
+from filter_trajectory import *
 from findpoint import *
 from build_folium_map import build_map
 from build_local_map import build_local_cartesian_map

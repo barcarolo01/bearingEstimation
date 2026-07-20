@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import scipy.io.wavfile as wav
 import numpy as np
 from utils import *
-from LUTs_computation import *
+from floater_geometry import *
 from bearing_calculation import *
 
 MAX_SAMPLE_DELAY = 25
