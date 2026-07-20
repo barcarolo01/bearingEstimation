@@ -10,8 +10,8 @@ from build_local_map import build_local_cartesian_map
 from floater_mobility import computer_RX_mobility
 from utils_runner import *
 
-SIMULATE = False
-ANALYZE_WAVS = False
+SIMULATE = True
+ANALYZE_WAVS = True
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
@@ -37,8 +37,8 @@ lat1,lon1 = sposta(Lat_center,Lon_center,100,270)
 lat2,lon2 = sposta(Lat_center,Lon_center,100,90)
 
 # Compute coordinates of 1st receiver with constant initial velocity component
-v_x_init = 2
-v_y_init = 2
+v_x_init = 10
+v_y_init = -10
 RX_Coordinates = np.zeros([SIMULATION_STEPS,2,3])
 RX_Coordinates [:,0,:] = computer_RX_mobility(Lat_init=lat1,Lon_init=lon1,constant_depth=d_RX1,
                                               N_STEPS=SIMULATION_STEPS,
@@ -46,8 +46,8 @@ RX_Coordinates [:,0,:] = computer_RX_mobility(Lat_init=lat1,Lon_init=lon1,consta
                                               sigma_x=0.2,sigma_y=0.3,rho=0.8)
 
 # Compute coordinates of 2nd receiver with random initial velocity component
-v_x_init = 0
-v_y_init = -5
+v_x_init = -10
+v_y_init = 10
 RX_Coordinates [:,1,:] = computer_RX_mobility(Lat_init=lat2,Lon_init=lon2,constant_depth=d_RX2,
                                               N_STEPS=SIMULATION_STEPS,
                                               v_x_init=v_x_init, v_y_init=v_y_init,
