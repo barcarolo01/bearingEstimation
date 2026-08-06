@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 import math
 from scipy import stats
@@ -40,13 +41,14 @@ def compute_bearing_angle_array(H_index):
     time_delay_31 = sample_delay_31 / fs
 
     # Bearing estimation
-    estimated_bearing = np.zeros(len(times))
-    for i in range(len(estimated_bearing)):
-        estimated_bearing[i],_ = find_bearing_triangle(time_delay_32[i],time_delay_21[i],time_delay_31[i])
+    estimated_azimuth = np.zeros(len(times))
+    for i in range(len(estimated_azimuth)):
+        estimated_azimuth[i],_ = find_bearing_triangle(time_delay_32[i],time_delay_21[i],time_delay_31[i])
 
-    np.save(f"Synth/F{H_index}",estimated_bearing)
+    estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
 
-    return estimated_bearing[:-1]
+    np.save(f"Synth/F{H_index}",estimated_azimuth)
+    return estimated_azimuth
 
 def compute_bearing_angle_array_square(H_index):
     d=0.3
@@ -59,9 +61,7 @@ def compute_bearing_angle_array_square(H_index):
     # Parametri finestra
     durata_finestra = 0.05 # Secondi
     campioni_finestra = int(durata_finestra * fs)
-    #print(f"FREQUENZA DI CAMPIONAMENTO: {fs}")
-    #print(f"FINESTRA: {durata_finestra*1000} ms - {campioni_finestra} samples")
-    
+
     quality_threshold = 0.0
     sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
     sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
@@ -78,14 +78,14 @@ def compute_bearing_angle_array_square(H_index):
     time_delay_43 = sample_delay_43 / fs
 
     # Bearing estimation
-    estimated_bearing = np.zeros(len(times))
-    for i in range(len(estimated_bearing)):
-        estimated_bearing[i] = find_bearing_square(time_delay_32[i],time_delay_21[i],time_delay_31[i],
+    estimated_azimuth = np.zeros(len(times))
+    for i in range(len(estimated_azimuth)):
+        estimated_azimuth[i] = find_bearing_square(time_delay_32[i],time_delay_21[i],time_delay_31[i],
                                                    time_delay_41[i],time_delay_42[i],time_delay_43[i])
-
-    np.save(f"Synth/F{H_index}",estimated_bearing)
-
-    return estimated_bearing[:-1]
+        
+    estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
+    np.save(f"Synth/F{H_index}",estimated_azimuth)
+    return estimated_azimuth
 
 def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     d = 0.228 / math.sqrt(2)
@@ -152,49 +152,30 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
         estimated_elevation[i] = el
         
 
-    '''
-    estimated_elevation = estimated_elevation[:-1]
-    estimated_azimuth = estimated_azimuth[:-1]
-    '''
-
-
-    perc_to_tim_out = 0.1
-    N_finale = int(1/durata_finestra)
-    estimated_azimuth += 360
-    N_adjusted = (len(estimated_azimuth) // N_finale) * N_finale
-    dati_regolari = estimated_azimuth[:N_adjusted]
-    matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
-    azimuth_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
-    azimuth_tagliato -= 360
-
-    N_adjusted = (len(estimated_elevation) // N_finale) * N_finale
-    dati_regolari = estimated_elevation[:N_adjusted]
-    matrice_spezzoni = dati_regolari.reshape(-1, N_finale)
-    elevation_tagliato = stats.trim_mean(matrice_spezzoni, proportiontocut=perc_to_tim_out, axis=1)
-    estimated_elevation = elevation_tagliato
-    estimated_azimuth = azimuth_tagliato
+    estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
+    estimated_elevation = format_bearings(estimated_elevation,durata_finestra,0.1)
 
     np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
     np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
     return estimated_azimuth, estimated_elevation
 
 
+def format_bearings(array,window_duration,perc_to_trim):
+    final_length = int(1/window_duration)
+    array += 360
+    N_adjusted = (len(array) // final_length) * final_length
+    dati_regolari = array[:N_adjusted]
+    segment_matrix = dati_regolari.reshape(-1, final_length)
+    array_trimmed = stats.trim_mean(segment_matrix, proportiontocut=perc_to_trim, axis=1)
+    array = array_trimmed - 360
+    return array
+    
+
 
 def clean_temporary_files():
-    dir_path = "TMP"
-    if os.path.isdir(dir_path):
-        for filename in os.listdir(dir_path):
-            file_path = os.path.join(dir_path, filename)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-        os.rmdir(dir_path)
+    if os.path.isdir("TMP"):
+        shutil.rmtree("TMP")
 
-    dir_path_base = "HM_out_"
-    for i in range(5):
-        dir_path = dir_path_base + str(i+1)
-        if os.path.isdir(dir_path):
-            for filename in os.listdir(dir_path):
-                file_path = os.path.join(dir_path, filename)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-            os.rmdir(dir_path)
+    for j in range(5):
+        if os.path.isdir(f"HM_OUT_{j+1}"):
+                shutil.rmtree(f"HM_OUT_{j+1}")

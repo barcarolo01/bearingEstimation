@@ -1,10 +1,13 @@
 import os
 import numpy as np
+from scipy.fft import rfft, irfft, next_fast_len
 from scipy.signal import convolve, resample_poly
 from math import gcd
 import soundfile as sf
 
-FS_OUT = 96000     # Sampling frequency of output files (Hz)
+# Sampling frequency of output files (Hz)
+#FS_OUT = int(os.getenv('SAMPLING_FREQUENCY'))
+FS_OUT = 96000
 
 def read_arr(filename):
     with open(filename) as f:
@@ -51,10 +54,8 @@ def load_audio_source(filepath, fs_target):
         down = fs_orig // g
         data = resample_poly(data, up, down).astype(np.float32)
         print(f"  Resampled from {fs_orig} Hz to {fs_target} Hz")
-    else:
-        print(f"  Sampling frequency: {fs_orig} Hz (no resampling)")
+
     data /= np.max(np.abs(data))
-    print(f"  Duration: {len(data)/fs_target:.2f} s ({len(data)} samples)")
     return data
 
 def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
@@ -160,29 +161,51 @@ def from_arr_to_wav(
     for i, mic in enumerate(arr_list, start=1):
         h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"], FS_OUT, n_arrivals=n_arrivals)
         ir_list.append(h)
-        first_non_zero_at.append(np.nonzero(h)[0][0])
-        #print(f"  Hydrophone {i}: {len(used)} arrivals used, IR length = {len(h)} samples")
-        #np.save("H.npy", h)
+        nz = np.nonzero(h)[0]
+        if nz.size == 0:
+            raise ValueError(f"Hydrophone {i}: IR completamente nulla")
+        first_non_zero_at.append(nz[0])
 
-    # ── Convolution ──────────────────────────────────────────────────
-    transient = max((len(h) for h in ir_list if h.size > 0), default=FS_OUT)
-    maximum_length = max((len(h) for h in ir_list if h.size > 0))
-    to_clip = np.max(first_non_zero_at)
-    
+    # ── Punto di sincronizzazione: primo istante in cui una QUALSIASI traccia è non-zero ──
+    start = int(np.min(first_non_zero_at))
+
+    # ── Sorgente: solo i campioni che possono influenzare l'uscita ──
+    Lx = FS_OUT + start
+    if len(src) < Lx:
+        x = np.zeros(Lx, dtype=np.float32)
+        x[:len(src)] = src
+    else:
+        x = src[:Lx].astype(np.float32)
+
+    # ── Bound FISSO, indipendente dalla lunghezza reale delle IR ──
+    max_hslice_len = Lx + FS_OUT - 1                 # limite superiore teorico del ritaglio di h
+    nfft = next_fast_len(Lx + max_hslice_len - 1)    # stessa FFT size per TUTTI i canali
+    X_f = rfft(x, n=nfft)                            # FFT della sorgente: calcolata UNA volta, riusata sempre
+
     rx_out_list = []
     for h in ir_list:
-        #h_bis = h[minimum_length-FS_OUT:minimum_length]
-        rx_out = convolve(src[0:FS_OUT], h, mode='full', method='direct').astype(np.float32)
-        #rx_out = convolve(src, h, mode='full', method='direct')[transient:transient + FS_OUT].astype(np.float32)
-        #rx_out = convolve(src, h, mode='full', method='direct')[:FS_OUT].astype(np.float32)
-        
-        rx_out = rx_out[to_clip: to_clip + FS_OUT].astype(np.float32)
+        k_lo = max(0, start - Lx + 1)
+        k_hi = min(len(h) - 1, start + FS_OUT - 1)
+
+        if k_hi < k_lo:
+            # nessuna sovrapposizione possibile: canale silente nella finestra richiesta
+            rx_out_list.append(np.zeros(FS_OUT, dtype=np.float32))
+            continue
+
+        h_slice = h[k_lo:k_hi + 1]                   # <-- indipendente da len(h) reale, bounded
+        H_f = rfft(h_slice, n=nfft)
+        z = irfft(X_f * H_f, n=nfft)                 # z[m] == y[m + k_lo]
+
+        lo = start - k_lo                             # offset dentro z corrispondente a n = start
+        rx_out = z[lo: lo + FS_OUT].astype(np.float32)
+
+        if rx_out.size < FS_OUT:                      # safety net, non dovrebbe mai scattare
+            rx_out = np.pad(rx_out, (0, FS_OUT - rx_out.size))
+
         rx_out_list.append(rx_out)
 
-    # global normalization
+    # ── Normalizzazione globale ──
     gmax = max(np.max(np.abs(s)) for s in rx_out_list)
-    #gmax = max((np.max(np.abs(s)) for s in rx_out_list if s.size > 0), default=1.0)
-    
     rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
     # ── Saving ───────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+'''
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -5,9 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 from dotenv import load_dotenv
 from coordinate_generator import  generate_grid_of_samples,calculate_distance, sposta
-from discrete_hydromate import run_discrete_hydromate
+
 from findpoint import *
-from build_folium_map import build_map
+from map_creation.build_folium_map import build_map
 from utils_runner import *
 
 SIMULATE = True
@@ -140,3 +141,4 @@ for TX_sample_point in Coordinate_SAMPLED:
         f.flush()
 
 f.close()
+'''

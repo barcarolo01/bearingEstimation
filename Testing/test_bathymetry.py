@@ -1,5 +1,9 @@
 import xarray as xr
 
+"""
+FOR TESTING: Query a point to find its find the depth
+"""
+
 PATH = "C:/Users/Nicola/Desktop/TESI/HYDROMATE/hm_code/gebco_2024_sub_ice_topo/GEBCO_2024_sub_ice_topo.nc"
 
 lon_query = 55.141862749665
@@ -7,11 +11,7 @@ lat_query = 25.903322371762606
 
 ds = xr.open_dataset(PATH, engine="netcdf4")
 
-elev = ds.elevation.sel(
-    lon=lon_query,
-    lat=lat_query,
-    method="nearest"
-)
+elev = ds.elevation.sel(lon=lon_query,lat=lat_query,method="nearest")
 
 lon_actual = float(elev.lon)
 lat_actual = float(elev.lat)

@@ -1,6 +1,5 @@
 import numpy as np
 import math
-from itertools import combinations
 
 def math_to_bearing(math_angle_deg: float) -> float:
     """
@@ -88,12 +87,6 @@ def _least_squares_point_n(
     dx = np.sin(brgs_rad)  # East component
     dy = np.cos(brgs_rad)  # North component
 
-    # Least squares system: minimize sum_i dist(P, line_i)^2
-    # The distance from point P=(x,y) to the line passing through (x0,y0)
-    # with direction (dx,dy) is: |(P - H) x d| = (dy*(x-x0) - dx*(y-y0))
-    # Matrix A and vector b of the normal system A^T A p = A^T b
-    # with orthogonal projection: (I - d d^T) P = (I - d d^T) H
-
     # Use approximate metric coordinates centred on the floaters position
     lat0 = np.mean(lats)
     lon0 = np.mean(lons)
@@ -104,8 +97,6 @@ def _least_squares_point_n(
     x0 = np.deg2rad(lons - lon0) * R * np.cos(lat0_rad)
     y0 = np.deg2rad(lats - lat0) * R
 
-    # Orthogonal projectors: for each line i, (I - d_i d_i^T)
-    # A x = b  =>  sum_i (I - d_i d_i^T) @ p = sum_i (I - d_i d_i^T) @ h_i
     A = np.zeros((2, 2))
     b = np.zeros(2)
     for i in range(len(lats)):
@@ -130,29 +121,12 @@ def _least_squares_point_n(
     return float(lat_opt), float(lon_opt)
 
 def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Distance in metres between two nearby points, flat-earth approximation."""
+    """Distance in meters between two points (flat-earth approximation)"""
     meters_per_deg_lat = 111_319.9
     meters_per_deg_lon = 111_319.9 * np.cos(np.deg2rad((lat1 + lat2) / 2))
     dy = (lat2 - lat1) * meters_per_deg_lat
     dx = (lon2 - lon1) * meters_per_deg_lon
     return np.sqrt(dx**2 + dy**2)
-
-def _residual_error(lats, lons, bearings_deg, lat_est, lon_est) -> float:
-    total = 0.0
-    n = 0
-    for i in range(len(lats)):
-        # Compute distance between i-th floater and estimated point
-        d = _flat_dist_m(lats[i], lons[i], lat_est, lon_est)
-
-        # Skip distances very close to zero
-        if d < 1e-6:
-            continue
-
-        az = _flat_azimuth(lats[i], lons[i], lat_est, lon_est)
-        delta_angle = np.deg2rad(az - bearings_deg[i])
-        total += np.sin(delta_angle) ** 2  # dimensionless, independent of d
-        n += 1
-    return total / n if n > 0 else np.inf
 
 def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
@@ -174,7 +148,7 @@ def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dx = np.deg2rad(lon2 - lon1) * R * np.cos(lat0_rad)  # East component
     dy = np.deg2rad(lat2 - lat1) * R                      # North component
 
-    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) → CW from North
+    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) -> CW from North
     return float(bearing % 360)
 
 def find_points(
@@ -183,45 +157,47 @@ def find_points(
     elevation_array: np.ndarray | None = None,
 ) -> np.ndarray:
     """
-    Per ciascuna delle N simulazioni, calcola il punto che minimizza la distanza
-    dalle M semirette geodetiche emesse dagli M floaters.
+    For each of the N simulation steps, this method compute the point that minimzes the distance 
+    among the M direction of arrival lines estimated by each of the M floaters
 
     Parameters
     ---------
     floaters : np.ndarray of shape (N, M, 2) or (N, M, 3)
-        N simulazioni, ciascuna con M floaters. Coordinate [lat, lon] o [lat, lon, depth_m].
+        N simulation steps, each with M floaters. Coordinates must be in form [lat, lon] or [lat, lon, depth_m].
     bearings : np.ndarray of shape (M, N)
-        Angoli (gradi) per ciascuno degli M floaters (righe) e ciascuna delle N simulazioni (colonne).
-    elevation_array : np.ndarray of shape (M, N), optional
-        Angoli di elevazione per ciascun floater (righe) e simulazione (colonne).
+        Horizontal angles (degrees) for each of the M floaters and for each of the N simulation steps.
+    elevation_array : np.ndarray of shape (M, N)
+        Vertical angles (degrees) for each of the M floaters and for each of the N simulation steps.
 
     Returns
     -------
     positions : np.ndarray of shape (N, 3)
-        Una riga [latitude, longitude, depth_m] per ciascuna delle N simulazioni.
+        A triple [latitude, longitude, depth_m] for each of the N simulation steps
     """
+
     floaters = np.asarray(floaters, dtype=float)
     bearings = np.asarray(bearings, dtype=float)
 
     if floaters.ndim != 3 or floaters.shape[2] not in (2, 3):
         raise ValueError(
-            f"floaters deve essere di forma (N, M, 2) o (N, M, 3), invece ha forma {floaters.shape}."
+            f"Floaters must have shape (N, M, 2) or (N, M, 3), while it has {floaters.shape}."
         )
     if bearings.ndim != 2:
         raise ValueError(
-            f"bearings deve essere di forma (M, N), invece ha forma {bearings.shape}."
+            f"Bearings must have shape (M, N), while it has {bearings.shape}."
         )
 
     n_simulations = floaters.shape[0]
     n_floaters = floaters.shape[1]
 
-    # ── Controllo speculare: ora bearings deve essere (M, N) ──
+
     if bearings.shape[0] != n_floaters or bearings.shape[1] != n_simulations:
         raise ValueError(
-            f"bearings deve avere forma ({n_floaters}, {n_simulations}), invece ha forma {bearings.shape}."
+            f"Bearings must have shape ({n_floaters}, {n_simulations}), while it has {bearings.shape}."
         )
     if n_floaters < 2:
-        raise ValueError("Servono almeno 2 floaters per simulazione.")
+        raise ValueError("At least 2 floaters are needed")
+
 
     has_depth = floaters.shape[2] == 3
     use_elevation = has_depth and elevation_array is not None
@@ -230,26 +206,25 @@ def find_points(
         elevation_array = np.asarray(elevation_array, dtype=float)
         if elevation_array.shape != bearings.shape:
             raise ValueError(
-                f"elevation_array deve avere la stessa forma di bearings {bearings.shape}, invece ha {elevation_array.shape}."
+                f"Elevation_array must have the same shape of bearings {bearings.shape}, while it has {elevation_array.shape}."
             )
 
-    # L'output mantiene la forma (N, 3)
+    
     positions = np.full((n_simulations, 3), np.nan)
-
-    # Applichiamo la vettorizzazione (mantiene la forma M, N)
     brgs = np.vectorize(math_to_bearing)(bearings)
 
-    # ── Ciclo sulle N simulazioni ──
+    # Iteration over the N simulation steps
     for n in range(n_simulations):
-        # Estraiamo i dati per la simulazione n-esima
-        floaters_n = floaters[n]          # Forma (M, 2) o (M, 3)
-        brg_n = brgs[:, n]                # PRENDIAMO LA COLONNA n -> Forma (M,)
+
+        # Fetching data of the n-th simulation
+        floaters_n = floaters[n]
+        brg_n = brgs[:, n] # Shape (M,) (i.e.: one angle for each floater)
         
         lats = floaters_n[:, 0]
         lons = floaters_n[:, 1]
         floater_depths = floaters_n[:, 2] if has_depth else None
 
-        # ── Stima di lat/lon ──
+        # If only two floaters are present, the point of minimum distance is the intersection of the bearing lines
         if n_floaters == 2:
             lat_i, lon_i = _flat_earth_intersection(
                 lats[0], lons[0], brg_n[0],
@@ -258,6 +233,8 @@ def find_points(
             if not np.isnan(lat_i):
                 positions[n, 0] = lat_i
                 positions[n, 1] = lon_i
+
+        # If more than two floaters are used, estimate the point minimizing the distance between all bearing lines
         else:
             candidates = []
             for i in range(n_floaters):
@@ -284,18 +261,19 @@ def find_points(
                 positions[n, 0] = opt[0]
                 positions[n, 1] = opt[1]
 
-        # ── Stima della profondità ──
+        # Depth estimation
         if use_elevation and not np.isnan(positions[n, 0]):
             depth_estimates = []
             weights = []
             
             for i in range(n_floaters):
-                # PRENDIAMO LA RIGA i E LA COLONNA n dell'elevation_array
-                el_deg = elevation_array[i, n]
+                el_deg = elevation_array[i, n] #i-th floater, n-th simulation step
                 
+                '''
                 if abs(el_deg) > 85.0:
                     continue
-                
+                '''
+
                 el_rad = np.deg2rad(el_deg)
                 dist_h = _flat_dist_m(lats[i], lons[i], positions[n, 0], positions[n, 1])
                 
@@ -311,71 +289,3 @@ def find_points(
                 positions[n, 2] = float(np.mean(floater_depths))
 
     return positions
-
-def find_points_weighted(
-    floaters: np.ndarray,
-    bearings: np.ndarray,
-    elevation_array: np.ndarray | None = None,
-) -> np.ndarray:
-    """
-    For each event, computes the estimated position as a weighted average
-    of all combinations of K floaters (K from 3 to N), with weight 1/error.
-    """
-    floaters = np.asarray(floaters, dtype=float)
-    bearings    = np.asarray(bearings,    dtype=float)
-
-    n_floaters   = floaters.shape[0]
-    n_events  = bearings.shape[1]
-    has_depth = floaters.shape[1] == 3
-    use_elevation = has_depth and elevation_array is not None
-
-    best_positions = np.full((n_events, 3), np.nan)
-
-    # Pre-compute all estimates for all combinations
-    all_combos = []
-    for k in range(3, n_floaters + 1):
-        for indices in combinations(range(n_floaters), k):
-            idx = list(indices)
-            floater_subset   = floaters[idx, :]
-            bearing_subset = bearings[idx, :]
-            elev_sub    = elevation_array[idx, :] if use_elevation else None
-
-            pos = find_points(floater_subset, bearing_subset, elev_sub)  # (n_events, 3)
-            all_combos.append((idx, pos))
-
-    for m in range(n_events):
-        weights   = []
-        lats_acc  = []
-        lons_acc  = []
-        depth_acc = []
-
-        for idx, intersection in all_combos:
-            pos_m = intersection[m]  # (3,)
-
-            if np.isnan(pos_m[0]):
-                continue
-
-            brgs_m = np.vectorize(math_to_bearing)(bearings[idx, m])
-
-            error = _residual_error(floaters[idx, 0], floaters[idx, 1],brgs_m,pos_m[0], pos_m[1])
-            
-            if error <= 0 or not np.isfinite(error):
-                continue
-
-            weights.append(1.0 / error)
-            lats_acc.append(pos_m[0])
-            lons_acc.append(pos_m[1])
-            depth_acc.append(pos_m[2])
-
-        if not weights:
-            continue
-
-        w = np.array(weights)
-        w /= w.sum()
-
-        best_positions[m, 0] = np.dot(w, lats_acc)
-        best_positions[m, 1] = np.dot(w, lons_acc)
-        if use_elevation:
-            best_positions[m, 2] = np.dot(w, depth_acc)
-
-    return best_positions

@@ -18,6 +18,10 @@ def build_local_cartesian_map(
     track_TX=False, 
     track_estimated=False,
     track_floaters=True,
+    RX_fw_IMU=None,
+    RX_fw_IMU_MDS=None,
+    RX_bw_IMU=None,
+    RX_bw_IMU_MDS=None,
 ):
     """
     Genera e salva un grafico cartesiano locale in metri basato su un centro custom.
@@ -32,6 +36,12 @@ def build_local_cartesian_map(
     window_width_m : float -> Larghezza della finestra di visualizzazione in metri
     window_height_m : float -> Altezza della finestra di visualizzazione in metri
     track_floaters : bool -> se True, disegna la traiettoria tratteggiata di ogni floater
+    RX_fw_IMU, RX_fw_IMU_MDS, RX_bw_IMU, RX_bw_IMU_MDS : array-like di forma (N, M, 3) oppure None
+        N = numero di posizioni temporali, M = numero di device, 3 = [lat, lon, depth].
+        Stessa convenzione di forma di `floaters_coordinates` (accetta anche (M, 3)/(M, 2)
+        come singolo istante temporale, con N=1 aggiunto automaticamente).
+        Traiettorie del ricevitore sempre disegnate come linea connessa (nessun flag di attivazione):
+        RX_fw_IMU in blu, RX_fw_IMU_MDS in arancione, RX_bw_IMU in verde chiaro, RX_bw_IMU_MDS in rosso.
     """
     
     # Raggio della Terra in metri
@@ -74,14 +84,28 @@ def build_local_cartesian_map(
     def _depth_str(depth):
         return f"{depth:.1f}m" if not np.isnan(depth) else "N/A"
 
+    def _normalize_multi(arr):
+        """
+        Converte input geografico in coordinate locali con forma (N, M, C),
+        stessa convenzione usata per floaters_coordinates: se l'input ha forma
+        (M, C) viene trattato come singolo istante temporale (N=1).
+        """
+        xy = _geo_to_local(arr)
+        if xy.size > 0 and xy.ndim == 2:
+            xy = xy[np.newaxis, :, :]
+        return xy
+
     # --- Normalizzazione floaters a forma (N, M, C) ---
-    xy_fl = _geo_to_local(floaters_coordinates)
-    if xy_fl.size > 0 and xy_fl.ndim == 2:
-        # Input (M, C) -> singolo istante temporale, aggiunge asse N=1
-        xy_fl = xy_fl[np.newaxis, :, :]
+    xy_fl = _normalize_multi(floaters_coordinates)
 
     xy_tx = _geo_to_local(TX_positions_coordinates)
     xy_est = _geo_to_local(estimated_vessel_coordinates)
+
+    # --- Normalizzazione traiettorie RX IMU a forma (N, M, C), come floaters_coordinates ---
+    xy_fw_imu = _normalize_multi(RX_fw_IMU)
+    xy_fw_imu_mds = _normalize_multi(RX_fw_IMU_MDS)
+    xy_bw_imu = _normalize_multi(RX_bw_IMU)
+    xy_bw_imu_mds = _normalize_multi(RX_bw_IMU_MDS)
 
     # Filtraggio dei punti validi (rimozione NaN)
     tx_valid = xy_tx[[_is_valid(pt[0], pt[1]) for pt in xy_tx]] if len(xy_tx) > 0 else []
@@ -116,6 +140,38 @@ def build_local_cartesian_map(
             ax.plot(pt[0], pt[1], marker='o', color="#00CC66", markersize=8, markeredgecolor='black', zorder=4)
             #ax.text(pt[0]+2, pt[1]-4, f"Est{i+1}\n({_depth_str(depth_val)})", fontsize=8, color='#005522')
 
+    # --- Traiettorie RX IMU (sempre attive, una traiettoria per ciascun device) ---
+    _imu_tracks = [
+        (RX_fw_IMU, xy_fw_imu, "#0000FF", "RX fw IMU"),
+        (RX_fw_IMU_MDS, xy_fw_imu_mds, "#FFA500", "RX fw IMU MDS"),
+        (RX_bw_IMU, xy_bw_imu, "#90EE90", "RX bw IMU"),
+        (RX_bw_IMU_MDS, xy_bw_imu_mds, "#115511", "RX bw IMU MDS"),
+    ]
+
+    for raw_input, xy_multi, color, _ in _imu_tracks:
+        if raw_input is None or xy_multi.size == 0:
+            continue
+
+        n_devices = xy_multi.shape[1]
+        for d in range(n_devices):
+            device_traj = xy_multi[:, d, :]  # (N, 2 o 3)
+            valid_mask = [_is_valid(pt[0], pt[1]) for pt in device_traj]
+            valid_traj = device_traj[valid_mask]
+
+            if len(valid_traj) == 0:
+                continue
+
+            # Traiettoria connessa (sempre disegnata di default)
+            if len(valid_traj) > 1:
+                ax.plot(valid_traj[:, 0], valid_traj[:, 1], color=color, linewidth=2, alpha=0.4, zorder=2)
+
+            # Marker sui singoli punti
+            ax.plot(
+                valid_traj[:, 0], valid_traj[:, 1],
+                marker='o', markersize=6, color=color, linestyle='None',
+                markeredgecolor='black', markeredgewidth=0.5, alpha=0.4, zorder=4
+            )
+
     # --- Floaters: traiettoria tratteggiata per ciascun floater + etichetta sull'ultima posizione ---
     if floaters_coordinates is not None and xy_fl.size > 0:
         n_positions, n_floaters = xy_fl.shape[0], xy_fl.shape[1]
@@ -143,7 +199,7 @@ def build_local_cartesian_map(
 
             # --- Etichetta sulla prima posizione nota ---
             first_pt = valid_traj[0]
-            label = f"F{m+1}"
+            label = f"{m+1}"
             ax.text(
                 first_pt[0], first_pt[1], label, 
                 color='white',
@@ -185,7 +241,11 @@ def build_local_cartesian_map(
         ax.plot([], [], marker='o', color='#FFD700', linestyle='None', label='Groung truth')
     if estimated_vessel_coordinates is not None:
         ax.plot([], [], marker='o', color='#00CC66', linestyle='None', label='Estimated positions')
-    
+
+    for raw_input, _, color, legend_label in _imu_tracks:
+        if raw_input is not None:
+            ax.plot([], [], marker='o', color=color, linestyle='-', label=legend_label)
+
     #ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE)
 
     # Salvataggio ed output
@@ -228,5 +288,10 @@ if __name__ == '__main__':
         window_height_m=40,
         output_file="map_local.png",
         track_TX=True,
-        track_estimated=True
+        track_estimated=True,
+        # Esempio di utilizzo dei nuovi parametri (forma attesa: (timestamps, device, 3)):
+        # RX_fw_IMU=np.load("Synth/RX_fw_IMU.npy"),
+        # RX_fw_IMU_MDS=np.load("Synth/RX_fw_IMU_MDS.npy"),
+        # RX_bw_IMU=np.load("Synth/RX_bw_IMU.npy"),
+        # RX_bw_IMU_MDS=np.load("Synth/RX_bw_IMU_MDS.npy"),
     )

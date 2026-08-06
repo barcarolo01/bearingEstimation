@@ -22,6 +22,7 @@ def build_local_cartesian_map_3d(
     track_TX=False, 
     track_estimated=False,
     track_floaters=True,
+    out_path="maps/local_map_3D.png"
 ):
     """
     Genera una visualizzazione 3D interattiva cartesiana locale in metri.
@@ -149,7 +150,7 @@ def build_local_cartesian_map_3d(
 
             # --- Etichetta circolare sulla prima posizione nota ---
             first_pt = valid_traj[0]
-            label = f"F{mi+1}"
+            label = f"{mi+1}"
             ax.text(
                 first_pt[0], first_pt[1], -first_pt[2], label,
                 color='white',
@@ -196,7 +197,7 @@ def build_local_cartesian_map_3d(
     
     
     
-    plt.savefig("map_3D.png",bbox_inches='tight',pad_inches=0.5, dpi=600)
+    plt.savefig(out_path,bbox_inches='tight',pad_inches=0.5, dpi=600)
     plt.show()
 
     
@@ -204,7 +205,7 @@ def build_local_cartesian_map_3d(
     PIXEL_DA_TAGLIARE_SOPRA = 800
     PIXEL_DA_TAGLIARE_SOTTO = 500  # Sostituisci con il numero esatto di pixel da rimuovere
 
-    img = Image.open("map_3D.png")
+    img = Image.open(out_path)
     larghezza, altezza = img.size
 
     # Definiamo la scatola di ritaglio (box): (sinistra, alto, destra, basso)
@@ -213,7 +214,7 @@ def build_local_cartesian_map_3d(
     img_ritagliata = img.crop(box_ritaglio)
 
     # 3. Salva il file finale definitivo
-    img_ritagliata.save("map_3D.png")
+    img_ritagliata.save(out_path)
 
 if __name__ == "__main__":
     RX_Coordinates = np.load("Synth/RX_Coordinates.npy")

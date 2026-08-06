@@ -1,7 +1,9 @@
 from findpoint import *
 from utils_runner import *
 
-def sposta(lat, lon, distanza, dir):
+def sposta(center, distanza, dir):
+    lat, lon = center[0],center[1]
+    
     # Converti i gradi in radianti
     angolo_rad = math.radians(dir)
     
@@ -95,8 +97,7 @@ def generate_grid_of_samples(lat_orig, lon_orig, W, N):
     return coordinate_coppie
 
 def compute_TX_circle_trajectory(
-    Lat_center: float,
-    Lon_center: float,
+    Center,
     constant_depth: float,
     start_deg: float,  # Angolo di inizio da NORD (0-360)
     end_deg: float,    # Angolo di fine da NORD (0-360)
@@ -110,6 +111,8 @@ def compute_TX_circle_trajectory(
     
     Ritorna un numpy array di forma (n_steps, 3) con colonne [Lat, Lon, Depth].
     """
+    Lat_center, Lon_center = Center[0], Center[1]
+
     # Raggio medio della Terra in metri
     R_EARTH = 6371000.0
     

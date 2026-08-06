@@ -1,10 +1,12 @@
 import numpy as np
 from floater_geometry import *
 
+"""
+This file contains the functions to estimate the angle of arrival (0°-359°)
+by minimizing the least square error for all possible hydrophone configurations.
+"""
+
 def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
-    """
-    This function estimates the angle of arrival (0°-359°) by minimizing the least square error.
-    """
     E  = (measured_tau32 - lut_tau32[:,90])**2
     E += (measured_tau21 - lut_tau21[:,90])**2
     E += (measured_tau31 - lut_tau31[:,90])**2
@@ -23,7 +25,6 @@ def find_bearing_square(measured_tau32, measured_tau21, measured_tau31,measured_
     estimated_angle = np.argmin(E)
 
     return estimated_angle
-
 
 
 def find_bearing_complete(measured_tau32, measured_tau21, measured_tau31,
@@ -45,7 +46,7 @@ def find_bearing_complete(measured_tau32, measured_tau21, measured_tau31,
     flat_min_idx = np.argmin(E)
     az_idx, el_idx = np.unravel_index(flat_min_idx, E.shape)
 
-    # Elevation convertion: from [0 : 180] to [-90 : +90]
+    # Elevation conversion: from [0 : 180] to [-90 : +90]
     elevation_deg = el_idx - 90  
 
     return az_idx, elevation_deg

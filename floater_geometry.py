@@ -103,9 +103,9 @@ def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hyd
             lat_H3 = lat_center + delta_lat_H3
             lon_H3 = lon_center + delta_lon_H3
 
-            return ((lat_H1, lon_H1,depth_center),
-                    (lat_H2, lon_H2,depth_center),
-                    (lat_H3, lon_H3,depth_center))
+            return np.asarray([ (lat_H1, lon_H1,depth_center),
+                                (lat_H2, lon_H2,depth_center),
+                                (lat_H3, lon_H3,depth_center)])
         
         case 4:
             L = 0.228 / math.sqrt(2) # In meters
