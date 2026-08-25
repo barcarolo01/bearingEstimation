@@ -188,7 +188,7 @@ def build_local_cartesian_map_3d(
 
 
     # Legenda ordinata
-    #ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE-3)
+    ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE-3)
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(prune='lower'))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='lower'))

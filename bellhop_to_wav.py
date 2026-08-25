@@ -5,8 +5,6 @@ from scipy.signal import convolve, resample_poly
 from math import gcd
 import soundfile as sf
 
-# Sampling frequency of output files (Hz)
-#FS_OUT = int(os.getenv('SAMPLING_FREQUENCY'))
 FS_OUT = 96000
 
 def read_arr(filename):
@@ -47,15 +45,17 @@ def load_audio_source(filepath, fs_target):
     data, fs_orig = sf.read(filepath, dtype='float32')
     if data.ndim > 1:
         data = data.mean(axis=1)
-        print(f"  Converted from stereo to mono")
+        print(f"Converted from stereo to mono")
+
+    # Resample the track if its current sample rate does not match the target one
     if fs_orig != fs_target:
         g = gcd(fs_target, fs_orig)
         up = fs_target // g
         down = fs_orig // g
         data = resample_poly(data, up, down).astype(np.float32)
-        print(f"  Resampled from {fs_orig} Hz to {fs_target} Hz")
+        print(f"Resampled from {fs_orig} Hz to {fs_target} Hz")
 
-    data /= np.max(np.abs(data))
+    data /= np.max(np.abs(data)) # Normalization
     return data
 
 def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
@@ -116,14 +116,7 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
 
 
 # ===============================================================================================
-def from_arr_to_wav(
-    input_folder: str,
-    number_mic: int,
-    source: str,
-    out_folder: str,
-    n_arrivals: int = 0,
-    duration: int = 1,
-):
+def from_arr_to_wav(input_folder: str,number_mic: int,source: str,out_folder: str,n_arrivals=0):
     """
     Generates simulated .wav files for N microphones from Bellhop .arr files.
 
@@ -136,16 +129,17 @@ def from_arr_to_wav(
     n_arrivals   : number of arrivals per RD sorted by time (0 = all)
     fs           : output sample rate
     """
+
+    # Create the output folder if it does not exists
     os.makedirs(out_folder, exist_ok=True)
 
+    # Load the audio source (with resample, if needed)
     src = load_audio_source(source, FS_OUT)
 
-    # ── Reading .arr ──────────────────────────────────────────────────
+    # == Reading .arr file
     arr_list  = []   # dictionaries with data from each microphone
     for i in range(1, number_mic + 1):
         arr_path = os.path.join(input_folder, f"H{i}.arr")
-        #arr_path = f"{input_folder}/{i}.arr"
-        #print(f"\nReading {arr_path}...")
 
         rr_vals, rd_vals, arr = read_arr(arr_path)
         arr_list.append({
@@ -155,18 +149,22 @@ def from_arr_to_wav(
             "rr_max":  max(rr_vals),
         })
 
-    # ── Impulse response ────────────────────────────────────────────
+    # == Impulse response
     ir_list = []
     first_non_zero_at = []
     for i, mic in enumerate(arr_list, start=1):
+        # Create the impulse responde
         h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"], FS_OUT, n_arrivals=n_arrivals)
         ir_list.append(h)
+
         nz = np.nonzero(h)[0]
         if nz.size == 0:
-            raise ValueError(f"Hydrophone {i}: IR completamente nulla")
+            raise ValueError(f"Hydrophone {i}: impulse response is null")
+
+        # Keep track of the index of the first non-zero sample
         first_non_zero_at.append(nz[0])
 
-    # ── Punto di sincronizzazione: primo istante in cui una QUALSIASI traccia è non-zero ──
+    # Synch point: first time instant in which any track is not zero
     start = int(np.min(first_non_zero_at))
 
     # ── Sorgente: solo i campioni che possono influenzare l'uscita ──
@@ -204,12 +202,11 @@ def from_arr_to_wav(
 
         rx_out_list.append(rx_out)
 
-    # ── Normalizzazione globale ──
+    # Global normalization
     gmax = max(np.max(np.abs(s)) for s in rx_out_list)
     rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
-    # ── Saving ───────────────────────────────────────────────────
-    out_paths = []
+    # Save the convolved track (one per hydrophone) in numpy array format (.npy)
     for i, rx_out in enumerate(rx_out_list, start=1):
         out_path = os.path.join(out_folder, f"H{i}.npy")
         np.save(out_path, rx_out)

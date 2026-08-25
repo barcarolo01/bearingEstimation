@@ -15,7 +15,7 @@ def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
 
     return estimated_angle,error
 
-def find_bearing_square(measured_tau32, measured_tau21, measured_tau31,measured_tau41,measured_tau42,measured_tau43):
+def find_bearing_square(measured_tau32, measured_tau21, measured_tau31, measured_tau41,measured_tau42,measured_tau43):
     E  = (measured_tau32 - lut_tau32[:,90])**2
     E += (measured_tau21 - lut_tau21[:,90])**2 
     E += (measured_tau31 - lut_tau31[:,90])**2 
@@ -26,11 +26,7 @@ def find_bearing_square(measured_tau32, measured_tau21, measured_tau31,measured_
 
     return estimated_angle
 
-
-def find_bearing_complete(measured_tau32, measured_tau21, measured_tau31,
-                          measured_tau41, measured_tau42, measured_tau43,
-                          measured_tau51, measured_tau52, measured_tau53, measured_tau54):
-
+def find_bearing_complete(measured_tau32, measured_tau21, measured_tau31, measured_tau41, measured_tau42, measured_tau43, measured_tau51, measured_tau52, measured_tau53, measured_tau54):
     E =  (measured_tau21 - lut_tau21) ** 2
     E += (measured_tau32 - lut_tau32) ** 2
     E += (measured_tau31 - lut_tau31) ** 2

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def gcc_phat(sig_A, sig_B):
     beta = 0
     N = len(sig_A) + len(sig_B) - 1
@@ -25,8 +26,6 @@ def gcc_phat_bandpass(sig_A, sig_B, f_sampling, f_low, f_high):
 
     denumerator = np.abs(Xa * np.conj(Xb))
     numerator = Xa * np.conj(Xb)
-
-
     
     freqs = np.fft.rfftfreq(N, d=1/f_sampling)
     numerator[freqs > f_high] = 0

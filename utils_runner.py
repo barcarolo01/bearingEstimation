@@ -32,9 +32,9 @@ def compute_bearing_angle_array(H_index):
     
     quality_threshold = 0.0
     overlap = 0.0
-    sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
-    sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
-    sample_delay_31, _ = compute_sample_delay_value(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    _, sample_delay_21, times  = compute_sample_delay_array(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    _, sample_delay_32, _ = compute_sample_delay_array(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    _, sample_delay_31, _ = compute_sample_delay_array(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
 
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -63,12 +63,12 @@ def compute_bearing_angle_array_square(H_index):
     campioni_finestra = int(durata_finestra * fs)
 
     quality_threshold = 0.0
-    sample_delay_21, times  = compute_sample_delay_value(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_32, _ = compute_sample_delay_value(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_31, _ = compute_sample_delay_value(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_41, _ = compute_sample_delay_value(sig4,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_42, _ = compute_sample_delay_value(sig4,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
-    sample_delay_43, _ = compute_sample_delay_value(sig4,sig3,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_21, times  = compute_sample_delay_array(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_32, _ = compute_sample_delay_array(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_31, _ = compute_sample_delay_array(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_41, _ = compute_sample_delay_array(sig4,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_42, _ = compute_sample_delay_array(sig4,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
+    _, sample_delay_43, _ = compute_sample_delay_array(sig4,sig3,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=0)
 
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -112,18 +112,18 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     quality_threshold = 0.0
     
     # Ritardi tra H1–H4 (invariati)
-    sample_delay_21, times = compute_sample_delay_value(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_32, _     = compute_sample_delay_value(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_31, _     = compute_sample_delay_value(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_41, _     = compute_sample_delay_value(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_42, _     = compute_sample_delay_value(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_43, _     = compute_sample_delay_value(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
 
     # Ritardi con H5 → informazione sull'angolo verticale
-    sample_delay_51, _ = compute_sample_delay_value(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_52, _ = compute_sample_delay_value(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_53, _ = compute_sample_delay_value(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    sample_delay_54, _ = compute_sample_delay_value(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
 
     # Conversione in secondi
     time_delay_21 = sample_delay_21 / fs

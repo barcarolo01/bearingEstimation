@@ -21,27 +21,11 @@ import numpy as np
 FIXED_DIST_ERR = 10  # Errore fisso su distanze (unità)
 
 
+'''
 def estimate_mov_error(mov):
-    """
-    Stima l'errore accumulato dal movimento misurato da IMU.
-    
-    LOGICA SEMPLICE:
-    L'errore di dead-reckoning (integrazione del movimento) cresce
-    con la velocità. Usiamo la norma euclidea del movimento come stima.
-    
-    Interpretazione:
-    - Se il nodo si muove di poco: errore piccolo
-    - Se il nodo si muove molto: errore grande
-    - Questo è un semplice modello (realistico per IMU accurati)
-    
-    Args:
-        mov (ndarray): matrice N x D del movimento (velocità)
-    
-    Returns:
-        ndarray: vettore N dell'errore per ogni nodo
-    """
     # Norma euclidea del movimento per ogni nodo
     return np.linalg.norm(mov, axis=1)
+'''
 
 
 def estimate_pos_error(pos, pos_new, dist, ref):

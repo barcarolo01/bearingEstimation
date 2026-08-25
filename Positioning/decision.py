@@ -15,8 +15,8 @@ from Positioning.error import estimate_pos_error
 # ===== PARAMETRI DECISIONI =====
 
 # RESURFACE: reset periodico della posizione a quella reale
-RESURFACE_FREQ = 180    # Resetta ogni N iterazioni
-MDS_FREQ = 30           # Esegui MDS ogni N iterazioni
+#RESURFACE_FREQ = 180    # Resetta ogni N iterazioni
+#MDS_FREQ = 100           # Esegui MDS ogni N iterazioni
 
 # Not used by Davide
 #RESURFACE_TH = 200     
@@ -87,7 +87,8 @@ def resurface_decision(err, n, ref):
         bool: True se va fatto resurface per questo nodo
     """
     # Versione periodica (attiva nel codice)
-    return n % RESURFACE_FREQ == 0
+    #return n % RESURFACE_FREQ == 0
+    return True 
     
     # Versione basata su errore (commentata, potrebbe essere migliore)
     # return err[ref] > RESURFACE_TH
@@ -115,7 +116,8 @@ def mds_decision(n, err, local, ref=None):
         bool: True se va eseguito MDS
     """
     # Versione periodica (attiva nel codice)
-    return n % MDS_FREQ == 0
+    #return n % MDS_FREQ == 0
+    return True
     
     # Versioni alternative (commentate):
     # return np.mean(err) > MDS_TH        # MDS se errore medio > soglia

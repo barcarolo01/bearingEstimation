@@ -1,58 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from maps.build_local_map import build_local_cartesian_map
+# DATASHEET PARAMETERS
+IMU_ACCEL_BIAS = np.ones(3) * 0         
 
-'''
-This file contians a class that simualtes a floater equipped with a IMU
-'''
+#IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
+IMU_SIGMA_WHITENOISE = np.ones(3) * (0.5 / np.sqrt(3600 * 1))
 
-def local_to_geo(Center_coordinates,local_point):
-    Lat_center, Lon_center = Center_coordinates[0], Center_coordinates[1]
-    gt_x = local_point[..., 0]
-    gt_y = local_point[..., 1]
+#IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
+IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-4 * 9.81 * np.sqrt(1 / 200.0))
 
-    R = 6371000.0
-    Lat = Lat_center + (gt_y / R) * (180 / np.pi)
-    Lon = Lon_center + (gt_x / (R * np.cos(np.radians(Lat_center)))) * (180 / np.pi)
-    depth = np.full_like(Lat, 22.0)
-
-    return np.stack((Lat, Lon, depth), axis=-1)
-
-def geo_to_local(Center_coordinates, geo_coordinates):
-    Lats = geo_coordinates[..., 0]
-    Lons = geo_coordinates[..., 1]
-    Lat_center, Lon_center = Center_coordinates[0], Center_coordinates[1]
-
-    lats = np.radians(Lats)
-    lons = np.radians(Lons)
-    R = 6371000.0
-    x = R * (lons - np.radians(Lon_center)) * np.cos(np.radians(Lat_center))
-    y = R * (lats - np.radians(Lat_center))
-    z = np.full_like(x, 10.0)
-
-    return np.stack((x, y, z), axis=-1)
-
-def computer_local_mobility(N_STEPS,v_x_init,v_y_init,Rho,sigma_x,sigma_y):
-    local_coordinates = np.zeros((N_STEPS,2))
-    local_coordinates[0,:] = [0,0]
-
-    v_x = v_x_init
-    v_y = v_y_init
-    v_x_y = np.sqrt(v_x**2 + v_y**2)
-
-    for i in range(1,N_STEPS):
-        e_x = np.random.normal(0,sigma_x)
-        e_y = np.random.normal(0,sigma_y)
-    
-        v_x = v_x*Rho + e_x*np.sqrt(1 - Rho**2)
-        v_y = v_y*Rho + e_y*np.sqrt(1 - Rho**2)
-        
-        local_coordinates[i,:] = [ local_coordinates[i-1,0] + v_x * 1, 
-                                   local_coordinates[i-1,1] + v_y * 1 ]
-
-
-    return np.asarray(local_coordinates)
 
 class Floater:
     """
@@ -84,16 +41,17 @@ class Floater:
         
         # IMU parameters
         # == Contribution 1: constant bias
-        self.accel_bias = np.zeros(self.dim)
+        self.accel_bias = IMU_ACCEL_BIAS
 
         # == Contribution 2: white noise
-        #self.sigma_white_noise = np.full(self.dim, 0.037 / np.sqrt(3600 * dt), dtype=float)
-        self.sigma_white_noise = np.full(self.dim, 0.37 / np.sqrt(3600 * dt), dtype=float)
+        self.sigma_white_noise = IMU_SIGMA_WHITENOISE
+        
         
         # == Contribution 3: bias random walk (cumulative error)
-        #self.sigma_bias_driving = 13e-6 * 9.81 * np.sqrt(dt / 200.0)
-        self.sigma_bias_driving = 13e-4 * 9.81 * np.sqrt(dt / 200.0)
+        self.sigma_bias_driving = IMU_SIGMA_BIAS_DRIVING
+
         self.bias_random_walk = np.zeros(self.dim, dtype=float) # Initially zeros
+        self.sigma_bias_driving = np.zeros(self.dim)
         
         
         # Previous acceleration value (used for integration)
@@ -159,19 +117,19 @@ class Floater:
         # Accumulate random walk bias
         self.bias_random_walk += bias_drift
         
-        # Measured acceleration = true acceleration + errors
-        a_measured = self.a_gt + self.accel_bias + white_noise + self.bias_random_walk
+        # MEASURED acceleration = true acceleration + errors
+        a_MEASURED = self.a_gt + self.accel_bias + white_noise + self.bias_random_walk
         
         # === INTEGRATE ESTIMATED VELOCITY (trapezoidal rule) ===
-        self.est_v += 0.5 * (self._prev_est_a + a_measured) * self.dt
-        #self.est_v += a_measured * self.dt
+        #self.est_v += 0.5 * (self._prev_est_a + a_MEASURED) * self.dt
+        self.est_v += a_MEASURED * self.dt
 
         # === INTEGRATE ESTIMATED POSITION ===
         self.est_pos += self.est_v * self.dt
         
         # === SAVE STATE FOR NEXT ITERATION ===
-        self._prev_est_a = a_measured.copy()
-        self.est_a = a_measured.copy()
+        self._prev_est_a = a_MEASURED.copy()
+        self.est_a = a_MEASURED.copy()
 
     def get_gt_position(self):
         """Return the true position as a numpy array"""
@@ -192,7 +150,7 @@ class Floater:
     def resurface(self):
         # The estimated position is reset to the ground truth position
         self.est_pos = self.gt_pos.copy()
-        '''
+        
         # The estimated velocity is reset to the ground truth velocity
         self.est_v = self.gt_v.copy()
     
@@ -202,40 +160,198 @@ class Floater:
 
         # Random walk (i.e. cumulative error) is zeroed
         self.bias_random_walk = np.zeros(self.dim, dtype=float)
-        
-        '''
 
 
 if __name__ == '__main__':
-
-    np.random.seed(5)
-    Center = [12.61529, 43.37765]
+    np.random.seed(999)    
     DIM = 3
-    N = 900
+    N = 1000
     
-    floater = Floater(gt_x=0, gt_y=0, gt_z=0.0, dt=1.0, dim  = DIM)
-    floater.set_rho(0.98)
-    floater.set_sigma(0.2, 0.2,0.0)
-    floater.set_initial_velocity(1.0, 0.5,0.0)
-    
+    floater = Floater(gt_x=0, gt_y=0, gt_z=0.0, dt=1.0, dim = DIM)
+    floater.set_rho(0.992)
+    floater.set_sigma(0.2, 0.2, 0.0)
+    floater.set_initial_velocity(0.5, 0.5, 0.0)
+    step = 300
     gt = np.zeros((N,DIM))
     est = np.zeros((N,DIM))
     for i in range(N):
+        if i % step == 0: 
+            floater.resurface()
+
         gt[i] = floater.get_gt_position()
         est[i] = floater.get_est_position()
         print(np.linalg.norm(floater.get_position_error()))
         floater.move()
 
-    
-    fig,axes= plt.subplots(1,2,figsize=(12,6))
-    axes[0].plot(gt[:,0],gt[:,1],'-o',color='green',label="Ground truth")
-    axes[0].plot(est[:,0],est[:,1],'-o',color='red',label="IMU estimated")
-    axes[0].legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=9)
-    axes[1].plot(np.linalg.norm(gt-est,axis=1))
-    axes[0].set_xlabel("Meters")
-    axes[0].set_ylabel("Meters")
-    axes[1].set_xlabel("Simulation steps / seconds")
-    axes[1].set_ylabel("Auto-estimated error w.r.t. ground truth [meters]")
-    axes[1].set_title("Positioning error: IMU vs ground truth")
-    axes[0].set_title("Estimated position vs ground truth (start at [0;0])")
+   # ========== PLOTTING ==========
+
+    FONTSIZE = 20
+
+    fig, axes = plt.subplots(1, 1, figsize=(10, 10))
+
+    # Gli indici in cui avviene il resurface()
+    indices = list(range(0, len(est), step))
+
+
+    # ============================================================
+    # 1. Traiettoria stimata
+    # ============================================================
+    #
+    # Tutta la traiettoria è continua, TRANNE il segmento
+    # immediatamente precedente a ogni resurface:
+    #
+    #   199 -> 200
+    #   399 -> 400
+    #   599 -> 600
+    #   ...
+    #
+    # Questo segmento rappresenta il "riposizionamento" della
+    # traiettoria stimata sulla posizione reale.
+    # ============================================================
+
+    for i in range(len(est) - 1):
+
+        # Il segmento i -> i+1 è quello che porta al resurface
+        if (i + 1) % step == 0:
+            linestyle = "--"
+            lw=0.5
+        else:
+            linestyle = "-"
+            lw  = 2
+
+        axes.plot(
+            np.abs(est[i:i+2, 0]),
+            np.abs(est[i:i+2, 1]),
+            color="blue",
+            linewidth=lw,
+            linestyle=linestyle,
+            
+        )
+
+
+    # Label della traiettoria stimata
+    axes.plot(
+        [],
+        [],
+        color="blue",
+        linewidth=2,
+        linestyle="-",
+        label="IMU estimated",
+    )
+
+
+    # ============================================================
+    # 2. Punti in corrispondenza dei resurface
+    # ============================================================
+    #
+    # Visualizziamo solo i punti in cui la traiettoria viene
+    # riposizionata, senza aggiungere forzatamente l'ultimo punto.
+    # ============================================================
+
+
+    axes.plot(
+        np.abs(est[indices, 0]),
+        np.abs(est[indices, 1]),
+        "o",
+        color="blue",
+        markersize=10,
+    )
+    axes.plot(
+        np.abs(est[indices[0], 0]),
+        np.abs(est[indices[0], 1]),
+        "o",
+        color="red",
+        markersize=10,
+    )
+
+
+
+    # ============================================================
+    # 3. Ground truth
+    # ============================================================
+
+    axes.plot(
+        np.abs(gt[:, 0]),
+        np.abs(gt[:, 1]),
+        "o",
+        color="red",
+        label="Ground truth",
+        markersize=3,
+    )
+
+
+    # ============================================================
+    # 4. Etichetta del primo punto
+    # ============================================================
+
+    if len(indices) > 0:
+        idx = indices[0]
+
+        axes.annotate(
+            f"t={idx} s",
+            (np.abs(est[idx, 0]), np.abs(est[idx, 1])),
+            textcoords="offset points",
+            xytext=(25, -10),
+            fontsize=FONTSIZE,
+            color="red",
+        )
+
+
+    # ============================================================
+    # 5. Impostazioni grafiche
+    # ============================================================
+
+    axes.set_xlabel("Meters", fontsize=FONTSIZE)
+    axes.set_ylabel("Meters", fontsize=FONTSIZE)
+
+    axes.tick_params(
+        axis="both",
+        which="major",
+        labelsize=FONTSIZE,
+    )
+
+    axes.legend(
+        loc="lower right",
+        frameon=True,
+        facecolor="white",
+        edgecolor="grey",
+        fontsize=FONTSIZE,
+    )
+
+    axes.grid(True, linestyle="--", alpha=0.5)
+
+    plt.savefig("ADIS16470_GT_vs_estimated_resurface.png")
+    plt.show()
+
+
+    # ============================================================
+    # 6. Errore di posizione
+    # ============================================================
+
+    fig, axes = plt.subplots(1, 1, figsize=(10, 10))
+
+    axes.plot(
+        np.linalg.norm(gt - est, axis=1),
+        linewidth=3.0,
+    )
+
+    axes.grid(True, linestyle="--", alpha=0.5)
+
+    axes.set_xlabel(
+        "Simulation steps / seconds",
+        fontsize=FONTSIZE,
+    )
+
+    axes.set_ylabel(
+        "Meters",
+        fontsize=FONTSIZE,
+    )
+
+    axes.tick_params(
+        axis="both",
+        which="major",
+        labelsize=FONTSIZE,
+    )
+
+    plt.savefig("ADIS16470_accumulated_error_resurface.png")
     plt.show()

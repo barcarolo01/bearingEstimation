@@ -2,56 +2,56 @@ import os
 import shutil
 from dotenv import load_dotenv
 from maps.build_local_3D import build_local_cartesian_map_3d
-from coordinate_generator import compute_TX_circle_trajectory, sposta
+from coordinate_generator import compute_TX_circle_trajectory, geo_to_local, local_to_geo, sposta
 from discrete_hydromate_single import run_discrete_hydromate_single
 from filter_trajectory import *
 from findpoint import *
 from maps.build_folium_map import build_map
 from maps.build_local_map import build_local_cartesian_map
+from ping_all import *
 from utils_runner import *
 from Floater import *
 from PositioningFramework import *
 
 np.random.seed(256123)
 
-SIMULATION_STEPS =102
-NUMBER_OF_FLOATERS=3
+SIMULATION_STEPS = 1
+NUMBER_OF_FLOATERS = 2
 
 SIMULATE = True
 ANALYZE_WAVS = False
-RESURFACE_FREQ = 100
 
+RESURFACE_FREQ = 600
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 SAMPLING_FREQUENCY = int(os.getenv('SAMPLING_FREQUENCY'))
-
 
 #Center = [20.832813, 88.698390] # India, low depth
 Center = [12.61529, 43.37765]
 Lat_center = Center[0]
 Lon_center = Center[1]
 
-np.save("Synth/Center_Coordinates.npy",Center)
 
 
 #TX_Coordinates = compute_TX_circle_trajectory(Center, 50 ,start_deg=0,end_deg=350,n_steps=9,radius_m=200,clockwise=True)
-
 #TX_Coordinates = np.zeros((1000,3))
 #SIMULATION_STEPS = TX_Coordinates.shape[0]
 
 TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
 
 
-Center_2 =sposta(Center,250*np.sqrt(2),225)
+Center_2 =sposta(Center,150*np.sqrt(2),225)
 lat1,lon1 = sposta(Center_2,150,0)
-lat2,lon2 = sposta(Center_2,150,90)
+lat2,lon2 = Center_2
 lat3,lon3 = sposta(Center_2,150,180)
 lat4,lon4 = sposta(Center_2,150,270)
+lat5,lon5 = sposta(Center_2,150,225)
 RX_init_coordinates = np.asarray( [[lat1,lon1,10],
                                    [lat2,lon2,20],
                                    [lat3,lon3,30],
-                                   [lat4,lon4,20]])
+                                   [lat4,lon4,20],
+                                   [lat5,lon5,20]])
 
 # Hydromate is launched from python: this produces three tracks for each floater of "Synth" folder
 if SIMULATE:
@@ -62,11 +62,12 @@ if SIMULATE:
                         shutil.rmtree("Synth")
         os.makedirs("Synth")
 
+        np.save("Synth/Center_Coordinates.npy",Center)
 
         trans = Floater(-100,-100,20,1.0,3)
         trans.set_rho(1.0)
         trans.set_sigma(0.10, 0.10, 0.0)
-        trans.set_initial_velocity(5.0,5.0,0)
+        trans.set_initial_velocity(1.0,1.0,0)
 
 
         # === Floater initialization ===
@@ -83,33 +84,34 @@ if SIMULATE:
                         dim=3)
 
                 RX_gt_Coordinates[0,n,:] = local_to_geo(Center,f.get_gt_position())
+                tmp = np.zeros(RX_gt_Coordinates.shape)
 
-                f.set_initial_velocity(1,2,0)
-                f.set_rho(0.98)
-                f.set_sigma(0.8, 0.8, 0.0)
+                f.set_initial_velocity(0.3,0.3,0)
+                f.set_rho(1.0)
+                f.set_sigma(0.1, 0.1, 0.0)
+                if n == 4:
+                        f.set_initial_velocity(-0.3,0.3,0)
                 floaters.append(f)
 
 
         PFW = PositioningFramework(RESURFACE_FREQ,np.array([f.get_gt_position() for f in floaters]))
         
         for i in range(SIMULATION_STEPS):
+                #print(ping_all(Center,floaters))
                 TX_Coordinates[i,:] = local_to_geo(Center,trans.get_gt_position())        
                 for n in range(NUMBER_OF_FLOATERS):
                         print(f"# Simulation step {i}, Floater {n} #")
                         RX_gt_Coordinates[i,n,:] = local_to_geo(Center,floaters[n].get_gt_position())
+                        tmp[i,n,:] = local_to_geo(Center,floaters[n].get_est_position())
 
-
-                        
-                        if i % RESURFACE_FREQ == 0:
+                        if i % RESURFACE_FREQ == 0 and i != 0:
                                 print(f"Refurface of floater #{n} at timestamp {i}")
                                 floaters[n].resurface()
-        
-                        floaters[n].move() # Move the floater of 1 step 
 
                         
-                    
+                        floaters[n].move() # Move the floater of 1 step 
+                
                         
-                        '''
                         run_discrete_hydromate_single(TX_Coordinates[i,0],
                                                       TX_Coordinates[i,1],
                                                       TX_Coordinates[i,2],
@@ -118,25 +120,25 @@ if SIMULATE:
                                                       RX_gt_Coordinates[i,n,2],
                                                       (n+1))
                         
-                        for j in range(NUMBER_OF_HYDROPHONES):
-                                array = np.load(f'Synth/F{n+1}_H{j+1}.npy')
-                                wav.write(f'Synth/F{n+1}_H{j+1}.wav', SAMPLING_FREQUENCY, array)
-                        '''
-                        
-                               
+
+                PFW.update_positioning(np.array([f.get_gt_position() for f in floaters]),
+                                        np.array([f.get_est_position() for f in floaters]))
+
+                
+                                                            
                         
                 trans.move()
-                if(i>97):
-                        print(f"===== {i} =====")
-                        print(floaters[0].get_gt_position())
-                        print("-----------")
-                        print(floaters[0].get_est_position())
-                        print()
-                       
-                PFW.update_positioning(np.array([f.get_gt_position() for f in floaters]),
-                                       np.array([f.get_est_position() for f in floaters]))
+                print("=#"*10)
+
+
+        for n in range(NUMBER_OF_FLOATERS):
+                for j in range(NUMBER_OF_HYDROPHONES):
+                        array = np.load(f'Synth/F{n+1}_H{j+1}.npy')
+                        wav.write(f'Synth/F{n+1}_H{j+1}.wav', SAMPLING_FREQUENCY, array)
+                                        
+                                
                 
-        RX_fw_IMU, RX_fw_IMU_MDS, RX_bw_IMU, RX_bw_IMU_MDS =  PFW.end_simulation()
+        RX_fw_IMU_MDS, RX_fw_IMU, RX_bw_IMU_MDS, RX_bw_IMU =  PFW.end_simulation()
 
 
         # End of simulation: save coordinates
@@ -162,20 +164,22 @@ RX_fw_IMU = np.load("Synth/RX_fw_IMU.npy")
 RX_fw_IMU_MDS = np.load("Synth/RX_fw_IMU_MDS.npy")
 RX_bw_IMU = np.load("Synth/RX_bw_IMU.npy")
 RX_bw_IMU_MDS = np.load("Synth/RX_bw_IMU_MDS.npy")
+
+
 build_local_cartesian_map(
         RX_gt_Coordinates, 
         None, 
         None, 
         center_coordinates=Center,
-        window_width_m=600, 
-        window_height_m=600,
+        window_width_m=900, 
+        window_height_m=900,
         output_file="maps/map_local.png",
         track_TX=True,
         track_estimated=True,
         RX_fw_IMU=RX_fw_IMU,
-        #RX_fw_IMU_MDS=RX_fw_IMU_MDS,
-        #RX_bw_IMU=RX_bw_IMU,
-        #RX_bw_IMU_MDS=RX_bw_IMU_MDS
+        RX_fw_IMU_MDS=RX_fw_IMU_MDS,
+        RX_bw_IMU=RX_bw_IMU,
+        RX_bw_IMU_MDS=RX_bw_IMU_MDS
         )
 
 
@@ -244,8 +248,6 @@ np.save("Synth/Estimated_fw_IMU_MDS",estimated_fw_IMU_MDS)
 np.save("Synth/Estimated_estimated_bw_IMU",estimated_bw_IMU)
 np.save("Synth/Estimated_",estimated_bw_IMU_MDS)
 
-print("GG")
-
 # Plotting points on the map
 build_map(
         floaters_coordinates = RX_gt_Coordinates,
@@ -293,9 +295,9 @@ if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimate
                 track_estimated=True)
 '''    
 
-print(f"RMSE estimated_points:\t\t {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_fw_IMU:\t\t {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_fw_IMU_MDS:\t {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_bw_IMU: \t\t {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_bw_IMU_MDS: \t {compute_RMSE_same_size(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
-#print(f"RMSE depth: {compute_depth_rmse(TX_Coordinates[:,2],estimated_points[:,2])}")
+print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center):.1f}")
+print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],Lat_center,Lon_center):.1f}")
+print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
+print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],Lat_center,Lon_center):.1f}")
+print(f"RMSE estimated_bw_IMU_MDS: \t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")

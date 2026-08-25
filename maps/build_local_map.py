@@ -142,10 +142,10 @@ def build_local_cartesian_map(
 
     # --- Traiettorie RX IMU (sempre attive, una traiettoria per ciascun device) ---
     _imu_tracks = [
-        (RX_fw_IMU, xy_fw_imu, "#0000FF", "RX fw IMU"),
-        (RX_fw_IMU_MDS, xy_fw_imu_mds, "#FFA500", "RX fw IMU MDS"),
-        (RX_bw_IMU, xy_bw_imu, "#90EE90", "RX bw IMU"),
-        (RX_bw_IMU_MDS, xy_bw_imu_mds, "#115511", "RX bw IMU MDS"),
+        (RX_fw_IMU, xy_fw_imu, "#F3C178", "RX fw IMU"),
+        (RX_fw_IMU_MDS, xy_fw_imu_mds, "#6BFFB8", "RX fw IMU MDS"),
+        (RX_bw_IMU, xy_bw_imu, "#FE5E41", "RX bw IMU"),
+        (RX_bw_IMU_MDS, xy_bw_imu_mds, "#2A6041", "RX bw IMU MDS"),
     ]
 
     for raw_input, xy_multi, color, _ in _imu_tracks:
@@ -163,13 +163,18 @@ def build_local_cartesian_map(
 
             # Traiettoria connessa (sempre disegnata di default)
             if len(valid_traj) > 1:
-                ax.plot(valid_traj[:, 0], valid_traj[:, 1], color=color, linewidth=2, alpha=0.4, zorder=2)
+                ax.plot(valid_traj[:, 0], valid_traj[:, 1], color=color, linewidth=2,
+                        alpha=0.7, zorder=2)
 
             # Marker sui singoli punti
             ax.plot(
                 valid_traj[:, 0], valid_traj[:, 1],
-                marker='o', markersize=6, color=color, linestyle='None',
-                markeredgecolor='black', markeredgewidth=0.5, alpha=0.4, zorder=4
+                #marker='o', markersize=6,  # ROUND MARKER
+                color=color, linestyle='None',
+                markeredgecolor='black',
+                markeredgewidth=0.5, 
+                alpha=0.7,
+                zorder=4
             )
 
     # --- Floaters: traiettoria tratteggiata per ciascun floater + etichetta sull'ultima posizione ---
@@ -189,13 +194,15 @@ def build_local_cartesian_map(
             if track_floaters and len(valid_traj) > 1:
                 ax.plot(
                     valid_traj[:, 0], valid_traj[:, 1],
-                    color='#FF0000', linewidth=1.5, linestyle='--', alpha=0.6, zorder=4
+                    color='#FF0000', linewidth=1.5, linestyle='--', alpha=0.5, zorder=4
                 )
+                '''
                 # Marker su tutte le posizioni tranne la prima (che ha già l'etichetta)
                 ax.plot(
                     valid_traj[1:, 0], valid_traj[1:, 1],
-                    marker='o', markersize=4, color='#FF0000', linestyle='None', alpha=0.6, zorder=4
+                    marker='o', markersize=4, color='#FF0000', linestyle='None', alpha=0.1, zorder=4
                 )
+                '''
 
             # --- Etichetta sulla prima posizione nota ---
             first_pt = valid_traj[0]
@@ -236,7 +243,7 @@ def build_local_cartesian_map(
     ax.plot(0, 0, 'kx', markersize=5, markeredgewidth=2, label=label_centro)
     
     if floaters_coordinates is not None:
-        ax.plot([], [], marker='s', color='#FF0000', linestyle='None', label='Floaters')
+        ax.plot([], [], marker='s', color='#FF0000', linestyle='None', label='Floaters', alpha=0.1)
     if TX_positions_coordinates is not None:
         ax.plot([], [], marker='o', color='#FFD700', linestyle='None', label='Groung truth')
     if estimated_vessel_coordinates is not None:
@@ -244,9 +251,9 @@ def build_local_cartesian_map(
 
     for raw_input, _, color, legend_label in _imu_tracks:
         if raw_input is not None:
-            ax.plot([], [], marker='o', color=color, linestyle='-', label=legend_label)
+            ax.plot([], [], color=color, linestyle='-', label=legend_label)
 
-    #ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE)
+    ax.legend(loc="upper left", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE)
 
     # Salvataggio ed output
     plt.savefig(output_file, dpi=300, bbox_inches='tight')

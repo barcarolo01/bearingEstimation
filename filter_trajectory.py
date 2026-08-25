@@ -49,44 +49,35 @@ def replace_outliers_mean(coordinate, WIN_LEN=7):
     
     return filtered_coordinates
 
-
-def compute_RMSE_same_size(st, gt, lat_rad, lon_rad):
-    METRI_PER_GRADO_LAT = (
-        111132.92
-        - 559.82 * np.cos(2 * lat_rad)
-        + 1.175 * np.cos(4 * lat_rad)
-        - 0.0023 * np.cos(6 * lat_rad)
-    )
-    METRI_PER_GRADO_LON = (
-        111412.84 * np.cos(lat_rad)
-        - 93.5 * np.cos(3 * lat_rad)
-        + 0.118 * np.cos(5 * lat_rad)
-    )
-
-    # maschera comune sui NaN, per mantenere l'allineamento point-wise
+'''
+Computes the RMSE error only along the depth coordinate of a series of 3D points
+'''
+def compute_flat_RMSE(st, gt, lat_rad_center, lon_rad_center):
+    # Generate a mask for NaN values of both sequences (to maintain the point-wise alignment)
     mask = ~(np.isnan(gt).any(axis=1) | np.isnan(st).any(axis=1))
-    gt = gt[mask]
-    st = st[mask]
 
-    if gt.shape[0] == 0:
-        return np.nan  # nessun punto valido in comune
+    # Coordinate differences, in degrees
+    diff = gt[mask] - st[mask]
 
-    gt_m = gt * [METRI_PER_GRADO_LAT, METRI_PER_GRADO_LON]
-    st_m = st * [METRI_PER_GRADO_LAT, METRI_PER_GRADO_LON]
+    # Distance conversion in meters
+    diff[:,0] *= 111_319.9
+    diff[:,1] *= (111_319.9 * np.cos(np.deg2rad((gt[:,0]))))
 
-    diff = gt_m - st_m
-    dist2 = np.sum(diff**2, axis=1)   # distanza euclidea al quadrato, per ogni punto
+    # Return a single number: average RMSE of the distances
+    rmse = np.sqrt(np.sum(diff**2))
+    return np.mean(rmse)
 
-    rmse = np.sqrt(np.mean(dist2))    # un solo numero, in metri
-    return rmse
+'''
+Computes the RMSE error only along the depth coordinate of a series of 3D points
+'''
+def compute_depth_RMSE(depth_true, depth_pred):
+    depth_true = np.asarray(depth_true, dtype=float)
+    depth_est = np.asarray(depth_pred, dtype=float)
 
-def compute_depth_rmse(y_true, y_pred):
-    y_true = np.asarray(y_true, dtype=float)
-    y_pred = np.asarray(y_pred, dtype=float)
-
-    mask = ~np.isnan(y_true) & ~np.isnan(y_pred)
+    mask = ~np.isnan(depth_true) & ~np.isnan(depth_est)
     if not np.any(mask):
         return np.nan
 
-    diff = y_true[mask] - y_pred[mask]
-    return np.sqrt(np.mean(diff ** 2))
+    diff = depth_true[mask] - depth_est[mask]
+    rmse = np.sqrt(np.sum(diff**2))
+    return np.mean(rmse)

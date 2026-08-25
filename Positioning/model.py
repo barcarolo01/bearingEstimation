@@ -80,14 +80,16 @@ def distance_emulation(pos, local, ref=None):
 
     # ===== AGGIUNGE ERRORI GAUSSIANI =====
     
+    rand_dist_emu = np.random.default_rng(67890)
+    
     # Errore relativo (dipende dalla distanza)
     sd_dist_e = compute_target_sd(e_measure, ERR_P)
-    dist_deviation = np.random.randn(n, n) * sd_dist_e
+    dist_deviation = rand_dist_emu.standard_normal((n, n)) * sd_dist_e
     dist_error = dist * dist_deviation  # Errore proporzionale alla distanza
     
     # Errore fisso (indipendente dalla distanza)
     sd_dist_e_fix = compute_target_sd(e_measure_fix, ERR_P)
-    dist_fix_deviation = np.random.randn(n, n) * sd_dist_e_fix
+    dist_fix_deviation = rand_dist_emu.standard_normal((n, n)) * sd_dist_e_fix
     dist_error += dist_fix_deviation  # Aggiungi errore fisso
     
     # Applica errore solo alle distanze misurate (maschera)
@@ -95,7 +97,9 @@ def distance_emulation(pos, local, ref=None):
     
     # Distanze misurate = distanze reali + errori
     self_dist = dist + dist_error
+    
 
+    self_dist = dist
     # Rendi matrice simmetrica (se misuro dist(i,j), conosco dist(j,i))
     return self_dist + np.transpose(self_dist)
 

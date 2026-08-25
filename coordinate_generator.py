@@ -1,6 +1,32 @@
 from findpoint import *
 from utils_runner import *
 
+def local_to_geo(Center_coordinates,local_point):
+    Lat_center, Lon_center = Center_coordinates[0], Center_coordinates[1]
+    gt_x = local_point[..., 0]
+    gt_y = local_point[..., 1]
+
+    R = 6371000.0
+    Lat = Lat_center + (gt_y / R) * (180 / np.pi)
+    Lon = Lon_center + (gt_x / (R * np.cos(np.radians(Lat_center)))) * (180 / np.pi)
+    depth = np.full_like(Lat, 22.0)
+
+    return np.stack((Lat, Lon, depth), axis=-1)
+
+def geo_to_local(Center_coordinates, geo_coordinates):
+    Lats = geo_coordinates[..., 0]
+    Lons = geo_coordinates[..., 1]
+    Lat_center, Lon_center = Center_coordinates[0], Center_coordinates[1]
+
+    lats = np.radians(Lats)
+    lons = np.radians(Lons)
+    R = 6371000.0
+    x = R * (lons - np.radians(Lon_center)) * np.cos(np.radians(Lat_center))
+    y = R * (lats - np.radians(Lat_center))
+    z = np.full_like(x, 10.0)
+
+    return np.stack((x, y, z), axis=-1)
+
 def sposta(center, distanza, dir):
     lat, lon = center[0],center[1]
     
@@ -62,7 +88,7 @@ def generate_TX_trajectory(Lat_TX_init,Lon_TX_init,Lat_TX_end,Lon_TX_end,constan
     # Returns the array of coordinates in form of [n_steps,2]
     return np.asarray([Lat_TXs, Lon_TXs, depths]).T
 
-def generate_grid_of_samples(lat_orig, lon_orig, W, N):
+def generate_grid_of_samples(lat_orig, lon_orig, depth_constant, W, N):
     """
     Generates a grid of coordinates (Lat, Lon) centered on the specified origin.
     
@@ -92,7 +118,7 @@ def generate_grid_of_samples(lat_orig, lon_orig, W, N):
     
     # Meshgrid generates 2D matrices (N nows x 2N cols)
     LON, LAT = np.meshgrid(lon_griglia, lat_griglia)
-    coordinate_coppie = np.column_stack((LAT.ravel(), LON.ravel()))
+    coordinate_coppie = np.column_stack((LAT.ravel(), LON.ravel(),))
     
     return coordinate_coppie
 

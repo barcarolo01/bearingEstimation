@@ -4,8 +4,11 @@ from Positioning.error import *
 from Positioning.reverse import *
 from Positioning.algo import *
 from Positioning.model import *
+from coordinate_generator import local_to_geo
+import ping_all
 
-MDS_FREQ = 9999
+MDS_FREQ = 180
+Center = [12.61529, 43.37765]
 
 def compute_error(poss, estimationss):
     """
@@ -63,6 +66,8 @@ class PositioningFramework:
         self.self_err = np.zeros(self.N)
         self.self_plain_err = np.zeros(self.N)
         self.steps_counter = 0
+        self.steps_from_last_MDS = 0
+        self.steps_from_last_RESURFACE = 0
         self.dists = [dict() for _ in range(self.N)]
 
         # IMU only
@@ -76,19 +81,52 @@ class PositioningFramework:
         self.real_poss = []
         self.self_movs = []
 
+        self.MDS_index = []
+        self.Resurface_index = []
+
     def update_positioning(self,new_gt_position_matrix,new_est_position_matrix):
         self.steps_counter += 1
 
-        # Compute the estimated motion
-        self.self_mov = new_est_position_matrix - self.previous_est_position_matrix
-        self.previous_est_position_matrix = new_est_position_matrix.copy()
-        self.real_pos = new_gt_position_matrix.copy()
+        RUN_MDS = self.steps_counter % MDS_FREQ == 0 and self.steps_counter != 0
         
+        if RUN_MDS:
+            self.run_MDS()
+            self.steps_from_last_MDS = 0
+            self.MDS_index.append(self.steps_counter)
 
-        self.self_pos += self.self_mov
-        self.self_plain_pos += self.self_mov
-        self.self_err += estimate_mov_error(self.self_mov)
-        self.self_plain_err += estimate_mov_error(self.self_mov)
+        if self.steps_counter % self.RESURFACE_FREQ == 0 and self.steps_counter != 0:
+            self.previous_est_position_matrix = new_gt_position_matrix.copy()
+            self.real_pos = new_gt_position_matrix.copy()        
+            self.self_pos = new_gt_position_matrix.copy()
+            self.self_plain_pos = new_gt_position_matrix.copy()
+            self.self_err = np.zeros(self.N)
+            self.self_plain_err = np.zeros(self.N)
+            self.self_mov = np.zeros(new_gt_position_matrix.shape)
+            self.steps_from_last_RESURFACE = 0
+            self.Resurface_index.append(self.steps_counter)
+    
+        else:
+            # Compute the estimated motion
+            self.real_pos = new_gt_position_matrix.copy()
+            self.self_mov = new_est_position_matrix - self.previous_est_position_matrix
+            self.previous_est_position_matrix = new_est_position_matrix.copy()  
+            self.self_plain_pos += self.self_mov      
+
+            # QUAA
+            #self.self_plain_err += estimate_mov_error(self.self_mov)
+            self.self_plain_err = move_error_2(1,self.steps_from_last_RESURFACE,new_gt_position_matrix.shape[1])
+
+            # If MDS was run in this iteration, self_pos and self_err are already up to date
+            if not RUN_MDS: 
+                self.self_pos += self.self_mov
+
+                # QUAA
+                #self.self_err += estimate_mov_error(self.self_mov)
+                self.self_err = move_error_2(1,min(self.steps_from_last_MDS,self.steps_from_last_RESURFACE),new_gt_position_matrix.shape[1])
+
+                self.steps_from_last_MDS += 1
+                self.steps_from_last_RESURFACE += 1
+
 
         # === Append current status to history ===
         self.self_poss.append(self.self_pos.copy()) # IMU+MDS positions
@@ -98,31 +136,22 @@ class PositioningFramework:
         self.self_errs.append(self.self_err.copy()) # IMU+MDS error
         self.self_plain_errs.append(self.self_plain_err.copy()) # IMU only error
 
-        if self.steps_counter % self.RESURFACE_FREQ == 0:
-            self.resurface()
+        
 
-        if self.steps_counter % MDS_FREQ == 0:
-            self.run_MDS()
-
-    def resurface(self):
-        for n in range(self.N):
-            print("Resurface: ", n, "\n")
-            self.self_err[n] = 0 # Erros is zeroed
-            self.self_pos[n, :] = self.real_pos[n, :].copy() # Estimated position is set to the real one
-
-        for n in range(self.N):
-            print("Resurface: ", n, "\n")
-            self.self_plain_err[n] = 0 # Erros is zeroed
-            self.self_plain_pos[n, :] = self.real_pos[n, :].copy() # Estimated position is set to the real one
-
+   
     def run_MDS(self):
         print(f"[MDS] launched ad iteration {self.steps_counter}")
         self_pos_copy, self_err_copy = self.self_pos.copy(), self.self_err.copy()
         
         # Iteration over the number of floaters
+        measured_dist = ping_all.local_ping(Center,self.real_pos)
+        print(measured_dist)
+
         for n in range(self.N):
             # Measure the distance between every possible couple of nodes (NxN matrix)
-            measured_dist = distance_emulation(self.real_pos, local=False, ref=n)
+            #measured_dist = distance_emulation(self.real_pos, local=False, ref=n)
+            #print(self.real_pos[n,:])
+            #measured_dist = ping_all.local_ping(Center,self.real_pos)
             self.dists[n][self.steps_counter] = measured_dist  # Salva per retroazione backwar
             
             # TODO: CHECK! RUN (MDS + Procrustes)
@@ -133,7 +162,6 @@ class PositioningFramework:
             self.self_pos[n, :] = self_pos_new[n, :].copy()
             self.self_err[n] = self_err_new[n]
 
-
     
     def end_simulation(self):
         # Save the "forward-only" status
@@ -141,31 +169,36 @@ class PositioningFramework:
         old_self_errs, old_self_plain_errs = self.self_errs.copy(), self.self_plain_errs.copy()
     
         # Run MDS "reverse"
-        self.self_poss, self.self_errs = reverse(self.self_movs, self.self_errs.copy(), self.self_poss.copy(), self.dists)
         
-        # Run MDS "forward only"
+        self.self_poss, self.self_errs = reverse(self.self_movs, self.self_errs.copy(), self.self_poss.copy(), self.dists,
+                                                 self.MDS_index,self.Resurface_index)
+        
+
+        # Run MDS "forward only"    
         dists_empty = []
         for i in range(self.N):
             dists_empty.append(dict())
         self.self_plain_poss, self.self_plain_errs = reverse(self.self_movs, self.self_plain_errs.copy(), 
-                                                             self.self_plain_poss.copy(), dists_empty)
+                                                             self.self_plain_poss.copy(), dists_empty,
+                                                             [],self.Resurface_index)
+          
+        fw_imu_mean = np.mean(np.linalg.norm((np.asarray(old_self_plain_poss)-np.asarray(self.real_poss)),axis = 1))
+        fw_imu_mds_mean = np.mean(np.linalg.norm((np.asarray(old_self_poss)-np.asarray(self.real_poss)),axis = 1))
+        bw_imu_mean = np.mean(np.linalg.norm((np.asarray(self.self_plain_poss)-np.asarray(self.real_poss)),axis = 1))
+        bw_imu_mds_mean = np.mean(np.linalg.norm((np.asarray(self.self_poss)-np.asarray(self.real_poss)),axis = 1))
+        print(f"IMU only (Forward): {fw_imu_mean:.1f}")
+        print(f"IMU only (Backward): {bw_imu_mean:.1f}")
+        print(f"IMU + MDS (Forward): {fw_imu_mds_mean:.1f}")
+        print(f"IMU + MDS (Backward): {bw_imu_mds_mean:.1f}")
 
-
-        old_mean = np.mean([np.mean(e) for e in old_self_errs])
-        new_mean = np.mean([np.mean(e) for e in self.self_errs])
         
-        print(f"Forward mean error: {old_mean:.4f}")
-        print(f"Reverse mean error: {new_mean:.4f}")
-        
-        if new_mean > old_mean:
-            print("⚠️ WARNING: Reverse is worse than forward!")
 
         plt.figure(figsize=(12, 5))
         plt.subplot(1, 2, 1)
-        plt.plot(compute_means(self.self_plain_errs), label="IMU only (reverse)", alpha=0.7)
-        plt.plot(compute_means(self.self_errs), label="IMU + MDS (reverse)", alpha=0.7)
-        plt.plot(compute_means(old_self_plain_errs), label="IMU only (forward)", alpha=0.7)
-        plt.plot(compute_means(old_self_errs), label="IMU + MDS (forward)", alpha=0.7)
+        plt.plot(compute_means(self.self_plain_errs), label="IMU only (reverse)", alpha=0.5, color="#FE5E41")
+        plt.plot(compute_means(self.self_errs), label="IMU + MDS (reverse)", alpha=0.5, color = "#2A6041")
+        plt.plot(compute_means(old_self_plain_errs), label="IMU only (forward)", alpha=0.5, color = "#F3C178")
+        plt.plot(compute_means(old_self_errs), label="IMU + MDS (forward)", alpha=0.5, color = "#6BFFB8")
         plt.legend()
         plt.title("Self errors (accumulated error per node)")
         plt.xlabel("Iteration")
@@ -174,10 +207,10 @@ class PositioningFramework:
 
         # Plot 2: Error vs ground truth
         plt.subplot(1, 2, 2)
-        plt.plot(compute_error(self.real_poss, self.self_plain_poss), label="IMU only (reverse)", alpha=0.7)
-        plt.plot(compute_error(self.real_poss, self.self_poss), label="IMU + MDS (reverse)", alpha=0.7)
-        plt.plot(compute_error(self.real_poss, old_self_plain_poss), label="IMU only (forward)", alpha=0.7)
-        plt.plot(compute_error(self.real_poss, old_self_poss), label="IMU + MDS (forward)", alpha=0.7)
+        plt.plot(compute_error(self.real_poss, self.self_plain_poss), label="IMU only (reverse)", alpha=0.5,color="#FE5E41")
+        plt.plot(compute_error(self.real_poss, self.self_poss), label="IMU + MDS (reverse)", alpha=0.5, color = "#2A6041")
+        plt.plot(compute_error(self.real_poss, old_self_plain_poss), label="IMU only (forward)", alpha=0.5, color = "#F3C178")
+        plt.plot(compute_error(self.real_poss, old_self_poss), label="IMU + MDS (forward)", alpha=0.5, color = "#6BFFB8")
         plt.legend()
         plt.title("Positioning errors (vs ground truth)")
         plt.xlabel("Iteration")
@@ -186,7 +219,7 @@ class PositioningFramework:
         
         plt.tight_layout()
         #plt.show()
-        plt.savefig("miafigura.png")
+        plt.savefig("positioning_errors.png")
         plt.close("all")
 
         return np.asarray(old_self_poss), np.asarray(old_self_plain_poss), np.asarray(self.self_poss), np.asarray(self.self_plain_poss)

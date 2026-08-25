@@ -16,7 +16,7 @@ c = 1500 # Meters/second
 if __name__ == "__main__":
     precompute_bearing_angles_triangle(d)
 
-    '''
+    
     # Reading 3-tracks file
     fs, data = wav.read('AudioFiles/0958_crop.wav')
 
@@ -27,11 +27,12 @@ if __name__ == "__main__":
     sig1 = data[start*fs:end*fs, 0]
     sig2 = data[start*fs:end*fs, 1]
     sig3 = data[start*fs:end*fs, 2]
+    
     '''
     fs, sig1 = wav.read('Synth/F1_H1.wav')
     _, sig2 = wav.read('Synth/F1_H2.wav')
     _, sig3 = wav.read('Synth/F1_H3.wav')
-
+    '''
 
     # Window parameters
     durata_finestra = 0.05 # Seconds

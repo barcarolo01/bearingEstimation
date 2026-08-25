@@ -1,20 +1,18 @@
 import os
 import shutil
 from dotenv import load_dotenv
-import hydromate
+import sys
 import numpy as np
 from bellhop_to_wav import from_arr_to_wav
-#from hydromate.app_bellhop import AppBellhop
 from floater_geometry import get_hydrophones_coordinates
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
-HYDROMATE_PATH = os.getenv('HYDROMATE_PATH')
 
 def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, depth_RX, H_index):
     
-    import sys
-    sys.path.append(r"C:\Users\Nicola\Desktop\TESI\HYDROMATE\hm_code_py")
+    HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
+    sys.path.append(HYDROMATE_PY_PATH)
     from src.hydromate.app_bellhop import AppBellhop
 
     # Create TMP folder if not exists
@@ -39,15 +37,12 @@ def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, dept
                     10000,
                     nrd=1)
 
-    app.set_paths("C:/Users/Nicola/Desktop/TESI/HYDROMATE/hm_code_py/.env")
+    app.set_paths(os.path.join(HYDROMATE_PY_PATH,"/.env"))
     app.run_sim()
-
-    
 
     # Copy the files from the MATLAB folder to the python folder
     for j in range(NUMBER_OF_HYDROPHONES):
-        shutil.copyfile(f'HM_out_{j+1}/HM_out.arr',
-                        f'C:/Users/Nicola/Desktop/TESI/Prove/TMP/H{j+1}.arr')
+        shutil.copyfile(f'HM_out_{j+1}/HM_out.arr',f'TMP/H{j+1}.arr')
         shutil.rmtree(f'HM_out_{j+1}')
 
     # By convolution, obtain a signal for each of the arrival files

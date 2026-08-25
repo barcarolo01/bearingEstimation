@@ -15,14 +15,13 @@ Flusso principale:
 
 import numpy as np
 from sklearn.manifold import MDS
-
 from Positioning.error import estimate_dist_error, fill_distances
 from Positioning.decision import update_decision
 
 
 # ===== PARAMETRI =====
 DEF_WEIGHT = 0.00001  # Peso di default quando errore stima è infinito
-ITER = 10             # Iterazioni MDS per convergenza
+ITER = 50            # Iterazioni MDS per convergenza
 
 
 def roto_trans(pos, pos_local, weights):
@@ -141,7 +140,7 @@ def mds(pos, dist, weights):
     # Crea e applica MDS
     embedding = MDS(
         n_components=n,        # Mantieni numero di dimensioni
-        n_init=1,              # Un'inizializzazione (usiamo quella custom)
+        n_init=5,              # Un'inizializzazione (usiamo quella custom)
         max_iter=ITER,         # Numero iterazioni
         eps=0,                 # Tolerance di convergenza
         metric='precomputed',  # dist è matrice di distanze, non raw data,
@@ -236,7 +235,7 @@ def mds_weights(pos, err, dist):
     # Per distanze non misurate (dist[i,j] = 0), usa errori dei nodi
     for i in range(0, np.shape(dist_w)[0]):
         for j in range(0, np.shape(dist_w)[1]):
-            if dist[i][j] == 0:
+            if dist[i][j] == 0 and i != j:
                 # Errore della distanza = combinazione errori dei due nodi
                 dist_w[i][j] = 1 / ((err[i] + err[j]) + 10e-9)
     
@@ -276,11 +275,12 @@ def estimate(self_pos, self_err, dist):
     Returns:
         tuple: (self_pos aggiornata, self_err aggiornato)
     """
-    # Step 1: Calcola pesi
+    # Step 1: Calcola pesiì
     dist_w, pos_w = mds_weights(self_pos, self_err, dist)
     
     # Step 2: Completa distanze
-    dist_full = fill_distances(self_pos, dist)
+    #dist_full = fill_distances(self_pos, dist)
+    dist_full = dist
 
     # Step 3: Applica MDS
     estimated_pos = mds_algo(self_pos, dist_full, dist_w, pos_w)

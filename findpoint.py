@@ -120,7 +120,7 @@ def _least_squares_point_n(
 
     return float(lat_opt), float(lon_opt)
 
-def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+def compute_flat_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Distance in meters between two points (flat-earth approximation)"""
     meters_per_deg_lat = 111_319.9
     meters_per_deg_lon = 111_319.9 * np.cos(np.deg2rad((lat1 + lat2) / 2))
@@ -128,37 +128,10 @@ def _flat_dist_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dx = (lon2 - lon1) * meters_per_deg_lon
     return np.sqrt(dx**2 + dy**2)
 
-def _flat_azimuth(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.ndarray =None):
     """
-    Computes the geographic bearing (Clockwise from North, in degrees [0, 360))
-    from point 1 to point 2, flat-earth approximation.
-
-    Parameters
-    ---------
-    lat1, lon1 : coordinates of the starting point (decimal degrees)
-    lat2, lon2 : coordinates of the destination point (decimal degrees)
-
-    Returns
-    -------
-    Bearing in degrees, CW from North, in the range [0, 360).
-    """
-    R = 6371000.0
-    lat0_rad = np.deg2rad((lat1 + lat2) / 2)  # mean latitude for the correction
-
-    dx = np.deg2rad(lon2 - lon1) * R * np.cos(lat0_rad)  # East component
-    dy = np.deg2rad(lat2 - lat1) * R                      # North component
-
-    bearing = np.rad2deg(np.arctan2(dx, dy))  # arctan2(East, North) -> CW from North
-    return float(bearing % 360)
-
-def find_points(
-    floaters: np.ndarray,
-    bearings: np.ndarray,
-    elevation_array: np.ndarray | None = None,
-) -> np.ndarray:
-    """
-    For each of the N simulation steps, this method compute the point that minimzes the distance 
-    among the M direction of arrival lines estimated by each of the M floaters
+    For each of the N simulation steps, this method compute the point that minimzes the RMSE
+    distance with respect to the M direction of arrival lines estimated by each of the M floaters
 
     Parameters
     ---------
@@ -178,36 +151,29 @@ def find_points(
     floaters = np.asarray(floaters, dtype=float)
     bearings = np.asarray(bearings, dtype=float)
 
+    # Check "floaters" and "bearings" arrays
     if floaters.ndim != 3 or floaters.shape[2] not in (2, 3):
-        raise ValueError(
-            f"Floaters must have shape (N, M, 2) or (N, M, 3), while it has {floaters.shape}."
-        )
+        raise ValueError(f"Floaters must have shape (N, M, 2) or (N, M, 3), while it has {floaters.shape}.")
     if bearings.ndim != 2:
-        raise ValueError(
-            f"Bearings must have shape (M, N), while it has {bearings.shape}."
-        )
+        raise ValueError(f"Bearings must have shape (M, N), while it has {bearings.shape}.")
 
     n_simulations = floaters.shape[0]
     n_floaters = floaters.shape[1]
 
 
     if bearings.shape[0] != n_floaters or bearings.shape[1] != n_simulations:
-        raise ValueError(
-            f"Bearings must have shape ({n_floaters}, {n_simulations}), while it has {bearings.shape}."
-        )
+        raise ValueError(f"Bearings must have shape ({n_floaters}, {n_simulations}), while it has {bearings.shape}.")
     if n_floaters < 2:
         raise ValueError("At least 2 floaters are needed")
 
 
-    has_depth = floaters.shape[2] == 3
+    has_depth = floaters.shape[2] == 3 # Boolean flag
     use_elevation = has_depth and elevation_array is not None
 
     if use_elevation:
         elevation_array = np.asarray(elevation_array, dtype=float)
         if elevation_array.shape != bearings.shape:
-            raise ValueError(
-                f"Elevation_array must have the same shape of bearings {bearings.shape}, while it has {elevation_array.shape}."
-            )
+            raise ValueError(f"Elevation_array must have the same shape of bearings {bearings.shape}, while it has {elevation_array.shape}.")
 
     
     positions = np.full((n_simulations, 3), np.nan)
@@ -269,13 +235,8 @@ def find_points(
             for i in range(n_floaters):
                 el_deg = elevation_array[i, n] #i-th floater, n-th simulation step
                 
-                '''
-                if abs(el_deg) > 85.0:
-                    continue
-                '''
-
                 el_rad = np.deg2rad(el_deg)
-                dist_h = _flat_dist_m(lats[i], lons[i], positions[n, 0], positions[n, 1])
+                dist_h = compute_flat_distance(lats[i], lons[i], positions[n, 0], positions[n, 1])
                 
                 delta_z = dist_h * np.tan(el_rad)
                 estimated_z = floater_depths[i] - delta_z
