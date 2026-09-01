@@ -12,8 +12,8 @@ NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, depth_RX, H_index):
     
     HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
-    sys.path.append(HYDROMATE_PY_PATH)
-    from src.hydromate.app_bellhop import AppBellhop
+    #sys.path.append(HYDROMATE_PY_PATH)
+    from hydromate.app_bellhop import AppBellhop
 
     # Create TMP folder if not exists
     if not os.path.isdir("TMP"):
@@ -37,7 +37,7 @@ def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, dept
                     10000,
                     nrd=1)
 
-    app.set_paths(os.path.join(HYDROMATE_PY_PATH,"/.env"))
+    app.set_paths(os.path.join(HYDROMATE_PY_PATH,".env"))
     app.run_sim()
 
     # Copy the files from the MATLAB folder to the python folder

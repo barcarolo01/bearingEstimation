@@ -15,8 +15,8 @@ from PositioningFramework import *
 
 np.random.seed(256123)
 
-SIMULATION_STEPS = 1
-NUMBER_OF_FLOATERS = 2
+SIMULATION_STEPS = 60
+NUMBER_OF_FLOATERS = 4
 
 SIMULATE = True
 ANALYZE_WAVS = False
@@ -43,7 +43,7 @@ TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
 
 Center_2 =sposta(Center,150*np.sqrt(2),225)
 lat1,lon1 = sposta(Center_2,150,0)
-lat2,lon2 = Center_2
+lat2,lon2 = sposta(Center_2,150,90)
 lat3,lon3 = sposta(Center_2,150,180)
 lat4,lon4 = sposta(Center_2,150,270)
 lat5,lon5 = sposta(Center_2,150,225)
