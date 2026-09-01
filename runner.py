@@ -15,7 +15,7 @@ from PositioningFramework import *
 
 np.random.seed(256123)
 
-SIMULATION_STEPS = 60
+SIMULATION_STEPS = 3
 NUMBER_OF_FLOATERS = 4
 
 SIMULATE = True

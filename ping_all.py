@@ -1,19 +1,10 @@
 
-import os
 import shutil
 from Floater import *
 from bellhop_to_wav import build_ir, read_arr
 from coordinate_generator import local_to_geo
-import sys
+from hydromate.app_bellhop import AppBellhop
 
-HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
-sys.path.insert(0, os.path.join(HYDROMATE_PY_PATH, 'src'))
-print(HYDROMATE_PY_PATH)
-#from src.hydromate.app_bellhop import AppBellhop
-
-import src
-print(src.__file__)      # None se è un namespace package
-print(src.__path__)      # qui vedi quale/i directory sta usando davvero
 
 FS_OUT = 96000
 C_SOUND = 1540

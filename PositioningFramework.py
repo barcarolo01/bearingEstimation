@@ -7,7 +7,7 @@ from Positioning.model import *
 from coordinate_generator import local_to_geo
 import ping_all
 
-MDS_FREQ = 180
+MDS_FREQ = 2
 Center = [12.61529, 43.37765]
 
 def compute_error(poss, estimationss):
@@ -114,7 +114,7 @@ class PositioningFramework:
 
             # QUAA
             #self.self_plain_err += estimate_mov_error(self.self_mov)
-            self.self_plain_err = move_error_2(1,self.steps_from_last_RESURFACE,new_gt_position_matrix.shape[1])
+            self.self_plain_err = move_error_2(1,self.steps_from_last_RESURFACE,new_gt_position_matrix.shape[0])
 
             # If MDS was run in this iteration, self_pos and self_err are already up to date
             if not RUN_MDS: 
@@ -122,7 +122,7 @@ class PositioningFramework:
 
                 # QUAA
                 #self.self_err += estimate_mov_error(self.self_mov)
-                self.self_err = move_error_2(1,min(self.steps_from_last_MDS,self.steps_from_last_RESURFACE),new_gt_position_matrix.shape[1])
+                self.self_err = move_error_2(1,min(self.steps_from_last_MDS,self.steps_from_last_RESURFACE),new_gt_position_matrix.shape[0])
 
                 self.steps_from_last_MDS += 1
                 self.steps_from_last_RESURFACE += 1

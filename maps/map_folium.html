@@ -1,0 +1,2794 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_08e583aca0b20084c9de95a67aa03836 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    <script src="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.css"/>
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_08e583aca0b20084c9de95a67aa03836" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_08e583aca0b20084c9de95a67aa03836 = L.map(
+                "map_08e583aca0b20084c9de95a67aa03836",
+                {
+                    center: [12.61529, 43.376269198639854],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 15,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_830b074716b4895ae404687d5b3005f8 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_830b074716b4895ae404687d5b3005f8.addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        
+        // Crea il contenitore della scala
+        var scaleDiv = L.control({position: 'bottomleft'});
+        
+        scaleDiv.onAdd = function(map) {
+            var div = L.DomUtil.create('div', 'scale-bar');
+            div.style.cssText = `
+                background: white;
+                border: 2px solid #333;
+                border-top: none;
+                padding: 2px 5px;
+                font-size: 11px;
+                font-family: Arial, sans-serif;
+                color: #333;
+                pointer-events: none;
+                min-width: 60px;
+                text-align: center;
+            `;
+            return div;
+        };
+        
+        scaleDiv.addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+        function updateScale() {
+            var map = map_08e583aca0b20084c9de95a67aa03836;
+            var center = map.getCenter();
+            var bounds = map.getBounds();
+            
+            // Calcola la larghezza della mappa in metri
+            var leftPoint = map.latLngToContainerPoint(
+                L.latLng(center.lat, bounds.getWest())
+            );
+            var rightPoint = map.latLngToContainerPoint(
+                L.latLng(center.lat, bounds.getEast())
+            );
+            var pixelWidth = rightPoint.x - leftPoint.x;
+            
+            // Distanza reale in metri per tutta la larghezza
+            var realWidth = center.distanceTo(
+                L.latLng(center.lat, bounds.getEast())
+            ) * 2;
+            
+            // Scala: metri per pixel
+            var metersPerPixel = realWidth / pixelWidth;
+            
+            // Larghezza target della barra (100px) → distanza reale
+            var targetPixels = 100;
+            var targetMeters = metersPerPixel * targetPixels;
+            
+            // Arrotonda a un numero "bello"
+            var magnitude = Math.pow(10, Math.floor(Math.log10(targetMeters)));
+            var nice = [1, 2, 5, 10];
+            var niceMeters = magnitude;
+            for (var i = 0; i < nice.length; i++) {
+                if (nice[i] * magnitude >= targetMeters * 0.5) {
+                    niceMeters = nice[i] * magnitude;
+                    break;
+                }
+            }
+            
+            // Pixel effettivi per la distanza arrotondata
+            var barPixels = niceMeters / metersPerPixel;
+            
+            // Etichetta
+            var label;
+            if (niceMeters >= 1000) {
+                label = (niceMeters / 1000) + ' km';
+            } else {
+                label = niceMeters + ' m';
+            }
+            
+            // Aggiorna DOM
+            var div = document.querySelector('.scale-bar');
+            if (div) {
+                div.style.width = barPixels + 'px';
+                div.style.minWidth = 'unset';
+                div.innerHTML = label;
+            }
+        }
+        
+        // Aggiorna alla creazione e ad ogni zoom/spostamento
+        map_08e583aca0b20084c9de95a67aa03836.on('zoomend moveend load', updateScale);
+        setTimeout(updateScale, 300);
+        
+        
+    
+            var measure_control_6ddab515fec5f211fd82c9b0d14bd54a = new L.Control.Measure(
+                {
+  "position": "bottomleft",
+  "primaryLengthUnit": "meters",
+  "secondaryLengthUnit": "kilometers",
+  "primaryAreaUnit": "sqmeters",
+  "secondaryAreaUnit": "sqkilometers",
+});
+            map_08e583aca0b20084c9de95a67aa03836.addControl(measure_control_6ddab515fec5f211fd82c9b0d14bd54a);
+
+            // Workaround for using this plugin with Leaflet>=1.8.0
+            // https://github.com/ljagis/leaflet-measure/issues/171
+            L.Control.Measure.include({
+                _setCaptureMarkerIcon: function () {
+                    // disable autopan
+                    this._captureMarker.options.autoPanOnFocus = false;
+                    // default function
+                    this._captureMarker.setIcon(
+                        L.divIcon({
+                            iconSize: this._map.getSize().multiplyBy(2)
+                        })
+                    );
+                },
+            });
+
+        
+    
+            var poly_line_cc446bb4b4037d6293ad260e49e918aa = L.polyline(
+                [[12.61439067839408, 43.37672843033221], [12.61439967161014, 43.376737646028886], [12.6144086648262, 43.376746861725564]],
+                {"bubblingMouseEvents": true, "color": "#FFD700", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#FFD700", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 5}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_cc446bb4b4037d6293ad260e49e918aa.bindTooltip(
+                `<div>
+                     Traiettoria Stimata Vessel
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_0d1ffec8cb05697fc5306959020a5101 = L.circleMarker(
+                [12.61439067839408, 43.37672843033221],
+                {"bubblingMouseEvents": true, "color": "#FFD700", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFD700", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_662dc8da2c02c798fd1b383a047885b0 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_40e8fb469fa555171ce2a029248a06d8 = $(`<div id="html_40e8fb469fa555171ce2a029248a06d8" style="width: 100.0%; height: 100.0%;"><b>TX 1</b><br>Lat: 12.614391<br>Lon: 43.376728<br>Depth: 22.0 m</div>`)[0];
+                popup_662dc8da2c02c798fd1b383a047885b0.setContent(html_40e8fb469fa555171ce2a029248a06d8);
+            
+        
+
+        circle_marker_0d1ffec8cb05697fc5306959020a5101.bindPopup(popup_662dc8da2c02c798fd1b383a047885b0)
+        ;
+
+        
+    
+    
+            circle_marker_0d1ffec8cb05697fc5306959020a5101.bindTooltip(
+                `<div>
+                     TX 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_fb92a44bed2457fe44fac5eeb024fec3 = L.circleMarker(
+                [12.61439967161014, 43.376737646028886],
+                {"bubblingMouseEvents": true, "color": "#FFD700", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFD700", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_514af94b3fe38c6512ed473923d24b3a = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_8498f03e2c8c0d10f045a417c369152e = $(`<div id="html_8498f03e2c8c0d10f045a417c369152e" style="width: 100.0%; height: 100.0%;"><b>TX 2</b><br>Lat: 12.614400<br>Lon: 43.376738<br>Depth: 22.0 m</div>`)[0];
+                popup_514af94b3fe38c6512ed473923d24b3a.setContent(html_8498f03e2c8c0d10f045a417c369152e);
+            
+        
+
+        circle_marker_fb92a44bed2457fe44fac5eeb024fec3.bindPopup(popup_514af94b3fe38c6512ed473923d24b3a)
+        ;
+
+        
+    
+    
+            circle_marker_fb92a44bed2457fe44fac5eeb024fec3.bindTooltip(
+                `<div>
+                     TX 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_09f1f2966a9c86ebcbf0357249fb9b1f = L.circleMarker(
+                [12.6144086648262, 43.376746861725564],
+                {"bubblingMouseEvents": true, "color": "#FFD700", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFD700", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 10, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_938028dab6e2ab30ce90d13b5d99907f = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_da3c90b257d72b45291592590bf6a5b6 = $(`<div id="html_da3c90b257d72b45291592590bf6a5b6" style="width: 100.0%; height: 100.0%;"><b>TX 3</b><br>Lat: 12.614409<br>Lon: 43.376747<br>Depth: 22.0 m</div>`)[0];
+                popup_938028dab6e2ab30ce90d13b5d99907f.setContent(html_da3c90b257d72b45291592590bf6a5b6);
+            
+        
+
+        circle_marker_09f1f2966a9c86ebcbf0357249fb9b1f.bindPopup(popup_938028dab6e2ab30ce90d13b5d99907f)
+        ;
+
+        
+    
+    
+            circle_marker_09f1f2966a9c86ebcbf0357249fb9b1f.bindTooltip(
+                `<div>
+                     TX 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_cb7054f4a8662995004ce7cd4997f315 = L.polyline(
+                [[12.614389127023493, 43.376706537001894], [12.614413375164462, 43.376802283817874], [12.614371357927302, 43.376740576172324]],
+                {"bubblingMouseEvents": true, "color": "#00CC66", "dashArray": "5, 10", "dashOffset": null, "fill": false, "fillColor": "#00CC66", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.7, "smoothFactor": 1.0, "stroke": true, "weight": 5}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_cb7054f4a8662995004ce7cd4997f315.bindTooltip(
+                `<div>
+                     Traiettoria Stimata Vessel
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_7203b523fce472540e53f8b713e38446 = L.circleMarker(
+                [12.614389127023493, 43.376706537001894],
+                {"bubblingMouseEvents": true, "color": "#00CC66", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#00CC66", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 7, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_14f4134841f312b78f5965804289bed8 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_e03c348ed74588558a836a1c07cb41f8 = $(`<div id="html_e03c348ed74588558a836a1c07cb41f8" style="width: 100.0%; height: 100.0%;"><b>Stimato 1</b><br>Lat: 12.614389<br>Lon: 43.376707<br>Depth: 19.3 m</div>`)[0];
+                popup_14f4134841f312b78f5965804289bed8.setContent(html_e03c348ed74588558a836a1c07cb41f8);
+            
+        
+
+        circle_marker_7203b523fce472540e53f8b713e38446.bindPopup(popup_14f4134841f312b78f5965804289bed8)
+        ;
+
+        
+    
+    
+            circle_marker_7203b523fce472540e53f8b713e38446.bindTooltip(
+                `<div>
+                     Stimato 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_06bc5301afed20668fc88331c7ec7d24 = L.circleMarker(
+                [12.614413375164462, 43.376802283817874],
+                {"bubblingMouseEvents": true, "color": "#00CC66", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#00CC66", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 7, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_907a4752f0466733b59932c3f40df527 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_6fcaf921a00836d42a6b32d799e1572b = $(`<div id="html_6fcaf921a00836d42a6b32d799e1572b" style="width: 100.0%; height: 100.0%;"><b>Stimato 2</b><br>Lat: 12.614413<br>Lon: 43.376802<br>Depth: 16.4 m</div>`)[0];
+                popup_907a4752f0466733b59932c3f40df527.setContent(html_6fcaf921a00836d42a6b32d799e1572b);
+            
+        
+
+        circle_marker_06bc5301afed20668fc88331c7ec7d24.bindPopup(popup_907a4752f0466733b59932c3f40df527)
+        ;
+
+        
+    
+    
+            circle_marker_06bc5301afed20668fc88331c7ec7d24.bindTooltip(
+                `<div>
+                     Stimato 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c6f151d0cf21e26e402b562eb08f785d = L.circleMarker(
+                [12.614371357927302, 43.376740576172324],
+                {"bubblingMouseEvents": true, "color": "#00CC66", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#00CC66", "fillOpacity": 0.9, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 7, "stroke": true, "weight": 2}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_4f3f51901dac6d8f33a0fd856ebe0952 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_c71ee0ce83d9da6e30b6661ff2323f21 = $(`<div id="html_c71ee0ce83d9da6e30b6661ff2323f21" style="width: 100.0%; height: 100.0%;"><b>Stimato 3</b><br>Lat: 12.614371<br>Lon: 43.376741<br>Depth: 17.5 m</div>`)[0];
+                popup_4f3f51901dac6d8f33a0fd856ebe0952.setContent(html_c71ee0ce83d9da6e30b6661ff2323f21);
+            
+        
+
+        circle_marker_c6f151d0cf21e26e402b562eb08f785d.bindPopup(popup_4f3f51901dac6d8f33a0fd856ebe0952)
+        ;
+
+        
+    
+    
+            circle_marker_c6f151d0cf21e26e402b562eb08f785d.bindTooltip(
+                `<div>
+                     Stimato 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_05dc6588196341bd8c9fc80f40d21d05 = L.polyline(
+                [[12.615292671667094, 43.376271879694606], [12.615295431016447, 43.37627456845497], [12.615298096995899, 43.376277249192604]],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#0000FF", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_05dc6588196341bd8c9fc80f40d21d05.bindTooltip(
+                `<div>
+                     RX fw IMU - device 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_7ca9027ed1be3a45f139aea3a2612f6f = L.circleMarker(
+                [12.615292671667094, 43.376271879694606],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_11ba1f5397b6a044b03b6490a455b38f = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_8353c40080b54a3ddbcbb00dda37522b = $(`<div id="html_8353c40080b54a3ddbcbb00dda37522b" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 1 - pos 1</b><br>Lat: 12.615293<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_11ba1f5397b6a044b03b6490a455b38f.setContent(html_8353c40080b54a3ddbcbb00dda37522b);
+            
+        
+
+        circle_marker_7ca9027ed1be3a45f139aea3a2612f6f.bindPopup(popup_11ba1f5397b6a044b03b6490a455b38f)
+        ;
+
+        
+    
+    
+            circle_marker_7ca9027ed1be3a45f139aea3a2612f6f.bindTooltip(
+                `<div>
+                     RX fw IMU - device 1 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_11816257975997c01900c646ba03fb72 = L.circleMarker(
+                [12.615295431016447, 43.37627456845497],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_cb60e3f36e8d5b3fd68f859cea883d01 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_e2aba8c0f1fb5a26952244e182fec740 = $(`<div id="html_e2aba8c0f1fb5a26952244e182fec740" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 1 - pos 2</b><br>Lat: 12.615295<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_cb60e3f36e8d5b3fd68f859cea883d01.setContent(html_e2aba8c0f1fb5a26952244e182fec740);
+            
+        
+
+        circle_marker_11816257975997c01900c646ba03fb72.bindPopup(popup_cb60e3f36e8d5b3fd68f859cea883d01)
+        ;
+
+        
+    
+    
+            circle_marker_11816257975997c01900c646ba03fb72.bindTooltip(
+                `<div>
+                     RX fw IMU - device 1 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b20c205cba3f05f7d4f735b6560235d8 = L.circleMarker(
+                [12.615298096995899, 43.376277249192604],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_08e544a3aa2bb9c4412c25ccaa54af6d = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_fb30a9bda1c1db9bd9921232982dea82 = $(`<div id="html_fb30a9bda1c1db9bd9921232982dea82" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 1 - pos 3</b><br>Lat: 12.615298<br>Lon: 43.376277<br>Depth: 22.0 m</div>`)[0];
+                popup_08e544a3aa2bb9c4412c25ccaa54af6d.setContent(html_fb30a9bda1c1db9bd9921232982dea82);
+            
+        
+
+        circle_marker_b20c205cba3f05f7d4f735b6560235d8.bindPopup(popup_08e544a3aa2bb9c4412c25ccaa54af6d)
+        ;
+
+        
+    
+    
+            circle_marker_b20c205cba3f05f7d4f735b6560235d8.bindTooltip(
+                `<div>
+                     RX fw IMU - device 1 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_499ad875ba8616318f6ec2867e3e04bd = L.polyline(
+                [[12.61394515647811, 43.37765290663466], [12.613947850056336, 43.37765585018317], [12.613950485828367, 43.37765882075249]],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#0000FF", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_499ad875ba8616318f6ec2867e3e04bd.bindTooltip(
+                `<div>
+                     RX fw IMU - device 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_3998bc0709713d8af18a6cddbfd1c0ce = L.circleMarker(
+                [12.61394515647811, 43.37765290663466],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_721157eb14071e36d8e0236bbb56f54b = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_67b40ddd64e21763b5f952f331e48238 = $(`<div id="html_67b40ddd64e21763b5f952f331e48238" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 2 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.377653<br>Depth: 22.0 m</div>`)[0];
+                popup_721157eb14071e36d8e0236bbb56f54b.setContent(html_67b40ddd64e21763b5f952f331e48238);
+            
+        
+
+        circle_marker_3998bc0709713d8af18a6cddbfd1c0ce.bindPopup(popup_721157eb14071e36d8e0236bbb56f54b)
+        ;
+
+        
+    
+    
+            circle_marker_3998bc0709713d8af18a6cddbfd1c0ce.bindTooltip(
+                `<div>
+                     RX fw IMU - device 2 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1a1f212e5fd7cf006010214de5fb1e82 = L.circleMarker(
+                [12.613947850056336, 43.37765585018317],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_7a709c0cea6df4136cdcb419202e1406 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_e6ae094380713bb344427e5f1f7e799a = $(`<div id="html_e6ae094380713bb344427e5f1f7e799a" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 2 - pos 2</b><br>Lat: 12.613948<br>Lon: 43.377656<br>Depth: 22.0 m</div>`)[0];
+                popup_7a709c0cea6df4136cdcb419202e1406.setContent(html_e6ae094380713bb344427e5f1f7e799a);
+            
+        
+
+        circle_marker_1a1f212e5fd7cf006010214de5fb1e82.bindPopup(popup_7a709c0cea6df4136cdcb419202e1406)
+        ;
+
+        
+    
+    
+            circle_marker_1a1f212e5fd7cf006010214de5fb1e82.bindTooltip(
+                `<div>
+                     RX fw IMU - device 2 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_577fe02021657f18c53bf9cf73aa9ec7 = L.circleMarker(
+                [12.613950485828367, 43.37765882075249],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_c35a9495cd9b94d6b3d1bc2b0aa8e531 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_29790a5d3c5405547f08dae0df5e3aaf = $(`<div id="html_29790a5d3c5405547f08dae0df5e3aaf" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 2 - pos 3</b><br>Lat: 12.613950<br>Lon: 43.377659<br>Depth: 22.0 m</div>`)[0];
+                popup_c35a9495cd9b94d6b3d1bc2b0aa8e531.setContent(html_29790a5d3c5405547f08dae0df5e3aaf);
+            
+        
+
+        circle_marker_577fe02021657f18c53bf9cf73aa9ec7.bindPopup(popup_c35a9495cd9b94d6b3d1bc2b0aa8e531)
+        ;
+
+        
+    
+    
+            circle_marker_577fe02021657f18c53bf9cf73aa9ec7.bindTooltip(
+                `<div>
+                     RX fw IMU - device 2 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_3f1c20e3fcb509fc3625edceffc5265e = L.polyline(
+                [[12.612597804572735, 43.376272017307635], [12.61260047342308, 43.37627487487052], [12.612603121113255, 43.37627776785872]],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#0000FF", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_3f1c20e3fcb509fc3625edceffc5265e.bindTooltip(
+                `<div>
+                     RX fw IMU - device 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_296fd7c34b9fc57dcfb238c67683419a = L.circleMarker(
+                [12.612597804572735, 43.376272017307635],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_2a53d9a862a50e70c0a2b23a97c6267e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_4ebbf56a76a5c31b07786ba5eac1f14a = $(`<div id="html_4ebbf56a76a5c31b07786ba5eac1f14a" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 3 - pos 1</b><br>Lat: 12.612598<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_2a53d9a862a50e70c0a2b23a97c6267e.setContent(html_4ebbf56a76a5c31b07786ba5eac1f14a);
+            
+        
+
+        circle_marker_296fd7c34b9fc57dcfb238c67683419a.bindPopup(popup_2a53d9a862a50e70c0a2b23a97c6267e)
+        ;
+
+        
+    
+    
+            circle_marker_296fd7c34b9fc57dcfb238c67683419a.bindTooltip(
+                `<div>
+                     RX fw IMU - device 3 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b91751118784f5c884a6447128cf6204 = L.circleMarker(
+                [12.61260047342308, 43.37627487487052],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_641067bb6739544844ad0273bd351f6a = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_5cba837602b8f166c498955602f33970 = $(`<div id="html_5cba837602b8f166c498955602f33970" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 3 - pos 2</b><br>Lat: 12.612600<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_641067bb6739544844ad0273bd351f6a.setContent(html_5cba837602b8f166c498955602f33970);
+            
+        
+
+        circle_marker_b91751118784f5c884a6447128cf6204.bindPopup(popup_641067bb6739544844ad0273bd351f6a)
+        ;
+
+        
+    
+    
+            circle_marker_b91751118784f5c884a6447128cf6204.bindTooltip(
+                `<div>
+                     RX fw IMU - device 3 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_54089f9d04ce6e47ad62b8fab5ed5716 = L.circleMarker(
+                [12.612603121113255, 43.37627776785872],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_bfd74122a4e67d34a3be8c3af9540633 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_48c9e735c64d6164f0021ca5fa47c7d0 = $(`<div id="html_48c9e735c64d6164f0021ca5fa47c7d0" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 3 - pos 3</b><br>Lat: 12.612603<br>Lon: 43.376278<br>Depth: 22.0 m</div>`)[0];
+                popup_bfd74122a4e67d34a3be8c3af9540633.setContent(html_48c9e735c64d6164f0021ca5fa47c7d0);
+            
+        
+
+        circle_marker_54089f9d04ce6e47ad62b8fab5ed5716.bindPopup(popup_bfd74122a4e67d34a3be8c3af9540633)
+        ;
+
+        
+    
+    
+            circle_marker_54089f9d04ce6e47ad62b8fab5ed5716.bindTooltip(
+                `<div>
+                     RX fw IMU - device 3 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_3d35e1bfa61b46061f03767620efb05e = L.polyline(
+                [[12.61394539316328, 43.37489118408275], [12.613948226523913, 43.37489407980272], [12.61395104559427, 43.37489701887382]],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#0000FF", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_3d35e1bfa61b46061f03767620efb05e.bindTooltip(
+                `<div>
+                     RX fw IMU - device 4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_fabb281212ec4075095a31349a27b4ad = L.circleMarker(
+                [12.61394539316328, 43.37489118408275],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_2c1dd460a008075901737ed1df1baa6a = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_cd20f2936ab29ef5c91598ee77e886b1 = $(`<div id="html_cd20f2936ab29ef5c91598ee77e886b1" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 4 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_2c1dd460a008075901737ed1df1baa6a.setContent(html_cd20f2936ab29ef5c91598ee77e886b1);
+            
+        
+
+        circle_marker_fabb281212ec4075095a31349a27b4ad.bindPopup(popup_2c1dd460a008075901737ed1df1baa6a)
+        ;
+
+        
+    
+    
+            circle_marker_fabb281212ec4075095a31349a27b4ad.bindTooltip(
+                `<div>
+                     RX fw IMU - device 4 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9654d46ec55597a1c73fc284b2f6907d = L.circleMarker(
+                [12.613948226523913, 43.37489407980272],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_4e3847ef6ad7e6ab6285bbf57db3068a = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_44d0f628ffc89e5453724243eb6b85b3 = $(`<div id="html_44d0f628ffc89e5453724243eb6b85b3" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 4 - pos 2</b><br>Lat: 12.613948<br>Lon: 43.374894<br>Depth: 22.0 m</div>`)[0];
+                popup_4e3847ef6ad7e6ab6285bbf57db3068a.setContent(html_44d0f628ffc89e5453724243eb6b85b3);
+            
+        
+
+        circle_marker_9654d46ec55597a1c73fc284b2f6907d.bindPopup(popup_4e3847ef6ad7e6ab6285bbf57db3068a)
+        ;
+
+        
+    
+    
+            circle_marker_9654d46ec55597a1c73fc284b2f6907d.bindTooltip(
+                `<div>
+                     RX fw IMU - device 4 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_13bc3eaf03fca68856ece9b062cd1604 = L.circleMarker(
+                [12.61395104559427, 43.37489701887382],
+                {"bubblingMouseEvents": true, "color": "#0000FF", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#0000FF", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_7a1d05fcf14d1cc3572e9fc9bf53f13f = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_45c8924c20a67dd58f5ba341e74cf048 = $(`<div id="html_45c8924c20a67dd58f5ba341e74cf048" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU - device 4 - pos 3</b><br>Lat: 12.613951<br>Lon: 43.374897<br>Depth: 22.0 m</div>`)[0];
+                popup_7a1d05fcf14d1cc3572e9fc9bf53f13f.setContent(html_45c8924c20a67dd58f5ba341e74cf048);
+            
+        
+
+        circle_marker_13bc3eaf03fca68856ece9b062cd1604.bindPopup(popup_7a1d05fcf14d1cc3572e9fc9bf53f13f)
+        ;
+
+        
+    
+    
+            circle_marker_13bc3eaf03fca68856ece9b062cd1604.bindTooltip(
+                `<div>
+                     RX fw IMU - device 4 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_28e6ee127293c782d91fd56ed01e37be = L.polyline(
+                [[12.615292671667094, 43.376271879694606], [12.615291327720334, 43.37627270241428], [12.615293993699785, 43.37627538315193]],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#FFA500", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_28e6ee127293c782d91fd56ed01e37be.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_39e8b08126000d9ab6961c9a5781ba11 = L.circleMarker(
+                [12.615292671667094, 43.376271879694606],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_d090682d5970f9df8bd51f1c880e874d = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_0d9895b1164b64f0b3e4936c9dacca88 = $(`<div id="html_0d9895b1164b64f0b3e4936c9dacca88" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 1 - pos 1</b><br>Lat: 12.615293<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_d090682d5970f9df8bd51f1c880e874d.setContent(html_0d9895b1164b64f0b3e4936c9dacca88);
+            
+        
+
+        circle_marker_39e8b08126000d9ab6961c9a5781ba11.bindPopup(popup_d090682d5970f9df8bd51f1c880e874d)
+        ;
+
+        
+    
+    
+            circle_marker_39e8b08126000d9ab6961c9a5781ba11.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 1 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_dc80f711f7b700e3ecd622548d7c1fa6 = L.circleMarker(
+                [12.615291327720334, 43.37627270241428],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_cbb7132394a6d2402fe83bda0c23000c = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_459533dcfc12931c75020b51f48e2ec5 = $(`<div id="html_459533dcfc12931c75020b51f48e2ec5" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 1 - pos 2</b><br>Lat: 12.615291<br>Lon: 43.376273<br>Depth: 22.0 m</div>`)[0];
+                popup_cbb7132394a6d2402fe83bda0c23000c.setContent(html_459533dcfc12931c75020b51f48e2ec5);
+            
+        
+
+        circle_marker_dc80f711f7b700e3ecd622548d7c1fa6.bindPopup(popup_cbb7132394a6d2402fe83bda0c23000c)
+        ;
+
+        
+    
+    
+            circle_marker_dc80f711f7b700e3ecd622548d7c1fa6.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 1 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ec2f88d62de955fa5450c1048ba509d8 = L.circleMarker(
+                [12.615293993699785, 43.37627538315193],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_d49a5d7ff639fcd9700d3199d456a873 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_8e5abb61f90cbd6156354950bbd10f08 = $(`<div id="html_8e5abb61f90cbd6156354950bbd10f08" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 1 - pos 3</b><br>Lat: 12.615294<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_d49a5d7ff639fcd9700d3199d456a873.setContent(html_8e5abb61f90cbd6156354950bbd10f08);
+            
+        
+
+        circle_marker_ec2f88d62de955fa5450c1048ba509d8.bindPopup(popup_d49a5d7ff639fcd9700d3199d456a873)
+        ;
+
+        
+    
+    
+            circle_marker_ec2f88d62de955fa5450c1048ba509d8.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 1 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_251e3b5468b3af2ecee6d39f123f39d1 = L.polyline(
+                [[12.61394515647811, 43.37765290663466], [12.613945230844854, 43.37765179787636], [12.613947866616884, 43.37765476844568]],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#FFA500", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_251e3b5468b3af2ecee6d39f123f39d1.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_65b1a2444981dca48545ec7481de5ad6 = L.circleMarker(
+                [12.61394515647811, 43.37765290663466],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_13766d2711981e7ae1728d3ee060082e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_cc5b8a6999a332ccea1506d1aa5f2500 = $(`<div id="html_cc5b8a6999a332ccea1506d1aa5f2500" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 2 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.377653<br>Depth: 22.0 m</div>`)[0];
+                popup_13766d2711981e7ae1728d3ee060082e.setContent(html_cc5b8a6999a332ccea1506d1aa5f2500);
+            
+        
+
+        circle_marker_65b1a2444981dca48545ec7481de5ad6.bindPopup(popup_13766d2711981e7ae1728d3ee060082e)
+        ;
+
+        
+    
+    
+            circle_marker_65b1a2444981dca48545ec7481de5ad6.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 2 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2fdfdef42fc1099f28ff876e8e7e2bc1 = L.circleMarker(
+                [12.613945230844854, 43.37765179787636],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_0b25d1df2f03e81b9468c1cd0d7661e3 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_f31523fb6c61088ab9c3e633b61f5bae = $(`<div id="html_f31523fb6c61088ab9c3e633b61f5bae" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 2 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.377652<br>Depth: 22.0 m</div>`)[0];
+                popup_0b25d1df2f03e81b9468c1cd0d7661e3.setContent(html_f31523fb6c61088ab9c3e633b61f5bae);
+            
+        
+
+        circle_marker_2fdfdef42fc1099f28ff876e8e7e2bc1.bindPopup(popup_0b25d1df2f03e81b9468c1cd0d7661e3)
+        ;
+
+        
+    
+    
+            circle_marker_2fdfdef42fc1099f28ff876e8e7e2bc1.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 2 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_87e4b220ed2e07a4a3213bb5267aa7c0 = L.circleMarker(
+                [12.613947866616884, 43.37765476844568],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_8c1cf337478c0bacb489dd7e7fa38642 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_43022219f8bcd6e46579600914c0b5ff = $(`<div id="html_43022219f8bcd6e46579600914c0b5ff" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 2 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.377655<br>Depth: 22.0 m</div>`)[0];
+                popup_8c1cf337478c0bacb489dd7e7fa38642.setContent(html_43022219f8bcd6e46579600914c0b5ff);
+            
+        
+
+        circle_marker_87e4b220ed2e07a4a3213bb5267aa7c0.bindPopup(popup_8c1cf337478c0bacb489dd7e7fa38642)
+        ;
+
+        
+    
+    
+            circle_marker_87e4b220ed2e07a4a3213bb5267aa7c0.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 2 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_d0cb12df05cff50431beb80c54f70b39 = L.polyline(
+                [[12.612597804572735, 43.376272017307635], [12.612599134163629, 43.37627270219972], [12.612601781853801, 43.37627559518792]],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#FFA500", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_d0cb12df05cff50431beb80c54f70b39.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d16899677cd2e43310e438b5858e088c = L.circleMarker(
+                [12.612597804572735, 43.376272017307635],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_fa163612e24aeac2d89d3c4553e1b359 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_103ade55f549d80ba72e0fa1e7367ab5 = $(`<div id="html_103ade55f549d80ba72e0fa1e7367ab5" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 3 - pos 1</b><br>Lat: 12.612598<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_fa163612e24aeac2d89d3c4553e1b359.setContent(html_103ade55f549d80ba72e0fa1e7367ab5);
+            
+        
+
+        circle_marker_d16899677cd2e43310e438b5858e088c.bindPopup(popup_fa163612e24aeac2d89d3c4553e1b359)
+        ;
+
+        
+    
+    
+            circle_marker_d16899677cd2e43310e438b5858e088c.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 3 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2ba7ab705820ddb4c500096f39b3a1cb = L.circleMarker(
+                [12.612599134163629, 43.37627270219972],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_b42a3e4320838045d88016c3f5de2acf = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_5cc2271614f7dc05559e8e46c50340b9 = $(`<div id="html_5cc2271614f7dc05559e8e46c50340b9" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 3 - pos 2</b><br>Lat: 12.612599<br>Lon: 43.376273<br>Depth: 22.0 m</div>`)[0];
+                popup_b42a3e4320838045d88016c3f5de2acf.setContent(html_5cc2271614f7dc05559e8e46c50340b9);
+            
+        
+
+        circle_marker_2ba7ab705820ddb4c500096f39b3a1cb.bindPopup(popup_b42a3e4320838045d88016c3f5de2acf)
+        ;
+
+        
+    
+    
+            circle_marker_2ba7ab705820ddb4c500096f39b3a1cb.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 3 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_d4475bcebf4a373ceec48345ee939d4e = L.circleMarker(
+                [12.612601781853801, 43.37627559518792],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_e3385459373c31955f76b8ac4c12ca5c = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_6ccec9c6de2b4347f72c19734e16471b = $(`<div id="html_6ccec9c6de2b4347f72c19734e16471b" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 3 - pos 3</b><br>Lat: 12.612602<br>Lon: 43.376276<br>Depth: 22.0 m</div>`)[0];
+                popup_e3385459373c31955f76b8ac4c12ca5c.setContent(html_6ccec9c6de2b4347f72c19734e16471b);
+            
+        
+
+        circle_marker_d4475bcebf4a373ceec48345ee939d4e.bindPopup(popup_e3385459373c31955f76b8ac4c12ca5c)
+        ;
+
+        
+    
+    
+            circle_marker_d4475bcebf4a373ceec48345ee939d4e.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 3 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_26e313d9228cd4c4088049d43146aa5f = L.polyline(
+                [[12.61394539316328, 43.37489118408275], [12.613945333152405, 43.374890785229276], [12.613948152222761, 43.37489372430037]],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#FFA500", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_26e313d9228cd4c4088049d43146aa5f.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4002a47910e2fef09d79560143dccefd = L.circleMarker(
+                [12.61394539316328, 43.37489118408275],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_70b98bb0271c7a6e1bff5de3efa4747e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_283c60038caa734f24b4a4629cda6db9 = $(`<div id="html_283c60038caa734f24b4a4629cda6db9" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 4 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_70b98bb0271c7a6e1bff5de3efa4747e.setContent(html_283c60038caa734f24b4a4629cda6db9);
+            
+        
+
+        circle_marker_4002a47910e2fef09d79560143dccefd.bindPopup(popup_70b98bb0271c7a6e1bff5de3efa4747e)
+        ;
+
+        
+    
+    
+            circle_marker_4002a47910e2fef09d79560143dccefd.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 4 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_caad0201b71d4d9f0b2578da4e727f47 = L.circleMarker(
+                [12.613945333152405, 43.374890785229276],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_10a19c6b8c44f57ac4746b9494f2af02 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_6a1e8b268fdda7965c159b3c18b3e91a = $(`<div id="html_6a1e8b268fdda7965c159b3c18b3e91a" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 4 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_10a19c6b8c44f57ac4746b9494f2af02.setContent(html_6a1e8b268fdda7965c159b3c18b3e91a);
+            
+        
+
+        circle_marker_caad0201b71d4d9f0b2578da4e727f47.bindPopup(popup_10a19c6b8c44f57ac4746b9494f2af02)
+        ;
+
+        
+    
+    
+            circle_marker_caad0201b71d4d9f0b2578da4e727f47.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 4 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_23ce31346a688e9feadd71f0a2801228 = L.circleMarker(
+                [12.613948152222761, 43.37489372430037],
+                {"bubblingMouseEvents": true, "color": "#FFA500", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FFA500", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_5aebf5751f0a977e9fc1340cd0b5c62e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_1695e80ecdf4ca151ef2bcadbcf48f31 = $(`<div id="html_1695e80ecdf4ca151ef2bcadbcf48f31" style="width: 100.0%; height: 100.0%;"><b>RX fw IMU MDS - device 4 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.374894<br>Depth: 22.0 m</div>`)[0];
+                popup_5aebf5751f0a977e9fc1340cd0b5c62e.setContent(html_1695e80ecdf4ca151ef2bcadbcf48f31);
+            
+        
+
+        circle_marker_23ce31346a688e9feadd71f0a2801228.bindPopup(popup_5aebf5751f0a977e9fc1340cd0b5c62e)
+        ;
+
+        
+    
+    
+            circle_marker_23ce31346a688e9feadd71f0a2801228.bindTooltip(
+                `<div>
+                     RX fw IMU MDS - device 4 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_c9c164bcc613a657f319e3da9ff293fe = L.polyline(
+                [[12.615292671667094, 43.376271879694606], [12.615295431016447, 43.37627456845497], [12.615298096995899, 43.376277249192604]],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#90EE90", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_c9c164bcc613a657f319e3da9ff293fe.bindTooltip(
+                `<div>
+                     RX bw IMU - device 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_6dff6e192da390f2bc17d5907d673233 = L.circleMarker(
+                [12.615292671667094, 43.376271879694606],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_634929c88140725d4abaadb2dd6bc2f1 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_7eeee24474c3db15ae54eb1b968a5dd3 = $(`<div id="html_7eeee24474c3db15ae54eb1b968a5dd3" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 1 - pos 1</b><br>Lat: 12.615293<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_634929c88140725d4abaadb2dd6bc2f1.setContent(html_7eeee24474c3db15ae54eb1b968a5dd3);
+            
+        
+
+        circle_marker_6dff6e192da390f2bc17d5907d673233.bindPopup(popup_634929c88140725d4abaadb2dd6bc2f1)
+        ;
+
+        
+    
+    
+            circle_marker_6dff6e192da390f2bc17d5907d673233.bindTooltip(
+                `<div>
+                     RX bw IMU - device 1 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_349f85ace763a81f7fb8dc445b3103fd = L.circleMarker(
+                [12.615295431016447, 43.37627456845497],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_16663b40c600379e36339c6764950c4d = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_b4b9d840eb2e28a6ffe2ecd6f8166489 = $(`<div id="html_b4b9d840eb2e28a6ffe2ecd6f8166489" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 1 - pos 2</b><br>Lat: 12.615295<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_16663b40c600379e36339c6764950c4d.setContent(html_b4b9d840eb2e28a6ffe2ecd6f8166489);
+            
+        
+
+        circle_marker_349f85ace763a81f7fb8dc445b3103fd.bindPopup(popup_16663b40c600379e36339c6764950c4d)
+        ;
+
+        
+    
+    
+            circle_marker_349f85ace763a81f7fb8dc445b3103fd.bindTooltip(
+                `<div>
+                     RX bw IMU - device 1 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_392f51a4a469cc4271911171d295e868 = L.circleMarker(
+                [12.615298096995899, 43.376277249192604],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_1c30a14d6600e7b2e18ad62f2def90f6 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_0b8c092a16d307eab3613b455ec84b99 = $(`<div id="html_0b8c092a16d307eab3613b455ec84b99" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 1 - pos 3</b><br>Lat: 12.615298<br>Lon: 43.376277<br>Depth: 22.0 m</div>`)[0];
+                popup_1c30a14d6600e7b2e18ad62f2def90f6.setContent(html_0b8c092a16d307eab3613b455ec84b99);
+            
+        
+
+        circle_marker_392f51a4a469cc4271911171d295e868.bindPopup(popup_1c30a14d6600e7b2e18ad62f2def90f6)
+        ;
+
+        
+    
+    
+            circle_marker_392f51a4a469cc4271911171d295e868.bindTooltip(
+                `<div>
+                     RX bw IMU - device 1 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_cd3425be7a0a31021f0e3c95fe090a2d = L.polyline(
+                [[12.61394515647811, 43.37765290663466], [12.613947850056336, 43.37765585018317], [12.613950485828367, 43.37765882075249]],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#90EE90", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_cd3425be7a0a31021f0e3c95fe090a2d.bindTooltip(
+                `<div>
+                     RX bw IMU - device 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9b453e9e539742c6d5c81ed29c2581ca = L.circleMarker(
+                [12.61394515647811, 43.37765290663466],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_478951297fc33197ff04303427ea2f66 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_99ae96c86aea081f3e96cc23be17bc5d = $(`<div id="html_99ae96c86aea081f3e96cc23be17bc5d" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 2 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.377653<br>Depth: 22.0 m</div>`)[0];
+                popup_478951297fc33197ff04303427ea2f66.setContent(html_99ae96c86aea081f3e96cc23be17bc5d);
+            
+        
+
+        circle_marker_9b453e9e539742c6d5c81ed29c2581ca.bindPopup(popup_478951297fc33197ff04303427ea2f66)
+        ;
+
+        
+    
+    
+            circle_marker_9b453e9e539742c6d5c81ed29c2581ca.bindTooltip(
+                `<div>
+                     RX bw IMU - device 2 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5b2a6ee4d2c121c47ca54f0f4b5721e7 = L.circleMarker(
+                [12.613947850056336, 43.37765585018317],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_90349b8118646d5db656765b13dc55dc = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_b19998daa3b8c13f2dfbc343582dccdd = $(`<div id="html_b19998daa3b8c13f2dfbc343582dccdd" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 2 - pos 2</b><br>Lat: 12.613948<br>Lon: 43.377656<br>Depth: 22.0 m</div>`)[0];
+                popup_90349b8118646d5db656765b13dc55dc.setContent(html_b19998daa3b8c13f2dfbc343582dccdd);
+            
+        
+
+        circle_marker_5b2a6ee4d2c121c47ca54f0f4b5721e7.bindPopup(popup_90349b8118646d5db656765b13dc55dc)
+        ;
+
+        
+    
+    
+            circle_marker_5b2a6ee4d2c121c47ca54f0f4b5721e7.bindTooltip(
+                `<div>
+                     RX bw IMU - device 2 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1ed8a2c0c79725757dfbd1cc99fe5eb9 = L.circleMarker(
+                [12.613950485828367, 43.37765882075249],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_b1537a211697f799a38d8af042d544ca = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_a3eefd99db5b332b4696145d6ad716fd = $(`<div id="html_a3eefd99db5b332b4696145d6ad716fd" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 2 - pos 3</b><br>Lat: 12.613950<br>Lon: 43.377659<br>Depth: 22.0 m</div>`)[0];
+                popup_b1537a211697f799a38d8af042d544ca.setContent(html_a3eefd99db5b332b4696145d6ad716fd);
+            
+        
+
+        circle_marker_1ed8a2c0c79725757dfbd1cc99fe5eb9.bindPopup(popup_b1537a211697f799a38d8af042d544ca)
+        ;
+
+        
+    
+    
+            circle_marker_1ed8a2c0c79725757dfbd1cc99fe5eb9.bindTooltip(
+                `<div>
+                     RX bw IMU - device 2 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_7658c8ddef49ced23a9b8072a596e310 = L.polyline(
+                [[12.612597804572735, 43.376272017307635], [12.61260047342308, 43.37627487487052], [12.612603121113255, 43.37627776785872]],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#90EE90", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_7658c8ddef49ced23a9b8072a596e310.bindTooltip(
+                `<div>
+                     RX bw IMU - device 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_a2c7fbad52b66b2f94b61fae7e04219a = L.circleMarker(
+                [12.612597804572735, 43.376272017307635],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_e0322060f62378ea592727fe428a5de8 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_f5c52cc5ba246f726062162a4b9e740f = $(`<div id="html_f5c52cc5ba246f726062162a4b9e740f" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 3 - pos 1</b><br>Lat: 12.612598<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_e0322060f62378ea592727fe428a5de8.setContent(html_f5c52cc5ba246f726062162a4b9e740f);
+            
+        
+
+        circle_marker_a2c7fbad52b66b2f94b61fae7e04219a.bindPopup(popup_e0322060f62378ea592727fe428a5de8)
+        ;
+
+        
+    
+    
+            circle_marker_a2c7fbad52b66b2f94b61fae7e04219a.bindTooltip(
+                `<div>
+                     RX bw IMU - device 3 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_9bc7f43d32bc7bf8035dbf625003ea56 = L.circleMarker(
+                [12.61260047342308, 43.37627487487052],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_4d66570db3f4e8f9f370ef4ea3bec5dd = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_488855b7de0744fd332cd68644536cfe = $(`<div id="html_488855b7de0744fd332cd68644536cfe" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 3 - pos 2</b><br>Lat: 12.612600<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_4d66570db3f4e8f9f370ef4ea3bec5dd.setContent(html_488855b7de0744fd332cd68644536cfe);
+            
+        
+
+        circle_marker_9bc7f43d32bc7bf8035dbf625003ea56.bindPopup(popup_4d66570db3f4e8f9f370ef4ea3bec5dd)
+        ;
+
+        
+    
+    
+            circle_marker_9bc7f43d32bc7bf8035dbf625003ea56.bindTooltip(
+                `<div>
+                     RX bw IMU - device 3 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_0aea60ebb8a24cbeae74194214d7e896 = L.circleMarker(
+                [12.612603121113255, 43.37627776785872],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_aa469a5141371ef98168d464f7248aea = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_98f1d491e8acfdbaa88568f025ea0d8f = $(`<div id="html_98f1d491e8acfdbaa88568f025ea0d8f" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 3 - pos 3</b><br>Lat: 12.612603<br>Lon: 43.376278<br>Depth: 22.0 m</div>`)[0];
+                popup_aa469a5141371ef98168d464f7248aea.setContent(html_98f1d491e8acfdbaa88568f025ea0d8f);
+            
+        
+
+        circle_marker_0aea60ebb8a24cbeae74194214d7e896.bindPopup(popup_aa469a5141371ef98168d464f7248aea)
+        ;
+
+        
+    
+    
+            circle_marker_0aea60ebb8a24cbeae74194214d7e896.bindTooltip(
+                `<div>
+                     RX bw IMU - device 3 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_3d57e020ab442f0d3bb044657dbf8aef = L.polyline(
+                [[12.61394539316328, 43.37489118408275], [12.613948226523913, 43.37489407980272], [12.61395104559427, 43.37489701887382]],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#90EE90", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_3d57e020ab442f0d3bb044657dbf8aef.bindTooltip(
+                `<div>
+                     RX bw IMU - device 4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b2c1bf8679453fce6d0f9a5a543e8f7e = L.circleMarker(
+                [12.61394539316328, 43.37489118408275],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_d222a94df2479297c2e5f90cfe6b0aa5 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_cd60c2b72c5dda4482006c5be0a3ffe3 = $(`<div id="html_cd60c2b72c5dda4482006c5be0a3ffe3" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 4 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_d222a94df2479297c2e5f90cfe6b0aa5.setContent(html_cd60c2b72c5dda4482006c5be0a3ffe3);
+            
+        
+
+        circle_marker_b2c1bf8679453fce6d0f9a5a543e8f7e.bindPopup(popup_d222a94df2479297c2e5f90cfe6b0aa5)
+        ;
+
+        
+    
+    
+            circle_marker_b2c1bf8679453fce6d0f9a5a543e8f7e.bindTooltip(
+                `<div>
+                     RX bw IMU - device 4 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_de260887b634e8f0283ed468c397298a = L.circleMarker(
+                [12.613948226523913, 43.37489407980272],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_c7eea2b59409ede0d5b0141d1a3f837e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_ee910d2e357d36cada50765313503a41 = $(`<div id="html_ee910d2e357d36cada50765313503a41" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 4 - pos 2</b><br>Lat: 12.613948<br>Lon: 43.374894<br>Depth: 22.0 m</div>`)[0];
+                popup_c7eea2b59409ede0d5b0141d1a3f837e.setContent(html_ee910d2e357d36cada50765313503a41);
+            
+        
+
+        circle_marker_de260887b634e8f0283ed468c397298a.bindPopup(popup_c7eea2b59409ede0d5b0141d1a3f837e)
+        ;
+
+        
+    
+    
+            circle_marker_de260887b634e8f0283ed468c397298a.bindTooltip(
+                `<div>
+                     RX bw IMU - device 4 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_eea8eec0fe904c5fe2ab23dc229217ff = L.circleMarker(
+                [12.61395104559427, 43.37489701887382],
+                {"bubblingMouseEvents": true, "color": "#90EE90", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#90EE90", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_9ba657945c44915ebec3af79c2bc0171 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_e1e7b63b72363227a8d108dce68aea3e = $(`<div id="html_e1e7b63b72363227a8d108dce68aea3e" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU - device 4 - pos 3</b><br>Lat: 12.613951<br>Lon: 43.374897<br>Depth: 22.0 m</div>`)[0];
+                popup_9ba657945c44915ebec3af79c2bc0171.setContent(html_e1e7b63b72363227a8d108dce68aea3e);
+            
+        
+
+        circle_marker_eea8eec0fe904c5fe2ab23dc229217ff.bindPopup(popup_9ba657945c44915ebec3af79c2bc0171)
+        ;
+
+        
+    
+    
+            circle_marker_eea8eec0fe904c5fe2ab23dc229217ff.bindTooltip(
+                `<div>
+                     RX bw IMU - device 4 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_2ac4a08b6a745f4796f66e2153bc507c = L.polyline(
+                [[12.615292671667094, 43.376271879694606], [12.615291327720334, 43.37627270241428], [12.615293993699785, 43.37627538315193]],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#115511", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_2ac4a08b6a745f4796f66e2153bc507c.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_81366a12a34dd10dd0684dc30948a2a2 = L.circleMarker(
+                [12.615292671667094, 43.376271879694606],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_2a13ccbe86af41cb168b87588b7656c0 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_20915fac957d2101a4dd1fe9193c4f3c = $(`<div id="html_20915fac957d2101a4dd1fe9193c4f3c" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 1 - pos 1</b><br>Lat: 12.615293<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_2a13ccbe86af41cb168b87588b7656c0.setContent(html_20915fac957d2101a4dd1fe9193c4f3c);
+            
+        
+
+        circle_marker_81366a12a34dd10dd0684dc30948a2a2.bindPopup(popup_2a13ccbe86af41cb168b87588b7656c0)
+        ;
+
+        
+    
+    
+            circle_marker_81366a12a34dd10dd0684dc30948a2a2.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 1 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_630536f1fa2597c366dcdb1a6b671961 = L.circleMarker(
+                [12.615291327720334, 43.37627270241428],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_f2896a4b666edc0d4b2d385e2b0151d3 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_79aaa6683d722ef6f5f09f9cfef15880 = $(`<div id="html_79aaa6683d722ef6f5f09f9cfef15880" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 1 - pos 2</b><br>Lat: 12.615291<br>Lon: 43.376273<br>Depth: 22.0 m</div>`)[0];
+                popup_f2896a4b666edc0d4b2d385e2b0151d3.setContent(html_79aaa6683d722ef6f5f09f9cfef15880);
+            
+        
+
+        circle_marker_630536f1fa2597c366dcdb1a6b671961.bindPopup(popup_f2896a4b666edc0d4b2d385e2b0151d3)
+        ;
+
+        
+    
+    
+            circle_marker_630536f1fa2597c366dcdb1a6b671961.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 1 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4e6b944d42e94bf081b5e118ddee2519 = L.circleMarker(
+                [12.615293993699785, 43.37627538315193],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_0b768f2475e1d5a4cef9e245c0bb4f57 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_698c366e664a3d4b9c2d618056b27cc1 = $(`<div id="html_698c366e664a3d4b9c2d618056b27cc1" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 1 - pos 3</b><br>Lat: 12.615294<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_0b768f2475e1d5a4cef9e245c0bb4f57.setContent(html_698c366e664a3d4b9c2d618056b27cc1);
+            
+        
+
+        circle_marker_4e6b944d42e94bf081b5e118ddee2519.bindPopup(popup_0b768f2475e1d5a4cef9e245c0bb4f57)
+        ;
+
+        
+    
+    
+            circle_marker_4e6b944d42e94bf081b5e118ddee2519.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 1 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_654fa14ab9d681423c5606edbec30654 = L.polyline(
+                [[12.61394515647811, 43.37765290663466], [12.613945230844854, 43.37765179787636], [12.613947866616884, 43.37765476844568]],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#115511", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_654fa14ab9d681423c5606edbec30654.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_c8cf842e137c8762f80e4ca952e54f8f = L.circleMarker(
+                [12.61394515647811, 43.37765290663466],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_fb298666d9a06003f029426274bd931c = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_452acd8454f1f8fecc2249abeaa64541 = $(`<div id="html_452acd8454f1f8fecc2249abeaa64541" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 2 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.377653<br>Depth: 22.0 m</div>`)[0];
+                popup_fb298666d9a06003f029426274bd931c.setContent(html_452acd8454f1f8fecc2249abeaa64541);
+            
+        
+
+        circle_marker_c8cf842e137c8762f80e4ca952e54f8f.bindPopup(popup_fb298666d9a06003f029426274bd931c)
+        ;
+
+        
+    
+    
+            circle_marker_c8cf842e137c8762f80e4ca952e54f8f.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 2 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_6487bed38b86b3d7aa408881f3d84778 = L.circleMarker(
+                [12.613945230844854, 43.37765179787636],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_cf7ba9919c7338d08d1b7b0aeb0b247c = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_ff6be55c320c02d1ed3eab6c6c0f3244 = $(`<div id="html_ff6be55c320c02d1ed3eab6c6c0f3244" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 2 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.377652<br>Depth: 22.0 m</div>`)[0];
+                popup_cf7ba9919c7338d08d1b7b0aeb0b247c.setContent(html_ff6be55c320c02d1ed3eab6c6c0f3244);
+            
+        
+
+        circle_marker_6487bed38b86b3d7aa408881f3d84778.bindPopup(popup_cf7ba9919c7338d08d1b7b0aeb0b247c)
+        ;
+
+        
+    
+    
+            circle_marker_6487bed38b86b3d7aa408881f3d84778.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 2 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_2ab191d0b3fc33fed0861d615d244ae9 = L.circleMarker(
+                [12.613947866616884, 43.37765476844568],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_cdb4a09bb403dbfb5d6bb3dd895cb234 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_c89a20caeeaeee1fd218f3cc5d02fad0 = $(`<div id="html_c89a20caeeaeee1fd218f3cc5d02fad0" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 2 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.377655<br>Depth: 22.0 m</div>`)[0];
+                popup_cdb4a09bb403dbfb5d6bb3dd895cb234.setContent(html_c89a20caeeaeee1fd218f3cc5d02fad0);
+            
+        
+
+        circle_marker_2ab191d0b3fc33fed0861d615d244ae9.bindPopup(popup_cdb4a09bb403dbfb5d6bb3dd895cb234)
+        ;
+
+        
+    
+    
+            circle_marker_2ab191d0b3fc33fed0861d615d244ae9.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 2 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_2802887de6d8b6d3ce489c0201995200 = L.polyline(
+                [[12.612597804572735, 43.376272017307635], [12.612599134163629, 43.37627270219972], [12.612601781853801, 43.37627559518792]],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#115511", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_2802887de6d8b6d3ce489c0201995200.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5d23ccc288d3763e1f85691d6e413f95 = L.circleMarker(
+                [12.612597804572735, 43.376272017307635],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_f2788a13543e8a94ca3305f5f17653a8 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_a45394c60085bf40bf270f4e7a344817 = $(`<div id="html_a45394c60085bf40bf270f4e7a344817" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 3 - pos 1</b><br>Lat: 12.612598<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_f2788a13543e8a94ca3305f5f17653a8.setContent(html_a45394c60085bf40bf270f4e7a344817);
+            
+        
+
+        circle_marker_5d23ccc288d3763e1f85691d6e413f95.bindPopup(popup_f2788a13543e8a94ca3305f5f17653a8)
+        ;
+
+        
+    
+    
+            circle_marker_5d23ccc288d3763e1f85691d6e413f95.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 3 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_01a1b156e9ee37b88dbe668bce5245cf = L.circleMarker(
+                [12.612599134163629, 43.37627270219972],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_a3f258a977f06b98a703b38e7da0130e = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_bbaaf092256d27fe6fc59b4c58f047c5 = $(`<div id="html_bbaaf092256d27fe6fc59b4c58f047c5" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 3 - pos 2</b><br>Lat: 12.612599<br>Lon: 43.376273<br>Depth: 22.0 m</div>`)[0];
+                popup_a3f258a977f06b98a703b38e7da0130e.setContent(html_bbaaf092256d27fe6fc59b4c58f047c5);
+            
+        
+
+        circle_marker_01a1b156e9ee37b88dbe668bce5245cf.bindPopup(popup_a3f258a977f06b98a703b38e7da0130e)
+        ;
+
+        
+    
+    
+            circle_marker_01a1b156e9ee37b88dbe668bce5245cf.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 3 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_4f5db5c4c222f3c0193150816877bdd1 = L.circleMarker(
+                [12.612601781853801, 43.37627559518792],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_1b9793f3488d038b37e5615f06a6b7dc = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_76b4860f7ebaa5800f653397855d3b57 = $(`<div id="html_76b4860f7ebaa5800f653397855d3b57" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 3 - pos 3</b><br>Lat: 12.612602<br>Lon: 43.376276<br>Depth: 22.0 m</div>`)[0];
+                popup_1b9793f3488d038b37e5615f06a6b7dc.setContent(html_76b4860f7ebaa5800f653397855d3b57);
+            
+        
+
+        circle_marker_4f5db5c4c222f3c0193150816877bdd1.bindPopup(popup_1b9793f3488d038b37e5615f06a6b7dc)
+        ;
+
+        
+    
+    
+            circle_marker_4f5db5c4c222f3c0193150816877bdd1.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 3 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_1cb3764ed4be8761a28ac4ae7ed1fd5a = L.polyline(
+                [[12.61394539316328, 43.37489118408275], [12.613945333152405, 43.374890785229276], [12.613948152222761, 43.37489372430037]],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "#115511", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.4, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_1cb3764ed4be8761a28ac4ae7ed1fd5a.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b1cbb061aa6554c390ae0ab7f12ea6d6 = L.circleMarker(
+                [12.61394539316328, 43.37489118408275],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_48c57c5646341c9d2cb01f6ab1c9846d = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_3386121f3cc36a92df8abbb4212d387f = $(`<div id="html_3386121f3cc36a92df8abbb4212d387f" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 4 - pos 1</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_48c57c5646341c9d2cb01f6ab1c9846d.setContent(html_3386121f3cc36a92df8abbb4212d387f);
+            
+        
+
+        circle_marker_b1cbb061aa6554c390ae0ab7f12ea6d6.bindPopup(popup_48c57c5646341c9d2cb01f6ab1c9846d)
+        ;
+
+        
+    
+    
+            circle_marker_b1cbb061aa6554c390ae0ab7f12ea6d6.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 4 - pos 1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ab960bc4f256da52cc48ae87940e6e92 = L.circleMarker(
+                [12.613945333152405, 43.374890785229276],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_843c790e2ac8d9275cf63ee3d04e618c = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_1b4f56ab536fcdca4c97b24b7860bd10 = $(`<div id="html_1b4f56ab536fcdca4c97b24b7860bd10" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 4 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_843c790e2ac8d9275cf63ee3d04e618c.setContent(html_1b4f56ab536fcdca4c97b24b7860bd10);
+            
+        
+
+        circle_marker_ab960bc4f256da52cc48ae87940e6e92.bindPopup(popup_843c790e2ac8d9275cf63ee3d04e618c)
+        ;
+
+        
+    
+    
+            circle_marker_ab960bc4f256da52cc48ae87940e6e92.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 4 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_e8f7916ee50ac95a86787df9e2fe5a63 = L.circleMarker(
+                [12.613948152222761, 43.37489372430037],
+                {"bubblingMouseEvents": true, "color": "#115511", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#115511", "fillOpacity": 0.4, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 0.4, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_8f35254ada5ed133106aa07d805c2219 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_a3a580f1150565abe1ab74a869f01411 = $(`<div id="html_a3a580f1150565abe1ab74a869f01411" style="width: 100.0%; height: 100.0%;"><b>RX bw IMU MDS - device 4 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.374894<br>Depth: 22.0 m</div>`)[0];
+                popup_8f35254ada5ed133106aa07d805c2219.setContent(html_a3a580f1150565abe1ab74a869f01411);
+            
+        
+
+        circle_marker_e8f7916ee50ac95a86787df9e2fe5a63.bindPopup(popup_8f35254ada5ed133106aa07d805c2219)
+        ;
+
+        
+    
+    
+            circle_marker_e8f7916ee50ac95a86787df9e2fe5a63.bindTooltip(
+                `<div>
+                     RX bw IMU MDS - device 4 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var poly_line_714b566bb6b70991fa66ea82823dc3f7 = L.polyline(
+                [[12.61529, 43.376269198639854], [12.615292697964817, 43.376271963348856], [12.615295395929635, 43.37627472805786]],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": "5, 10", "dashOffset": null, "fill": false, "fillColor": "#FF0000", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.6, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_714b566bb6b70991fa66ea82823dc3f7.bindTooltip(
+                `<div>
+                     Traiettoria F1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_aaa6e68452db784964a4b8ff7581de79 = L.circleMarker(
+                [12.615292697964817, 43.376271963348856],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_4e28535594eb1ff9a2e8cabffe8e526a = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_8c8607070f7100b1159ae8a62845a288 = $(`<div id="html_8c8607070f7100b1159ae8a62845a288" style="width: 100.0%; height: 100.0%;"><b>1 - pos 2</b><br>Lat: 12.615293<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_4e28535594eb1ff9a2e8cabffe8e526a.setContent(html_8c8607070f7100b1159ae8a62845a288);
+            
+        
+
+        circle_marker_aaa6e68452db784964a4b8ff7581de79.bindPopup(popup_4e28535594eb1ff9a2e8cabffe8e526a)
+        ;
+
+        
+    
+    
+            circle_marker_aaa6e68452db784964a4b8ff7581de79.bindTooltip(
+                `<div>
+                     1 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f20b0b3958b063dbe182a1ea252abe0f = L.circleMarker(
+                [12.615295395929635, 43.37627472805786],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_c99886eacd997f84cd93db7027143d6f = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_913c53e6021d008618ef2ddf410b1c6f = $(`<div id="html_913c53e6021d008618ef2ddf410b1c6f" style="width: 100.0%; height: 100.0%;"><b>1 - pos 3</b><br>Lat: 12.615295<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_c99886eacd997f84cd93db7027143d6f.setContent(html_913c53e6021d008618ef2ddf410b1c6f);
+            
+        
+
+        circle_marker_f20b0b3958b063dbe182a1ea252abe0f.bindPopup(popup_c99886eacd997f84cd93db7027143d6f)
+        ;
+
+        
+    
+    
+            circle_marker_f20b0b3958b063dbe182a1ea252abe0f.bindTooltip(
+                `<div>
+                     1 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_54103cb7281c0b62ccb54f80162c28bf = L.marker(
+                [12.61529, 43.376269198639854],
+                {
+}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            var div_icon_d81a9938075f0367b0a36c66cff6c30e = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#FF0000;\n                        color:white;\n                        display: flex;\n                        justify-content: center;\n                        align-items: center;\n                        font-weight:bold;\n                        font-family:monospace;\n                        font-size:11px;\n                        width:26px;\n                        height:26px;\n                        border-radius:50%;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 6px rgba(0,0,0,0.5);\n                        white-space:nowrap;\n                    \"\u003e1\u003c/div\u003e",
+  "iconSize": [26, 26],
+  "iconAnchor": [13, 13],
+  "className": "empty",
+});
+        
+    
+        var popup_e1f6ffd10d2a2fff2c9df9fcefc1b342 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_b866639195f8c2aa1e6cceedb1d901f8 = $(`<div id="html_b866639195f8c2aa1e6cceedb1d901f8" style="width: 100.0%; height: 100.0%;"><b>1</b><br>Lat: 12.615290<br>Lon: 43.376269<br>Depth: 22.0 m</div>`)[0];
+                popup_e1f6ffd10d2a2fff2c9df9fcefc1b342.setContent(html_b866639195f8c2aa1e6cceedb1d901f8);
+            
+        
+
+        marker_54103cb7281c0b62ccb54f80162c28bf.bindPopup(popup_e1f6ffd10d2a2fff2c9df9fcefc1b342)
+        ;
+
+        
+    
+    
+            marker_54103cb7281c0b62ccb54f80162c28bf.bindTooltip(
+                `<div>
+                     1
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_54103cb7281c0b62ccb54f80162c28bf.setIcon(div_icon_d81a9938075f0367b0a36c66cff6c30e);
+            
+    
+            var poly_line_1a7b770ff375abb5b6dfb4b10b71745b = L.polyline(
+                [[12.613942533237513, 43.377649992732685], [12.613945231202331, 43.37765275744169], [12.613947929167148, 43.37765552215069]],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": "5, 10", "dashOffset": null, "fill": false, "fillColor": "#FF0000", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.6, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_1a7b770ff375abb5b6dfb4b10b71745b.bindTooltip(
+                `<div>
+                     Traiettoria F2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_1b43741e8c96eb56ed9bff06f65a5bc8 = L.circleMarker(
+                [12.613945231202331, 43.37765275744169],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_ad62161454d19d5f5fb87e133b064e74 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_2ae72087dec54aa1877f7cbb8f0880f8 = $(`<div id="html_2ae72087dec54aa1877f7cbb8f0880f8" style="width: 100.0%; height: 100.0%;"><b>2 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.377653<br>Depth: 22.0 m</div>`)[0];
+                popup_ad62161454d19d5f5fb87e133b064e74.setContent(html_2ae72087dec54aa1877f7cbb8f0880f8);
+            
+        
+
+        circle_marker_1b43741e8c96eb56ed9bff06f65a5bc8.bindPopup(popup_ad62161454d19d5f5fb87e133b064e74)
+        ;
+
+        
+    
+    
+            circle_marker_1b43741e8c96eb56ed9bff06f65a5bc8.bindTooltip(
+                `<div>
+                     2 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f11c1aa1cc59fe919272e1da7252e261 = L.circleMarker(
+                [12.613947929167148, 43.37765552215069],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_32dc31c828c04a2dc761cf4c5deab2f5 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_1322ce9d3bf2819e5ff38679e6da0832 = $(`<div id="html_1322ce9d3bf2819e5ff38679e6da0832" style="width: 100.0%; height: 100.0%;"><b>2 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.377656<br>Depth: 22.0 m</div>`)[0];
+                popup_32dc31c828c04a2dc761cf4c5deab2f5.setContent(html_1322ce9d3bf2819e5ff38679e6da0832);
+            
+        
+
+        circle_marker_f11c1aa1cc59fe919272e1da7252e261.bindPopup(popup_32dc31c828c04a2dc761cf4c5deab2f5)
+        ;
+
+        
+    
+    
+            circle_marker_f11c1aa1cc59fe919272e1da7252e261.bindTooltip(
+                `<div>
+                     2 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_c3b62dff8c0e8466e56553bdfd7448fd = L.marker(
+                [12.613942533237513, 43.377649992732685],
+                {
+}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            var div_icon_4062a229beb442f0869fb9778d780ec4 = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#FF0000;\n                        color:white;\n                        display: flex;\n                        justify-content: center;\n                        align-items: center;\n                        font-weight:bold;\n                        font-family:monospace;\n                        font-size:11px;\n                        width:26px;\n                        height:26px;\n                        border-radius:50%;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 6px rgba(0,0,0,0.5);\n                        white-space:nowrap;\n                    \"\u003e2\u003c/div\u003e",
+  "iconSize": [26, 26],
+  "iconAnchor": [13, 13],
+  "className": "empty",
+});
+        
+    
+        var popup_f8dc5a612483f8f974bdc58b8c97d11b = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_df41d59920306797f1261d46f798b67f = $(`<div id="html_df41d59920306797f1261d46f798b67f" style="width: 100.0%; height: 100.0%;"><b>2</b><br>Lat: 12.613943<br>Lon: 43.377650<br>Depth: 22.0 m</div>`)[0];
+                popup_f8dc5a612483f8f974bdc58b8c97d11b.setContent(html_df41d59920306797f1261d46f798b67f);
+            
+        
+
+        marker_c3b62dff8c0e8466e56553bdfd7448fd.bindPopup(popup_f8dc5a612483f8f974bdc58b8c97d11b)
+        ;
+
+        
+    
+    
+            marker_c3b62dff8c0e8466e56553bdfd7448fd.bindTooltip(
+                `<div>
+                     2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c3b62dff8c0e8466e56553bdfd7448fd.setIcon(div_icon_4062a229beb442f0869fb9778d780ec4);
+            
+    
+            var poly_line_6a321a6d3a9635e664b67767494392af = L.polyline(
+                [[12.612595066475025, 43.376269198639854], [12.612597764439844, 43.376271963348856], [12.61260046240466, 43.37627472805786]],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": "5, 10", "dashOffset": null, "fill": false, "fillColor": "#FF0000", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.6, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_6a321a6d3a9635e664b67767494392af.bindTooltip(
+                `<div>
+                     Traiettoria F3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_879d8d37cb1b76d9b91c1d5cf6d069e5 = L.circleMarker(
+                [12.612597764439844, 43.376271963348856],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_5878f9714ce5eb8dc48e353673232118 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_67804ad8f7400dbed45ce95c10ac6559 = $(`<div id="html_67804ad8f7400dbed45ce95c10ac6559" style="width: 100.0%; height: 100.0%;"><b>3 - pos 2</b><br>Lat: 12.612598<br>Lon: 43.376272<br>Depth: 22.0 m</div>`)[0];
+                popup_5878f9714ce5eb8dc48e353673232118.setContent(html_67804ad8f7400dbed45ce95c10ac6559);
+            
+        
+
+        circle_marker_879d8d37cb1b76d9b91c1d5cf6d069e5.bindPopup(popup_5878f9714ce5eb8dc48e353673232118)
+        ;
+
+        
+    
+    
+            circle_marker_879d8d37cb1b76d9b91c1d5cf6d069e5.bindTooltip(
+                `<div>
+                     3 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_f320f1e892c45988fa61c8439000b3dd = L.circleMarker(
+                [12.61260046240466, 43.37627472805786],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_2b86d16567a2533b3b805915401b2ab5 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_adccf546deec8e93eda98d24e0c06b90 = $(`<div id="html_adccf546deec8e93eda98d24e0c06b90" style="width: 100.0%; height: 100.0%;"><b>3 - pos 3</b><br>Lat: 12.612600<br>Lon: 43.376275<br>Depth: 22.0 m</div>`)[0];
+                popup_2b86d16567a2533b3b805915401b2ab5.setContent(html_adccf546deec8e93eda98d24e0c06b90);
+            
+        
+
+        circle_marker_f320f1e892c45988fa61c8439000b3dd.bindPopup(popup_2b86d16567a2533b3b805915401b2ab5)
+        ;
+
+        
+    
+    
+            circle_marker_f320f1e892c45988fa61c8439000b3dd.bindTooltip(
+                `<div>
+                     3 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_29ed763cb3da406faaf344bddfa84abe = L.marker(
+                [12.612595066475025, 43.376269198639854],
+                {
+}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            var div_icon_3563a177581afc8b8bb1be58083de0fb = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#FF0000;\n                        color:white;\n                        display: flex;\n                        justify-content: center;\n                        align-items: center;\n                        font-weight:bold;\n                        font-family:monospace;\n                        font-size:11px;\n                        width:26px;\n                        height:26px;\n                        border-radius:50%;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 6px rgba(0,0,0,0.5);\n                        white-space:nowrap;\n                    \"\u003e3\u003c/div\u003e",
+  "iconSize": [26, 26],
+  "iconAnchor": [13, 13],
+  "className": "empty",
+});
+        
+    
+        var popup_670390f9fbcc878156b5bad9b73c59b6 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_6c3f0dd00ca93f6adf131f1ae301474f = $(`<div id="html_6c3f0dd00ca93f6adf131f1ae301474f" style="width: 100.0%; height: 100.0%;"><b>3</b><br>Lat: 12.612595<br>Lon: 43.376269<br>Depth: 22.0 m</div>`)[0];
+                popup_670390f9fbcc878156b5bad9b73c59b6.setContent(html_6c3f0dd00ca93f6adf131f1ae301474f);
+            
+        
+
+        marker_29ed763cb3da406faaf344bddfa84abe.bindPopup(popup_670390f9fbcc878156b5bad9b73c59b6)
+        ;
+
+        
+    
+    
+            marker_29ed763cb3da406faaf344bddfa84abe.bindTooltip(
+                `<div>
+                     3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_29ed763cb3da406faaf344bddfa84abe.setIcon(div_icon_3563a177581afc8b8bb1be58083de0fb);
+            
+    
+            var poly_line_eaa15be6c1cb4da4acdb511a084c2e76 = L.polyline(
+                [[12.613942533237513, 43.374888404547015], [12.613945231202331, 43.374891169256024], [12.613947929167148, 43.374893933965026]],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": "5, 10", "dashOffset": null, "fill": false, "fillColor": "#FF0000", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 0.6, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            poly_line_eaa15be6c1cb4da4acdb511a084c2e76.bindTooltip(
+                `<div>
+                     Traiettoria F4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_5193882ca79f87d70d67117fa11496d2 = L.circleMarker(
+                [12.613945231202331, 43.374891169256024],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_a27c0168598172345d23f46ea1edfd59 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_094d71422266e0f99ed0371339f75ebb = $(`<div id="html_094d71422266e0f99ed0371339f75ebb" style="width: 100.0%; height: 100.0%;"><b>4 - pos 2</b><br>Lat: 12.613945<br>Lon: 43.374891<br>Depth: 22.0 m</div>`)[0];
+                popup_a27c0168598172345d23f46ea1edfd59.setContent(html_094d71422266e0f99ed0371339f75ebb);
+            
+        
+
+        circle_marker_5193882ca79f87d70d67117fa11496d2.bindPopup(popup_a27c0168598172345d23f46ea1edfd59)
+        ;
+
+        
+    
+    
+            circle_marker_5193882ca79f87d70d67117fa11496d2.bindTooltip(
+                `<div>
+                     4 - pos 2
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_de62cd5b371e8ff2939ea138045a5264 = L.circleMarker(
+                [12.613947929167148, 43.374893933965026],
+                {"bubblingMouseEvents": true, "color": "#FF0000", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#FF0000", "fillOpacity": 0.6, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 4, "stroke": true, "weight": 1}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+        var popup_6768cbc3407a350943c723b9b33ab757 = L.popup({
+  "maxWidth": 180,
+});
+
+        
+            
+                var html_18019e037695e9a6ea6c53b4aa43d8b5 = $(`<div id="html_18019e037695e9a6ea6c53b4aa43d8b5" style="width: 100.0%; height: 100.0%;"><b>4 - pos 3</b><br>Lat: 12.613948<br>Lon: 43.374894<br>Depth: 22.0 m</div>`)[0];
+                popup_6768cbc3407a350943c723b9b33ab757.setContent(html_18019e037695e9a6ea6c53b4aa43d8b5);
+            
+        
+
+        circle_marker_de62cd5b371e8ff2939ea138045a5264.bindPopup(popup_6768cbc3407a350943c723b9b33ab757)
+        ;
+
+        
+    
+    
+            circle_marker_de62cd5b371e8ff2939ea138045a5264.bindTooltip(
+                `<div>
+                     4 - pos 3
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_e99ca0db74f0c028c0c9f45a86a989d2 = L.marker(
+                [12.613942533237513, 43.374888404547015],
+                {
+}
+            ).addTo(map_08e583aca0b20084c9de95a67aa03836);
+        
+    
+            var div_icon_9df1cc23f729c0dc02e20c30ba6606fe = L.divIcon({
+  "html": "\n                    \u003cdiv style=\"\n                        background:#FF0000;\n                        color:white;\n                        display: flex;\n                        justify-content: center;\n                        align-items: center;\n                        font-weight:bold;\n                        font-family:monospace;\n                        font-size:11px;\n                        width:26px;\n                        height:26px;\n                        border-radius:50%;\n                        border: 2px solid white;\n                        box-shadow: 0 2px 6px rgba(0,0,0,0.5);\n                        white-space:nowrap;\n                    \"\u003e4\u003c/div\u003e",
+  "iconSize": [26, 26],
+  "iconAnchor": [13, 13],
+  "className": "empty",
+});
+        
+    
+        var popup_0d56db2481b89f2f18f969cf35e439d3 = L.popup({
+  "maxWidth": 200,
+});
+
+        
+            
+                var html_bed6e1248334c7e4f4aa39d6654a5b14 = $(`<div id="html_bed6e1248334c7e4f4aa39d6654a5b14" style="width: 100.0%; height: 100.0%;"><b>4</b><br>Lat: 12.613943<br>Lon: 43.374888<br>Depth: 22.0 m</div>`)[0];
+                popup_0d56db2481b89f2f18f969cf35e439d3.setContent(html_bed6e1248334c7e4f4aa39d6654a5b14);
+            
+        
+
+        marker_e99ca0db74f0c028c0c9f45a86a989d2.bindPopup(popup_0d56db2481b89f2f18f969cf35e439d3)
+        ;
+
+        
+    
+    
+            marker_e99ca0db74f0c028c0c9f45a86a989d2.bindTooltip(
+                `<div>
+                     4
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_e99ca0db74f0c028c0c9f45a86a989d2.setIcon(div_icon_9df1cc23f729c0dc02e20c30ba6606fe);
+            
+</script>
+</html>

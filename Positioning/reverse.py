@@ -108,7 +108,7 @@ def reverse(self_movs, self_errs, self_poss, dists, MDS_i, Resurface_i):
             zz += 1
 
         #self_err_rev += estimate_mov_error(self_mov)
-        self_err_rev = move_error_2(1,zz,self_mov.shape[1])
+        self_err_rev = move_error_2(1,zz,self_mov.shape[0])
         
         # ----- COPIA STATO PRIMA DI TENTARE MDS -----
         self_pos_rev_copy = self_pos_rev.copy()

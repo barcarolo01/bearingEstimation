@@ -5,15 +5,13 @@ import sys
 import numpy as np
 from bellhop_to_wav import from_arr_to_wav
 from floater_geometry import get_hydrophones_coordinates
+from hydromate.app_bellhop import AppBellhop
 
 load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
+HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
 
 def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, depth_RX, H_index):
-    
-    HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
-    #sys.path.append(HYDROMATE_PY_PATH)
-    from hydromate.app_bellhop import AppBellhop
 
     # Create TMP folder if not exists
     if not os.path.isdir("TMP"):
