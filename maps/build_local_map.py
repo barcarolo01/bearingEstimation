@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 FONTSIZE = 18
 
 def _is_valid(*values):
-    """Restituisce True solo se nessuno dei valori è NaN o None."""
+    """Returns True only if none of the values is NaN or None"""
     return all(v is not None and not np.isnan(float(v)) for v in values)
 
 def build_local_cartesian_map(
@@ -23,28 +23,7 @@ def build_local_cartesian_map(
     RX_bw_IMU=None,
     RX_bw_IMU_MDS=None,
 ):
-    """
-    Genera e salva un grafico cartesiano locale in metri basato su un centro custom.
-    
-    Parametri
-    ---------
-    floaters_coordinates : array-like di forma (N, M, 3) oppure None
-        N = numero di posizioni temporali, M = numero di floater, 3 = [lat, lon, depth].
-        Se fornito un array (M, 3) o (M, 2), viene trattato come singolo istante temporale (N=1).
-    TX_positions_coordinates, estimated_vessel_coordinates : array-like di forma (N, 2/3) oppure None
-    center_coordinates : array-like di forma (2,) -> [lat_centro, lon_centro]
-    window_width_m : float -> Larghezza della finestra di visualizzazione in metri
-    window_height_m : float -> Altezza della finestra di visualizzazione in metri
-    track_floaters : bool -> se True, disegna la traiettoria tratteggiata di ogni floater
-    RX_fw_IMU, RX_fw_IMU_MDS, RX_bw_IMU, RX_bw_IMU_MDS : array-like di forma (N, M, 3) oppure None
-        N = numero di posizioni temporali, M = numero di device, 3 = [lat, lon, depth].
-        Stessa convenzione di forma di `floaters_coordinates` (accetta anche (M, 3)/(M, 2)
-        come singolo istante temporale, con N=1 aggiunto automaticamente).
-        Traiettorie del ricevitore sempre disegnate come linea connessa (nessun flag di attivazione):
-        RX_fw_IMU in blu, RX_fw_IMU_MDS in arancione, RX_bw_IMU in verde chiaro, RX_bw_IMU_MDS in rosso.
-    """
-    
-    # Raggio della Terra in metri
+
     R = 6371000.0
     lat_ref = np.radians(center_coordinates[0])
     lon_ref = np.radians(center_coordinates[1])
@@ -233,8 +212,8 @@ def build_local_cartesian_map(
     ax.set_ylim(-half_h, half_h)
 
     # Etichette assi e dettagli grafici
-    ax.set_xlabel("West-East [meters]", fontsize=FONTSIZE, fontweight='bold')
-    ax.set_ylabel("South-North [meters]", fontsize=FONTSIZE, fontweight='bold')
+    ax.set_xlabel("Easting [meters]", fontsize=FONTSIZE, fontweight='bold')
+    ax.set_ylabel("Northing [meters]", fontsize=FONTSIZE, fontweight='bold')
     
     ax.set_aspect('equal', adjustable='box')
     

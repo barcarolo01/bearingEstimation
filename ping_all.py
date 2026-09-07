@@ -5,7 +5,6 @@ from bellhop_to_wav import build_ir, read_arr
 from coordinate_generator import local_to_geo
 from hydromate.app_bellhop import AppBellhop
 
-
 FS_OUT = 96000
 C_SOUND = 1540
 
@@ -90,19 +89,3 @@ def local_ping(Center,position_matrix):
 
     dist_matrix += np.transpose(dist_matrix)
     return dist_matrix
-
-
-if __name__ == "__main__":
-    list = []
-
-    for k in range(5):
-        f = Floater(
-                    gt_x=0, # Random coordinates
-                    gt_y=0,
-                    gt_z=0,  # Constant depth
-                    dt=1.0,
-                    dim=3)
-        list.append(f)
-
-    z = ping_all(list)
-    print(z)
