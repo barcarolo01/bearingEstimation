@@ -14,13 +14,13 @@ from Floater import *
 
 np.random.seed(256123)
 
-SIMULATION_STEPS = 1000 
+SIMULATION_STEPS = 1 
 RESURFACE_FREQ = 999999
-NUMBER_OF_FLOATERS = 5
+NUMBER_OF_FLOATERS = 2
 TX_LIMIT = 2
 
 SIMULATE = True
-SKIPhydromate = True
+SKIPhydromate = False
 ANALYZE_WAVS = False
 
 load_dotenv()
@@ -28,7 +28,10 @@ NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 SAMPLING_FREQUENCY = int(os.getenv('SAMPLING_FREQUENCY'))
 
 #Center = [20.832813, 88.698390] # India, low depth
-Center = [12.61529, 43.37765]
+#Center = [12.61529, 43.37765]
+Center = [39.84164446886851,-70.90061264492535]
+
+
 Lat_center = Center[0]
 Lon_center = Center[1]
 
@@ -38,9 +41,9 @@ Lon_center = Center[1]
 
 TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
 
-Center_2 =sposta(Center,150*np.sqrt(2),225)
-lat1,lon1 = sposta(Center_2,100,0)
-lat2,lon2 = sposta(Center_2,151,90)
+Center_2 = sposta(Center,150*np.sqrt(2),225)
+lat1,lon1 = sposta(Center,100,0)
+lat2,lon2 = sposta(Center,100,90)
 lat3,lon3 = sposta(Center_2,201,180)
 lat4,lon4 = sposta(Center_2,250,270)
 lat5,lon5 = sposta(Center_2,50,200)
@@ -62,7 +65,7 @@ if SIMULATE:
 
         np.save("Synth/Center_Coordinates.npy",Center)
 
-        trans = Floater(0,-100,-100,20,NUMBER_OF_FLOATERS,1.0,3)
+        trans = Floater(0,0,0,20,NUMBER_OF_FLOATERS,1.0,3)
         trans.set_rho(1.0)
         trans.set_sigma(0.10, 0.10, 0.0)
         trans.set_initial_velocity(1.0,1.0,0)
@@ -118,7 +121,20 @@ if SIMULATE:
                         # At the end of the simulation, the floater emerges
                         if( i == SIMULATION_STEPS - 1):
                                 floaters[n].resurface()
+
+
                         
+                        # Hydromate simulation
+                        if not SKIPhydromate:
+                                run_discrete_hydromate_single(TX_Coordinates[i,0],
+                                                        TX_Coordinates[i,1],
+                                                        TX_Coordinates[i,2],
+                                                        RX_gt_Coordinates[i,n,0],
+                                                        RX_gt_Coordinates[i,n,1],
+                                                        RX_gt_Coordinates[i,n,2],
+                                                        (n+1))
+                        
+                trans.move() # Vessel motion
            
 
                 # Current shapshot
@@ -197,17 +213,7 @@ if SIMULATE:
                                 
 
 
-                # Hydromate simulation
-                if not SKIPhydromate:
-                        run_discrete_hydromate_single(TX_Coordinates[i,0],
-                                                TX_Coordinates[i,1],
-                                                TX_Coordinates[i,2],
-                                                RX_gt_Coordinates[i,n,0],
-                                                RX_gt_Coordinates[i,n,1],
-                                                RX_gt_Coordinates[i,n,2],
-                                                (n+1))
-                
-                trans.move() # Vessel motion
+
                 
                 
 
@@ -281,8 +287,9 @@ if SIMULATE:
                 print(f"{name:22s} {np.sqrt((e**2).mean()):10.3f}")
         
 
+        '''
         build_local_cartesian_map(
-                RX_gt_Coordinates, 
+                RX_gt_Coordinates,
                 None, 
                 None, 
                 center_coordinates=Center,
@@ -310,7 +317,7 @@ if SIMULATE:
                 RX_bw_IMU=RX_bw_IMU,
                 #RX_bw_IMU_MDS=RX_bw_IMU_MDS
                 )
-        
+        '''
 
 
         for n in range(NUMBER_OF_FLOATERS):
@@ -409,6 +416,18 @@ np.save("Synth/Estimated_",estimated_bw_IMU_MDS)
 
 # Plotting points on the map
 
+build_map(
+        floaters_coordinates = RX_gt_Coordinates,
+        TX_positions_coordinates = TX_Coordinates,
+        estimated_vessel_coordinates = estimated_points,
+        output_file="maps/map_folium.html",
+        track_TX = True,
+        track_estimated=True,
+        RX_fw_IMU=RX_fw_IMU,
+        RX_fw_IMU_MDS=RX_IMU_compensated,
+        RX_bw_IMU=RX_bw_IMU,
+        #RX_bw_IMU_MDS=RX_bw_IMU_MDS
+        )
 
 '''
 build_local_cartesian_map(
@@ -442,11 +461,10 @@ if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimate
                 track_TX=True, 
                 track_estimated=True)
 
-
-print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],Lat_center,Lon_center):.1f}")
-print(f"RMSE estimated_bw_IMU_MDS: \t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
-#print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")
 '''
+print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE estimated_bw_IMU_MDS: \t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
+#print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")

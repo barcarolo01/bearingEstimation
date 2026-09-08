@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from scipy.fft import rfft, irfft, next_fast_len
-from scipy.signal import convolve, resample_poly
+from scipy.signal import resample_poly
 from math import gcd
 import soundfile as sf
 
@@ -27,7 +27,7 @@ def read_arr(filename):
     while len(rr_values) < nr:
         rr_values += list(map(float, lines[i].split())); i += 1
 
-    i += 1  # skip entire global header
+    i += 1  # Skip entire global header
 
     arrivals = {}
     for rd in rd_values:
@@ -203,8 +203,8 @@ def from_arr_to_wav(input_folder: str,number_mic: int,source: str,out_folder: st
         rx_out_list.append(rx_out)
 
     # Global normalization
-    gmax = max(np.max(np.abs(s)) for s in rx_out_list)
-    rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
+    #gmax = max(np.max(np.abs(s)) for s in rx_out_list)
+    #rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
 
     # Save the convolved track (one per hydrophone) in numpy array format (.npy)
     for i, rx_out in enumerate(rx_out_list, start=1):
