@@ -122,7 +122,7 @@ def build_local_cartesian_map(
     # --- Traiettorie RX IMU (sempre attive, una traiettoria per ciascun device) ---
     _imu_tracks = [
         (RX_fw_IMU, xy_fw_imu, "#F3C178", "RX fw IMU"),
-        (RX_fw_IMU_MDS, xy_fw_imu_mds, "#6BFFB8", "RX fw IMU MDS"),
+        (RX_fw_IMU_MDS, xy_fw_imu_mds, "#6BFFB8", "IMU compensated"), #QUAA
         (RX_bw_IMU, xy_bw_imu, "#FE5E41", "RX bw IMU"),
         (RX_bw_IMU_MDS, xy_bw_imu_mds, "#2A6041", "RX bw IMU MDS"),
     ]

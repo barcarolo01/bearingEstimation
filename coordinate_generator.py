@@ -91,35 +91,33 @@ def generate_TX_trajectory(Lat_TX_init,Lon_TX_init,Lat_TX_end,Lon_TX_end,constan
 def generate_grid_of_samples(lat_orig, lon_orig, depth_constant, W, N):
     """
     Generates a grid of coordinates (Lat, Lon) centered on the specified origin.
-    
+
     Input:
     - lat_orig, lon_orig: Coordinates of the origin.
-    - W: Maximum displacement in North, East and West direction
-    - N: Number of samples along North, East and West direction
-    
+    - W: Maximum displacement in each of the four directions (N, S, E, W)
+    - N: Number of samples per direction (origin included)
+
     Output:
-    - Numpy array of shape (2N * N, 2) containing the generated pairs (Lat, Lon).
+    - Numpy array of shape ((2N-1)^2, 2) containing the generated pairs (Lat, Lon).
     """
     # Earth radius in meters
     R_earth = 6378137.0
-    
-    step = W / (N - 1)
 
-    # Usa il passo per creare l'asse X simmetrico in modo che abbia pixel quadrati
-    spostamento_y = np.linspace(0, W, N)
-    spostamento_x = np.arange(-(N-1), N) * step  # Generates 2N-1 points from -W to +W
-    
+    # 2N-1 punti equispaziati da -W a +W su entrambi gli assi -> pixel quadrati
+    spostamento_y = np.linspace(-W, W, 2 * N - 1)
+    spostamento_x = np.linspace(-W, W, 2 * N - 1)
+
     delta_lat = (spostamento_y / R_earth) * (180.0 / np.pi)
     fattore_lon = R_earth * np.cos(np.radians(lat_orig))
     delta_lon = (spostamento_x / fattore_lon) * (180.0 / np.pi)
 
     lat_griglia = lat_orig + delta_lat
     lon_griglia = lon_orig + delta_lon
-    
-    # Meshgrid generates 2D matrices (N nows x 2N cols)
+
+    # Meshgrid generates 2D matrices ((2N-1) rows x (2N-1) cols)
     LON, LAT = np.meshgrid(lon_griglia, lat_griglia)
-    coordinate_coppie = np.column_stack((LAT.ravel(), LON.ravel(),))
-    
+    coordinate_coppie = np.column_stack((LAT.ravel(), LON.ravel()))
+
     return coordinate_coppie
 
 def compute_TX_circle_trajectory(

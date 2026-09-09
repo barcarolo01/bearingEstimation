@@ -7,7 +7,7 @@ IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
 IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
 
 # ===== FREQUENCY OF MDS (simulation steps) =====
-MDS_FREQ = 20
+MDS_FREQ = 999999
 
 def distance_matrix(obs, N):
     D = np.full((N, N), np.nan)

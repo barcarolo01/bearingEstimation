@@ -14,13 +14,13 @@ from Floater import *
 
 np.random.seed(256123)
 
-SIMULATION_STEPS = 900
+SIMULATION_STEPS = 35
 RESURFACE_FREQ = 999999
 NUMBER_OF_FLOATERS = 2
 TX_LIMIT = 2
 
-SIMULATE = True
-SKIPhydromate = True
+SIMULATE = False
+SKIPhydromate = False
 ANALYZE_WAVS = False
 
 load_dotenv()
@@ -35,8 +35,11 @@ Center = [39.84164446886851,-70.90061264492535]
 Lat_center = Center[0]
 Lon_center = Center[1]
 
-#TX_Coordinates = compute_TX_circle_trajectory(Center, 50 ,start_deg=0,end_deg=350,n_steps=35,radius_m=200,clockwise=True)
-TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
+TX_Coordinates = compute_TX_circle_trajectory(Center, 50 ,start_deg=0,end_deg=350,n_steps=35,radius_m=200,clockwise=True)
+#TX_Coordinates = np.zeros((1000,3))
+
+
+#TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
 
 Center_2 = sposta(Center,150*np.sqrt(2),225)
 lat1,lon1 = sposta(Center,100,270)
@@ -100,7 +103,7 @@ if SIMULATE:
         for i in range(SIMULATION_STEPS):
                 print(f"Simulation step n. {i+1}/{SIMULATION_STEPS}")
                 transmissions_in_round = 0
-                TX_Coordinates[i,:] = local_to_geo(Center,trans.gt_pos)        
+                #TX_Coordinates[i,:] = local_to_geo(Center,trans.gt_pos)        
 
 
                 mustTX = [False] * NUMBER_OF_FLOATERS
@@ -220,14 +223,9 @@ if SIMULATE:
         RX_IMU_compensated = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
         GT            = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
 
-
-
-
-        #names  = ['imu', 'imu_rev', 'imu_mds', 'imu_mds_rev', 'imu_compensated','imu_compensated_bis']
+        names  = ['imu', 'imu_rev', 'imu_mds', 'imu_mds_rev', 'imu_compensated','imu_compensated_bis']
         colors = ['tab:blue', 'tab:green', 'tab:orange', 'tab:red', 'tab:purple', '#000000']
-        #targets = [RX_fw_IMU, RX_bw_IMU, RX_fw_IMU_MDS, RX_bw_IMU_MDS,RX_IMU_compensated]
-        targets = [RX_fw_IMU, RX_bw_IMU, RX_IMU_compensated]
-        names  = ['imu', 'imu_rev','imu_compensated']
+        targets = [RX_fw_IMU, RX_bw_IMU, RX_fw_IMU_MDS, RX_bw_IMU_MDS,RX_IMU_compensated]
         for n in range(NUMBER_OF_FLOATERS):
                 res = floaters[n].return_results(gps_sigma=0, fuse=False)
                 gt  = res['gt'][1:]
@@ -245,9 +243,9 @@ if SIMULATE:
                         ax_true.plot(np.linalg.norm(pos - gt, axis=1), color=color, lw=1.8, label=name)
                         
 
-                for ax, t in ((ax_pred, "Errore auto-stimato"), (ax_true, "Positioning error vs ground truth")):
+                for ax, t in ((ax_pred, "Errore auto-stimato"), (ax_true, "Errore vero vs ground truth")):
                         ax.set_title(t)
-                        ax.set_xlabel("Simulation steps")
+                        ax.set_xlabel("Passi di simulazione")
                         #ax.set_ylim([0,500])
                         ax.grid(True, ls='--', alpha=.5)
                         for k in floaters[n].Resurface_index:
@@ -274,23 +272,8 @@ if SIMULATE:
         '''
 
 
-        build_local_cartesian_map(
-        RX_gt_Coordinates,
-        None, 
-        None, 
-        center_coordinates=RX_fw_IMU[0,1,:2],
-        window_width_m=50, 
-        window_height_m=50,
-        output_file="maps/map_local.png",
-        track_TX=True,
-        track_estimated=True,
-        RX_fw_IMU=RX_fw_IMU,
-        RX_fw_IMU_MDS=RX_IMU_compensated,
-        RX_bw_IMU=RX_bw_IMU,
-        #RX_bw_IMU_MDS=RX_bw_IMU_MDS
-        )
 
-
+        
         print(f"{'Version':22s} {'RMSE':>10s}")
         for name, arr in zip(names, targets):
                 e_all, p_all = [], []
@@ -406,7 +389,10 @@ if SIMULATE or ANALYZE_WAVS:
 
 else:
         fist_azimuth = np.load(f"Synth/F1_azimuth.npy")
-        first_elevation = np.load(f"Synth/F1_elevation.npy")
+        try:
+                first_elevation = np.load(f"Synth/F1_elevation.npy")
+        except:
+                first_elevation = np.zeros(fist_azimuth.shape)
 
         bearing_arrays = np.zeros([NUMBER_OF_FLOATERS,len(fist_azimuth)])
         elevation_arrays = np.zeros([NUMBER_OF_FLOATERS,len(first_elevation)])
@@ -432,6 +418,7 @@ np.save("Synth/Estimated_",estimated_bw_IMU_MDS)
 
 # Plotting points on the map
 
+'''
 build_map(
         floaters_coordinates = RX_gt_Coordinates,
         TX_positions_coordinates = TX_Coordinates,
@@ -444,15 +431,15 @@ build_map(
         RX_bw_IMU=RX_bw_IMU,
         #RX_bw_IMU_MDS=RX_bw_IMU_MDS
         )
-
+'''
 
 build_local_cartesian_map(
         RX_gt_Coordinates, 
         TX_Coordinates,  
         estimated_points,
         center_coordinates=Center,
-        window_width_m=430, 
-        window_height_m=430,
+        window_width_m=600, 
+        window_height_m=600,
         output_file="maps/map_local.png",
         track_TX=True,
         track_estimated=True,
