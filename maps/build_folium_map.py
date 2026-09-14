@@ -4,15 +4,44 @@ import numpy as np
 from folium import MacroElement
 from jinja2 import Template
 
+from maps.map_common import (
+    Track,
+    as_multi,
+    as_points,
+    depth_str,
+    first_valid_location,
+    normalize_tracks,
+    valid_points,
+)
+
+FLOATER_COLOR = "#FF0000"
+TX_COLOR = "#FFD700"
+EST_COLOR = "#00CC66"
+
+# OpenStreetMap basemap.
+#
+# IMPORTANT:
+# The standard OSM tile service should be used with a normal HTTP(S)
+# application context. If map.html is opened directly with file://, some
+# browsers/proxies may omit the Referer and the OSM tile server can respond
+# with HTTP 403. The Python code below uses the official OSM tile URL; if your
+# browser still shows 403, serve map.html through a small local HTTP server
+# (see the note below the file).
+BASEMAP_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+BASEMAP_ATTRIBUTION = (
+    '&copy; <a href="https://www.openstreetmap.org/copyright">'
+    'OpenStreetMap</a> contributors'
+)
+
 class ScaleBar(MacroElement):
-    """Barra di scala fissa che si aggiorna automaticamente con lo zoom."""
-    
+    """Fixed scale bar, automatically updated on zoom."""
+
     _template = Template("""
         {% macro script(this, kwargs) %}
-        
-        // Crea il contenitore della scala
+
+        // Create the scale bar container
         var scaleDiv = L.control({position: 'bottomleft'});
-        
+
         scaleDiv.onAdd = function(map) {
             var div = L.DomUtil.create('div', 'scale-bar');
             div.style.cssText = `
@@ -29,15 +58,15 @@ class ScaleBar(MacroElement):
             `;
             return div;
         };
-        
+
         scaleDiv.addTo({{ this._parent.get_name() }});
-        
+
         function updateScale() {
             var map = {{ this._parent.get_name() }};
             var center = map.getCenter();
             var bounds = map.getBounds();
-            
-            // Calcola la larghezza della mappa in metri
+
+            // Width of the map in pixels
             var leftPoint = map.latLngToContainerPoint(
                 L.latLng(center.lat, bounds.getWest())
             );
@@ -45,20 +74,20 @@ class ScaleBar(MacroElement):
                 L.latLng(center.lat, bounds.getEast())
             );
             var pixelWidth = rightPoint.x - leftPoint.x;
-            
-            // Distanza reale in metri per tutta la larghezza
+
+            // Real width of the map in meters
             var realWidth = center.distanceTo(
                 L.latLng(center.lat, bounds.getEast())
             ) * 2;
-            
-            // Scala: metri per pixel
+
+            // Scale: meters per pixel
             var metersPerPixel = realWidth / pixelWidth;
-            
-            // Larghezza target della barra (100px) → distanza reale
+
+            // Target bar width (100px) -> real distance
             var targetPixels = 100;
             var targetMeters = metersPerPixel * targetPixels;
-            
-            // Arrotonda a un numero "bello"
+
+            // Round to a "nice" number
             var magnitude = Math.pow(10, Math.floor(Math.log10(targetMeters)));
             var nice = [1, 2, 5, 10];
             var niceMeters = magnitude;
@@ -68,19 +97,19 @@ class ScaleBar(MacroElement):
                     break;
                 }
             }
-            
-            // Pixel effettivi per la distanza arrotondata
+
+            // Actual pixels for the rounded distance
             var barPixels = niceMeters / metersPerPixel;
-            
-            // Etichetta
+
+            // Label
             var label;
             if (niceMeters >= 1000) {
                 label = (niceMeters / 1000) + ' km';
             } else {
                 label = niceMeters + ' m';
             }
-            
-            // Aggiorna DOM
+
+            // Update the DOM
             var div = document.querySelector('.scale-bar');
             if (div) {
                 div.style.width = barPixels + 'px';
@@ -88,347 +117,189 @@ class ScaleBar(MacroElement):
                 div.innerHTML = label;
             }
         }
-        
-        // Aggiorna alla creazione e ad ogni zoom/spostamento
+
+        // Update on creation and on every zoom/pan
         {{ this._parent.get_name() }}.on('zoomend moveend load', updateScale);
         setTimeout(updateScale, 300);
-        
+
         {% endmacro %}
     """)
-    
+
     def __init__(self):
         super().__init__()
 
-def _is_valid(*values):
-    """Restituisce True solo se nessuno dei valori è NaN o None."""
-    return all(v is not None and not np.isnan(float(v)) for v in values)
 
-def build_map(
-    floaters_coordinates, 
-    TX_positions_coordinates, 
-    estimated_vessel_coordinates, 
-    output_file, 
-    track_TX=False, 
-    track_estimated=False,
-    track_floaters=True,
-    RX_fw_IMU=None,
-    RX_fw_IMU_MDS=None,
-    RX_bw_IMU=None,
-    RX_bw_IMU_MDS=None,
-    imu_alpha=0.4,
+def build_folium_map(
+    floater_coordinates=None,
+    TX_coordinates=None,
+    estimated_vessel_coordinates=None,
+    tracks=None,
+    output_file="map.html",
+    track_alpha=0.7,
+    zoom_start=15,
 ):
     """
-    Costruisce, salva e restituisce la mappa Folium con:
-      - Floaters (F1, F2, ...) come marker con etichetta rossa circolare sulla prima posizione,
-        ed eventuale traiettoria tratteggiata che collega le posizioni successive
-      - Punti TX in giallo  (NaN ignorati)
-      - Punti stimati in verde (NaN ignorati)
-      - Traiettorie opzionali che collegano i punti sequenzialmente
-      - Traiettorie RX IMU (fw/bw, standard/MDS) sempre disegnate, in forma semi-trasparente
+    Build, save and return the folium map.
 
-    Per tutti gli array di coordinate, la profondità è opzionale:
-    se presente come ultima colonna viene mostrata nel popup, altrimenti "N/A".
-    I valori -999 sono trattati come profondità non disponibile.
+    Takes the same parameters as `build_local_cartesian_map`, except
+    `center_coordinates`, `window_width_m` and `window_height_m` (the folium map
+    centers itself on the first available valid point).
 
-    Parametri
-    ---------
-    floaters_coordinates : array-like di forma (N, M, 3) o (N, M, 2), oppure None
-        N = numero di posizioni temporali, M = numero di floater.
-        Se fornito un array (M, 3) o (M, 2), viene trattato come singolo istante (N=1).
-    TX_positions_coordinates : array-like di forma (K, 2) o (K, 3), oppure None
-    estimated_vessel_coordinates : array-like di forma (K, 2) o (K, 3), oppure None
+    floater_coordinates : array-like (N, M, 2|3) or (M, 2|3), or None
+        N = time steps, M = number of floaters, columns [lat, lon, (depth)].
+        Each floater has its own trajectory: different floaters are never connected.
+    TX_coordinates : array-like (K, 2|3), or None
+    estimated_vessel_coordinates : array-like (K, 2|3), or None
+    tracks : Track | dict | tuple | sequence of those, or None
+        Generic series of points: name (str), color (str) and points of shape
+        (NUMBER_STEPS, 2|3) or (NUMBER_STEPS, M, 2|3). With the 3-dimensional
+        shape, M independent series sharing name and color are drawn: points are
+        connected along the step axis only, never across different indices.
     output_file : str
-    track_TX : bool, opzionale (default=False)
-    track_estimated : bool, opzionale (default=False)
-    track_floaters : bool, opzionale (default=True)
-        Se True, mostra la traiettoria tratteggiata di ciascun floater.
-    RX_fw_IMU, RX_fw_IMU_MDS, RX_bw_IMU, RX_bw_IMU_MDS : array-like di forma (N, M, 3) oppure None
-        N = numero di posizioni temporali, M = numero di device, 3 = [lat, lon, depth].
-        Stessa convenzione di forma di `floaters_coordinates` (accetta anche (M, 3)/(M, 2)
-        come singolo istante temporale, con N=1 aggiunto automaticamente).
-        Traiettorie del ricevitore sempre disegnate come linea connessa (nessun flag di attivazione):
-        RX_fw_IMU in blu, RX_fw_IMU_MDS in arancione, RX_bw_IMU in verde chiaro, RX_bw_IMU_MDS in rosso.
-    imu_alpha : float -> livello di trasparenza (0=invisibile, 1=opaco) delle 4 traiettorie RX IMU. Default 0.4.
+    track_alpha : float
+        Transparency of the series in `tracks`.
+    zoom_start : int
+
+    Depth: the depth column is optional; -999 values are treated as missing.
     """
 
-    def _extract_coords(arr):
-        """
-        Restituisce (lats, lons, depths) appiattendo tutte le dimensioni tranne l'ultima.
-        Ritorna array vuoti se arr è None.
-        """
-        if arr is None:
-            return np.empty(0), np.empty(0), np.empty(0)
+    # --- Normalize every input to a single [lat, lon, depth] layout ---
+    floaters = as_multi(floater_coordinates)                            # (N, M, 3)
+    tx = valid_points(as_points(TX_coordinates))                        # (K, 3)
+    estimated = valid_points(as_points(estimated_vessel_coordinates))   # (K, 3)
+    track_list = normalize_tracks(tracks)                               # each .xyz is (N, M, 3)
 
-        arr = np.asarray(arr, dtype=float)
-        if arr.size == 0:
-            return np.empty(0), np.empty(0), np.empty(0)
-
-        flat = arr.reshape(-1, arr.shape[-1])
-        lats = flat[:, 0]
-        lons = flat[:, 1]
-        if flat.shape[1] >= 3:
-            depths = flat[:, 2]
-            depths = np.where(depths == -999, np.nan, depths)
-        else:
-            depths = np.full(len(lats), np.nan)
-        return lats, lons, depths
-
-    def _depth_str(depth):
-        """Formatta la profondità per il popup."""
-        return f"{depth:.1f} m" if not np.isnan(depth) else "N/A"
-
-    def _normalize_multi(arr):
-        """
-        Converte input in array (N, M, C), stessa convenzione usata per floaters_coordinates:
-        se l'input ha forma (M, C) viene trattato come singolo istante temporale (N=1).
-        Ritorna None se arr è None.
-        """
-        if arr is None:
-            return None
-        out = np.asarray(arr, dtype=float)
-        if out.ndim == 2:
-            out = out[np.newaxis, :, :]
-        return out
-
-    # --- Normalizzazione floaters a forma (N, M, C) ---
-    floaters_arr = _normalize_multi(floaters_coordinates)
-
-    lats_fl,  lons_fl,  depths_fl  = _extract_coords(floaters_arr)
-    lats_tx,  lons_tx,  depths_tx  = _extract_coords(TX_positions_coordinates)
-    lats_est, lons_est, depths_est = _extract_coords(estimated_vessel_coordinates)
-
-    # --- Normalizzazione traiettorie RX IMU a forma (N, M, C), come floaters_coordinates ---
-    fw_imu_arr = _normalize_multi(RX_fw_IMU)
-    fw_imu_mds_arr = _normalize_multi(RX_fw_IMU_MDS)
-    bw_imu_arr = _normalize_multi(RX_bw_IMU)
-    bw_imu_mds_arr = _normalize_multi(RX_bw_IMU_MDS)
-
-    tx_valid  = [(lat, lon, depth)
-                 for lat, lon, depth in zip(lats_tx, lons_tx, depths_tx)
-                 if _is_valid(lat, lon)]
-
-    est_valid = [(lat, lon, depth)
-                 for lat, lon, depth in zip(lats_est, lons_est, depths_est)
-                 if _is_valid(lat, lon)]
-
-    fl_valid  = [(lat, lon, depth)
-                 for lat, lon, depth in zip(lats_fl, lons_fl, depths_fl)
-                 if _is_valid(lat, lon)]
-
-    # --- Centro mappa: primo punto valido disponibile, in ordine di priorità ---
-    center = None
-    for candidate_list in (fl_valid, tx_valid, est_valid):
-        if len(candidate_list) > 0:
-            center = (candidate_list[0][0], candidate_list[0][1])
-            break
-
+    center = first_valid_location(floaters, tx, estimated, *[t.xyz for t in track_list])
     if center is None:
-        # Fallback: prova con le traiettorie RX IMU se non ci sono altri punti validi
-        for imu_arr in (fw_imu_arr, fw_imu_mds_arr, bw_imu_arr, bw_imu_mds_arr):
-            if imu_arr is not None and imu_arr.size > 0:
-                lats_i, lons_i, _ = _extract_coords(imu_arr)
-                for lat, lon in zip(lats_i, lons_i):
-                    if _is_valid(lat, lon):
-                        center = (lat, lon)
-                        break
-            if center is not None:
-                break
+        raise ValueError("No valid coordinate provided to center the map.")
 
-    if center is None:
-        raise ValueError("Nessuna coordinata valida fornita per centrare la mappa.")
-
-    # Creazione mappa
-    m = folium.Map(location=center, zoom_start=15, tiles="OpenStreetMap")
+    m = folium.Map(
+        location=center,
+        zoom_start=zoom_start,
+        tiles=BASEMAP_TILES,
+        attr=BASEMAP_ATTRIBUTION,
+        max_zoom=19,
+    )
 
     ScaleBar().add_to(m)
-
     folium.plugins.MeasureControl(
         position="bottomleft",
         primary_length_unit="meters",
         secondary_length_unit="kilometers",
         primary_area_unit="sqmeters",
-        secondary_area_unit="sqkilometers"
+        secondary_area_unit="sqkilometers",
     ).add_to(m)
 
-    
-    if TX_positions_coordinates is not None and track_TX and len(tx_valid) > 1:
-        trajectory_coords = [(lat, lon) for lat, lon, _ in tx_valid]
+    # --- TX points (yellow) ---
+    if len(tx) > 1:
         folium.PolyLine(
-            locations=trajectory_coords,
-            color="#FFD700",
-            weight=5,
-            opacity=0.7,
-            #dash_array="5, 10",
-            tooltip="Traiettoria Stimata Vessel"
+            locations=[(lat, lon) for lat, lon, _ in tx],
+            color=TX_COLOR, weight=5, opacity=0.7,
+            tooltip="TX trajectory",
         ).add_to(m)
 
-    # --- Punti TX (gialli) ---
-    if TX_positions_coordinates is not None:
-        for i, (lat, lon, depth) in enumerate(tx_valid):
-            folium.CircleMarker(
-                location=(lat, lon),
-                radius=10,
-                color="#FFD700",
-                fill=True,
-                fill_color="#FFD700",
-                fill_opacity=0.9,
-                weight=2,
-                popup=folium.Popup(
-                    f"<b>TX {i+1}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
-                    max_width=180
-                ),
-                tooltip=f"TX {i+1}"
-            ).add_to(m)
-
-    # Viene disegnata prima dei punti stimati in modo che i marker rimangano visivamente "sopra" la linea
-    if estimated_vessel_coordinates is not None and track_estimated and len(est_valid) > 1:
-        trajectory_coords = [(lat, lon) for lat, lon, _ in est_valid]
-        folium.PolyLine(
-            locations=trajectory_coords,
-            color="#00CC66",
-            weight=5,
-            opacity=0.7,
-            dash_array="5, 10",
-            tooltip="Traiettoria Stimata Vessel"
+    for i, (lat, lon, depth) in enumerate(tx, start=1):
+        folium.CircleMarker(
+            location=(lat, lon), radius=10,
+            color=TX_COLOR, fill=True, fill_color=TX_COLOR, fill_opacity=0.9, weight=2,
+            popup=folium.Popup(
+                f"<b>TX {i}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {depth_str(depth)}",
+                max_width=180),
+            tooltip=f"TX {i}",
         ).add_to(m)
 
-    # --- Punti stimati (verdi) ---
-    if estimated_vessel_coordinates is not None:
-        for i, (lat, lon, depth) in enumerate(est_valid):
-            folium.CircleMarker(
-                location=(lat, lon),
-                radius=7,
-                color="#00CC66",
-                fill=True,
-                fill_color="#00CC66",
-                fill_opacity=0.9,
-                weight=2,
-                popup=folium.Popup(
-                    f"<b>Stimato {i+1}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
-                    max_width=180
-                ),
-                tooltip=f"Stimato {i+1}"
-            ).add_to(m)
+    # --- Estimated positions (green) ---
+    if len(estimated) > 1:
+        folium.PolyLine(
+            locations=[(lat, lon) for lat, lon, _ in estimated],
+            color=EST_COLOR, weight=5, opacity=0.7, dash_array="5, 10",
+            tooltip="Estimated vessel trajectory",
+        ).add_to(m)
 
-    # --- Traiettorie RX IMU (sempre attive, una traiettoria per ciascun device, semi-trasparenti) ---
-    _imu_tracks = [
-        (RX_fw_IMU, fw_imu_arr, "#0000FF", "RX fw IMU"),
-        (RX_fw_IMU_MDS, fw_imu_mds_arr, "#FFA500", "RX fw IMU MDS"),
-        (RX_bw_IMU, bw_imu_arr, "#90EE90", "RX bw IMU"),
-        (RX_bw_IMU_MDS, bw_imu_mds_arr, "#115511", "RX bw IMU MDS"),
-    ]
+    for i, (lat, lon, depth) in enumerate(estimated, start=1):
+        folium.CircleMarker(
+            location=(lat, lon), radius=7,
+            color=EST_COLOR, fill=True, fill_color=EST_COLOR, fill_opacity=0.9, weight=2,
+            popup=folium.Popup(
+                f"<b>Estimated {i}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>"
+                f"Depth: {depth_str(depth)}",
+                max_width=180),
+            tooltip=f"Estimated {i}",
+        ).add_to(m)
 
-    for raw_input, imu_arr, color, label_prefix in _imu_tracks:
-        if raw_input is None or imu_arr is None or imu_arr.size == 0:
+    # --- Generic tracks: one polyline per index, never connected to each other ---
+    for track in track_list:
+        if track.xyz.size == 0:
             continue
 
-        n_devices = imu_arr.shape[1]
-        for d in range(n_devices):
-            device_lats = imu_arr[:, d, 0]
-            device_lons = imu_arr[:, d, 1]
-            if imu_arr.shape[-1] >= 3:
-                device_depths = np.where(imu_arr[:, d, 2] == -999, np.nan, imu_arr[:, d, 2])
-            else:
-                device_depths = np.full(imu_arr.shape[0], np.nan)
-
-            device_valid = [(lat, lon, depth)
-                             for lat, lon, depth in zip(device_lats, device_lons, device_depths)
-                             if _is_valid(lat, lon)]
-
-            if len(device_valid) == 0:
+        n_series = track.xyz.shape[1]
+        for series_index in range(n_series):
+            # series `series_index`, in step order
+            points = valid_points(track.xyz[:, series_index, :])
+            if len(points) == 0:
                 continue
 
-            # Traiettoria connessa (sempre disegnata di default, semi-trasparente)
-            if len(device_valid) > 1:
-                trajectory_coords = [(lat, lon) for lat, lon, _ in device_valid]
+            label = track.name if n_series == 1 else f"{track.name} [{series_index + 1}]"
+
+            if len(points) > 1:
                 folium.PolyLine(
-                    locations=trajectory_coords,
-                    color=color,
-                    weight=3,
-                    opacity=imu_alpha,
-                    tooltip=f"{label_prefix} - device {d+1}"
+                    locations=[(lat, lon) for lat, lon, _ in points],
+                    color=track.color, weight=3, opacity=track_alpha,
+                    tooltip=label,
                 ).add_to(m)
 
-            # Marker sui singoli punti
-            for i, (lat, lon, depth) in enumerate(device_valid, start=1):
+            for i, (lat, lon, depth) in enumerate(points, start=1):
                 folium.CircleMarker(
-                    location=(lat, lon),
-                    radius=4,
-                    color=color,
-                    fill=True,
-                    fill_color=color,
-                    fill_opacity=imu_alpha,
-                    opacity=imu_alpha,
-                    weight=1,
+                    location=(lat, lon), radius=4,
+                    color=track.color, fill=True, fill_color=track.color,
+                    fill_opacity=track_alpha, opacity=track_alpha, weight=1,
                     popup=folium.Popup(
-                        f"<b>{label_prefix} - device {d+1} - pos {i}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
-                        max_width=200
-                    ),
-                    tooltip=f"{label_prefix} - device {d+1} - pos {i}"
+                        f"<b>{label} - pos {i}</b><br>Lat: {lat:.6f}<br>"
+                        f"Lon: {lon:.6f}<br>Depth: {depth_str(depth)}",
+                        max_width=200),
+                    tooltip=f"{label} - pos {i}",
                 ).add_to(m)
 
-    # --- Floaters: traiettoria tratteggiata per ciascun floater + etichetta sulla prima posizione ---
-    if floaters_arr is not None and floaters_arr.size > 0:
-        n_positions, n_floaters = floaters_arr.shape[0], floaters_arr.shape[1]
-
-        for mi in range(n_floaters):
-            floater_lats = floaters_arr[:, mi, 0]
-            floater_lons = floaters_arr[:, mi, 1]
-            if floaters_arr.shape[-1] >= 3:
-                floater_depths = np.where(floaters_arr[:, mi, 2] == -999, np.nan, floaters_arr[:, mi, 2])
-            else:
-                floater_depths = np.full(n_positions, np.nan)
-
-            traj_valid = [(lat, lon, depth)
-                          for lat, lon, depth in zip(floater_lats, floater_lons, floater_depths)
-                          if _is_valid(lat, lon)]
-
-            if len(traj_valid) == 0:
+    # --- Floaters: dashed trajectory + label on the first known position ---
+    if floaters.size > 0:
+        for floater_index in range(floaters.shape[1]):
+            trajectory = valid_points(floaters[:, floater_index, :])
+            if len(trajectory) == 0:
                 continue
 
-            # --- Traiettoria tratteggiata (posizioni consecutive) ---
-            if track_floaters and len(traj_valid) > 1:
-                trajectory_coords = [(lat, lon) for lat, lon, _ in traj_valid]
+            if len(trajectory) > 1:
                 folium.PolyLine(
-                    locations=trajectory_coords,
-                    color="#FF0000",
-                    weight=3,
-                    opacity=0.6,
-                    dash_array="5, 10",
-                    tooltip=f"Traiettoria F{mi+1}"
+                    locations=[(lat, lon) for lat, lon, _ in trajectory],
+                    color=FLOATER_COLOR, weight=3, opacity=0.6, dash_array="5, 10",
+                    tooltip=f"F{floater_index + 1} trajectory",
                 ).add_to(m)
 
-            # --- Marker su tutte le posizioni tranne la prima (che ha già l'etichetta) ---
-            for i, (lat, lon, depth) in enumerate(traj_valid[1:], start=2):
+            # Markers on every position except the first one, which carries the label
+            for i, (lat, lon, depth) in enumerate(trajectory[1:], start=2):
                 folium.CircleMarker(
-                    location=(lat, lon),
-                    radius=4,
-                    color="#FF0000",
-                    fill=True,
-                    fill_color="#FF0000",
-                    fill_opacity=0.6,
-                    weight=1,
+                    location=(lat, lon), radius=4,
+                    color=FLOATER_COLOR, fill=True, fill_color=FLOATER_COLOR,
+                    fill_opacity=0.6, weight=1,
                     popup=folium.Popup(
-                        f"<b>{mi+1} - pos {i}</b><br>Lat: {lat:.6f}<br>Lon: {lon:.6f}<br>Depth: {_depth_str(depth)}",
-                        max_width=180
-                    ),
-                    tooltip=f"{mi+1} - pos {i}"
+                        f"<b>{floater_index + 1} - pos {i}</b><br>Lat: {lat:.6f}<br>"
+                        f"Lon: {lon:.6f}<br>Depth: {depth_str(depth)}",
+                        max_width=180),
+                    tooltip=f"{floater_index + 1} - pos {i}",
                 ).add_to(m)
 
-            # --- Etichetta circolare sulla prima posizione nota ---
-            first_lat, first_lon, first_depth = traj_valid[0]
-            label = f"{mi+1}"
+            first_lat, first_lon, first_depth = trajectory[0]
+            label = f"{floater_index + 1}"
             folium.Marker(
                 location=(first_lat, first_lon),
                 popup=folium.Popup(
-                    f"<b>{label}</b><br>Lat: {first_lat:.6f}<br>Lon: {first_lon:.6f}<br>Depth: {_depth_str(first_depth)}",
-                    max_width=200
-                ),
+                    f"<b>{label}</b><br>Lat: {first_lat:.6f}<br>"
+                    f"Lon: {first_lon:.6f}<br>Depth: {depth_str(first_depth)}",
+                    max_width=200),
                 tooltip=label,
                 icon=folium.DivIcon(
                     html=f"""
                     <div style="
-                        background:#FF0000;
+                        background:{FLOATER_COLOR};
                         color:white;
                         display: flex;
                         justify-content: center;
@@ -444,28 +315,36 @@ def build_map(
                         white-space:nowrap;
                     ">{label}</div>""",
                     icon_size=(26, 26),
-                    icon_anchor=(13, 13)
-                )
+                    icon_anchor=(13, 13),
+                ),
             ).add_to(m)
 
     m.save(output_file)
     print(f"Map saved in: {output_file}")
+    print("If OSM tiles return HTTP 403 when opening the HTML directly, serve "
+          "the file over HTTP, e.g.: python -m http.server 8000")
 
     return m
 
-if __name__ == '__main__':
-    TX_Coordinates = np.load("Synth/TX_Coordinates.npy")
-    RX_Coordinates = np.load("Synth/RX_Coordinates.npy")
 
-    build_map(RX_Coordinates[0,:],
-              TX_Coordinates,
-              np.zeros([10,3]),
-              "map.html",
-              False,
-              False,
-              # Esempio di utilizzo dei nuovi parametri (forma attesa: (timestamps, device, 3)):
-              # RX_fw_IMU=RX_fw_IMU_array,
-              # RX_fw_IMU_MDS=RX_fw_IMU_MDS_array,
-              # RX_bw_IMU=RX_bw_IMU_array,
-              # RX_bw_IMU_MDS=RX_bw_IMU_MDS_array,
-              )
+# Alias kept for backwards compatibility with the old name
+build_map = build_folium_map
+
+
+# --- USAGE EXAMPLE ---
+if __name__ == "__main__":
+    RX_Coordinates = np.load("Synth/RX_Coordinates.npy")
+    TX_Coordinates = np.load("Synth/TX_Coordinates.npy")
+    Est_Coordinates = np.load("Synth/Estimated_Coordinates.npy")
+
+    build_folium_map(
+        floater_coordinates=RX_Coordinates,
+        TX_coordinates=TX_Coordinates,
+        estimated_vessel_coordinates=Est_Coordinates,
+        tracks=[
+            Track("RX IMU", np.load("Synth/RX_fw_IMU.npy"), "#0000FF"),
+            Track("RX IMU+MDS", np.load("Synth/RX_fw_IMU_MDS.npy"), "#2AB040"),
+            Track("Compensated", np.load("Synth/RX_bw_IMU.npy"), "#FF8822"),
+        ],
+        output_file="map.html",
+    )

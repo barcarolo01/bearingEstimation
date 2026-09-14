@@ -49,23 +49,19 @@ def replace_outliers_mean(coordinate, WIN_LEN=7):
     
     return filtered_coordinates
 
-'''
-Computes the RMSE error only along the depth coordinate of a series of 3D points
-'''
-def compute_flat_RMSE(st, gt, lat_rad_center, lon_rad_center):
-    # Generate a mask for NaN values of both sequences (to maintain the point-wise alignment)
+def compute_flat_RMSE(st, gt, lat_rad_center=None, lon_rad_center=None):
     mask = ~(np.isnan(gt).any(axis=1) | np.isnan(st).any(axis=1))
 
-    # Coordinate differences, in degrees
-    diff = gt[mask] - st[mask]
+    gt_m = gt[mask].astype(float)
+    st_m = st[mask].astype(float)
 
-    # Distance conversion in meters
-    diff[:,0] *= 111_319.9
-    diff[:,1] *= (111_319.9 * np.cos(np.deg2rad((gt[:,0]))))
+    diff = gt_m - st_m
 
-    # Return a single number: average RMSE of the distances
-    rmse = np.sqrt(np.sum(diff**2))
-    return np.mean(rmse)
+    diff[:, 0] *= 111_319.9
+    diff[:, 1] *= 111_319.9 * np.cos(np.deg2rad(gt_m[:, 0]))
+
+    # RMSE sulla distanza planare
+    return np.sqrt(np.mean(np.sum(diff**2, axis=1)))
 
 '''
 Computes the RMSE error only along the depth coordinate of a series of 3D points

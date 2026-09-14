@@ -1,17 +1,32 @@
 from findpoint import *
 from utils_runner import *
 
-def local_to_geo(Center_coordinates,local_point):
-    Lat_center, Lon_center = Center_coordinates[0], Center_coordinates[1]
-    gt_x = local_point[..., 0]
-    gt_y = local_point[..., 1]
+import numpy as np
+
+def local_to_geo(Center_coordinates, local_point):
+    local_point = np.asarray(local_point)
+
+    Lat_center, Lon_center = Center_coordinates[:2]
 
     R = 6371000.0
-    Lat = Lat_center + (gt_y / R) * (180 / np.pi)
-    Lon = Lon_center + (gt_x / (R * np.cos(np.radians(Lat_center)))) * (180 / np.pi)
-    depth = np.full_like(Lat, 22.0)
 
-    return np.stack((Lat, Lon, depth), axis=-1)
+    # Local coordinates
+    x = local_point[..., 0]
+    y = local_point[..., 1]
+
+    # Conversion
+    Lat = Lat_center + (y / R) * (180 / np.pi)
+    Lon = Lon_center + (x / (R * np.cos(np.radians(Lat_center)))) * (180 / np.pi)
+
+    # Maintain the depth if local_point contains 3D points
+    if local_point.shape[-1] == 3:
+        depth = local_point[..., 2]
+        return np.stack((Lat, Lon, depth), axis=-1)
+    elif local_point.shape[-1] == 2:
+        return np.stack((Lat, Lon), axis=-1)
+    else:
+        raise ValueError("local_point should contain a collection of either 2D or 3D points")
+
 
 def geo_to_local(Center_coordinates, geo_coordinates):
     Lats = geo_coordinates[..., 0]

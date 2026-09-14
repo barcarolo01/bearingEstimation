@@ -178,8 +178,8 @@ def build_local_cartesian_map_3d(
     ax.set_zlim(-max_depth_m, 5)
 
     # Etichette assi
-    ax.set_xlabel("West-East [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
-    ax.set_ylabel("South-North [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
+    ax.set_xlabel("Easting [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
+    ax.set_ylabel("Northing [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
     ax.set_zlabel("Depth [meters]", fontsize=FONTSIZE, fontweight='bold', labelpad=10)
     
     # Origin marker (Centro mappa)
@@ -188,7 +188,7 @@ def build_local_cartesian_map_3d(
 
 
     # Legenda ordinata
-    ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE-3)
+    #ax.legend(loc="upper right", frameon=True, facecolor='white', edgecolor='grey', fontsize=FONTSIZE-3)
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(prune='lower'))
     ax.yaxis.set_major_locator(ticker.MaxNLocator(prune='lower'))

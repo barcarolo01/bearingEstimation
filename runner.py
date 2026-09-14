@@ -7,16 +7,19 @@ from discrete_hydromate_single import run_discrete_hydromate_single
 from filter_trajectory import *
 from findpoint import *
 from maps.build_folium_map import build_map
+from maps.build_local_3D import build_local_cartesian_map_3d
 from maps.build_local_map import build_local_cartesian_map
 from ping_all import *
 from utils_runner import *
 from Floater import *
 
-np.random.seed(256123)
+FONTSIZE = 18
 
-SIMULATION_STEPS = 900
-RESURFACE_FREQ = 999999
-NUMBER_OF_FLOATERS = 2
+np.random.seed(10)
+
+SIMULATION_STEPS = 2000
+RESURFACE_FREQ = 1000
+NUMBER_OF_FLOATERS = 5
 TX_LIMIT = 2
 
 SIMULATE = True
@@ -27,31 +30,45 @@ load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 SAMPLING_FREQUENCY = int(os.getenv('SAMPLING_FREQUENCY'))
 
-#Center = [20.832813, 88.698390] # India, low depth
+Center = [20.832813, 88.698390] # India, low depth
 #Center = [12.61529, 43.37765]
-Center = [39.84164446886851,-70.90061264492535]
+#Center = [39.84164446886851,-70.90061264492535]
 
 
 Lat_center = Center[0]
 Lon_center = Center[1]
 
 #TX_Coordinates = compute_TX_circle_trajectory(Center, 50 ,start_deg=0,end_deg=350,n_steps=35,radius_m=200,clockwise=True)
+#TX_Coordinates = np.asarray([[ Center[0], Center[1], 20 ]])
 TX_Coordinates = np.zeros((SIMULATION_STEPS,3))
 
-Center_2 = sposta(Center,150*np.sqrt(2),225)
-lat1,lon1 = sposta(Center,100,270)
-lat2,lon2 = sposta(Center,100,90)
-lat3,lon3 = sposta(Center_2,201,180)
-lat4,lon4 = sposta(Center_2,250,270)
-lat5,lon5 = sposta(Center_2,50,200)
+
+lat1,lon1 = sposta(Center,400,0)
+lat2,lon2 = sposta(Center,200,0)
+lat3,lon3 = sposta(Center,0,0)
+lat4,lon4 = sposta(Center,200,180)
+lat5,lon5 = sposta(Center,400,180)
+Center_2 = sposta([lat2,lon2],400,90)
 
 RX_init_coordinates = np.asarray( [[lat1,lon1,10],
                                    [lat2,lon2,20],
-                                   [lat3,lon3,30],
+                                   [lat3,lon3,80],
                                    [lat4,lon4,20],
                                    [lat5,lon5,10]])
 
 # Hydromate is launched from python: this produces three tracks for each floater of "Synth" folder
+#SIMULATION_STEPS = TX_Coordinates.shape[0]
+
+
+RX_fw_IMU     = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+RX_fw_IMU_MDS = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+RX_bw_IMU     = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+RX_bw_IMU_MDS = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+RX_IMU_compensated = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+GT            = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
+
+
+
 if SIMULATE:
         RX_gt_Coordinates = np.zeros((SIMULATION_STEPS,NUMBER_OF_FLOATERS,3))
         RX_est_plain_Coordinates = np.zeros((SIMULATION_STEPS,NUMBER_OF_FLOATERS,3))
@@ -64,8 +81,8 @@ if SIMULATE:
 
         trans = Floater(0,0,0,20,NUMBER_OF_FLOATERS,1.0,3)
         trans.set_rho(1.0)
-        trans.set_sigma(0.10, 0.10, 0.0)
-        trans.set_initial_velocity(1.0,1.0,0)
+        trans.set_sigma(0.00, 0.00, 0.0)
+        trans.set_initial_velocity(0.0,0.0,0)
 
         # === Floater initialization ===
         floaters = []
@@ -85,9 +102,10 @@ if SIMULATE:
                 RX_gt_Coordinates[0,n,:] = local_to_geo(Center,f.gt_pos)
                 tmp = np.zeros(RX_gt_Coordinates.shape)
 
-                f.set_initial_velocity(0.0,0.0,0)
-                f.set_rho(1)
-                f.set_sigma(0.1, 0.1, 0.0)
+                #f.set_initial_velocity(np.random.uniform()/10, np.random.uniform()/10,0)
+                f.set_initial_velocity(0.5,0.0,0)
+                f.set_rho(0.9999)
+                f.set_sigma(0.1,0.1, 0.0)
                 floaters.append(f)
 
         round_active  = False
@@ -99,7 +117,7 @@ if SIMULATE:
         resurf_dict = {}
         for i in range(SIMULATION_STEPS):
                 print(f"Simulation step n. {i+1}/{SIMULATION_STEPS}")
-                transmissions_in_round = 0
+                #transmissions_in_round = 0
                 TX_Coordinates[i,:] = local_to_geo(Center,trans.gt_pos)        
 
 
@@ -213,12 +231,6 @@ if SIMULATE:
                 
                 
 
-        RX_fw_IMU     = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
-        RX_fw_IMU_MDS = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
-        RX_bw_IMU     = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
-        RX_bw_IMU_MDS = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
-        RX_IMU_compensated = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
-        GT            = np.zeros((SIMULATION_STEPS, NUMBER_OF_FLOATERS, 3))
 
 
 
@@ -226,14 +238,14 @@ if SIMULATE:
         #names  = ['imu', 'imu_rev', 'imu_mds', 'imu_mds_rev', 'imu_compensated','imu_compensated_bis']
         colors = ['tab:blue', 'tab:green', 'tab:orange', 'tab:red', 'tab:purple', '#000000']
         #targets = [RX_fw_IMU, RX_bw_IMU, RX_fw_IMU_MDS, RX_bw_IMU_MDS,RX_IMU_compensated]
-        targets = [RX_fw_IMU, RX_bw_IMU, RX_IMU_compensated]
-        names  = ['imu', 'imu_rev','imu_compensated']
+        targets = [RX_fw_IMU,  RX_fw_IMU_MDS, RX_IMU_compensated]
+        names  = ['imu', 'imu_mds','imu_compensated']
         for n in range(NUMBER_OF_FLOATERS):
                 res = floaters[n].return_results(gps_sigma=0, fuse=False)
                 gt  = res['gt'][1:]
                 GT[:, n, :] = gt
 
-                fig, (ax_pred, ax_true) = plt.subplots(1, 2, figsize=(14, 5), sharey=False)
+                fig, ax_true = plt.subplots(1, 1, figsize=(7, 5), sharey=False)
 
                 for name, color, arr in zip(names, colors, targets):
                         pos, err = res[name]
@@ -241,23 +253,22 @@ if SIMULATE:
 
                         arr[:, n, :] = pos
 
-                        ax_pred.plot(err, color=color, lw=1.8, label=name)
                         ax_true.plot(np.linalg.norm(pos - gt, axis=1), color=color, lw=1.8, label=name)
                         
 
-                for ax, t in ((ax_pred, "Errore auto-stimato"), (ax_true, "Positioning error vs ground truth")):
-                        ax.set_title(t)
-                        ax.set_xlabel("Simulation steps")
-                        #ax.set_ylim([0,500])
-                        ax.grid(True, ls='--', alpha=.5)
-                        for k in floaters[n].Resurface_index:
-                                if 1 <= k <= SIMULATION_STEPS:
-                                        ax.axvline(k - 1, color='gray', ls=':', lw=.8)
+     
+                ax_true.set_title(t)
+                ax_true.set_xlabel("Simulation steps",fontweight='bold',fontsize=FONTSIZE)
+                ax_true.grid(True, ls='--', alpha=.5)
+                
+                for k in floaters[n].Resurface_index:
+                        if 1 <= k <= SIMULATION_STEPS:
+                                ax_true.axvline(k - 1, color='gray', ls=':', lw=.8)
 
-                ax_pred.set_ylabel("Metri")
+                ax_true.set_ylabel("Meters",fontweight='bold',fontsize=FONTSIZE)
                 ax_true.legend(loc="upper right", frameon=True)
 
-                fig.suptitle(f"Floater {n}", fontsize=14)
+                fig.suptitle(f"Positioning error vs ground truth (floater {n+1})", fontsize=14)
                 fig.tight_layout()
                 plt.savefig(f"floater_{n}_errors.png", dpi=120)
                 plt.close(fig)
@@ -268,27 +279,21 @@ if SIMULATE:
         RX_bw_IMU_MDS = local_to_geo(Center,RX_bw_IMU_MDS)
         RX_IMU_compensated = local_to_geo(Center,RX_IMU_compensated)
 
-        '''
-        for l in range(380,420):
-                print(f"tmpstmp{l}: {np.linalg.norm(Casss[l,0,:]-GT[l,0,:])}")
-        '''
-
-
         build_local_cartesian_map(
-        RX_gt_Coordinates,
-        None, 
-        None, 
-        center_coordinates=RX_fw_IMU[0,1,:2],
-        window_width_m=50, 
-        window_height_m=50,
-        output_file="maps/map_local.png",
-        track_TX=True,
-        track_estimated=True,
-        RX_fw_IMU=RX_fw_IMU,
-        RX_fw_IMU_MDS=RX_IMU_compensated,
-        RX_bw_IMU=RX_bw_IMU,
-        #RX_bw_IMU_MDS=RX_bw_IMU_MDS
-        )
+                RX_gt_Coordinates[:,:3,:],
+                None, 
+                None, 
+                center_coordinates=Center_2,
+                window_width_m=1200, 
+                window_height_m=1000,
+                output_file="maps/map_local.png",
+                track_TX=True,
+                track_estimated=True,
+                RX_fw_IMU=RX_fw_IMU[:,:3,:],
+                RX_fw_IMU_MDS=RX_fw_IMU_MDS[:,:3,:],
+                RX_bw_IMU=RX_IMU_compensated[:,:3,:],
+                #RX_bw_IMU_MDS=RX_bw_IMU_MDS
+                )
 
 
         print(f"{'Version':22s} {'RMSE':>10s}")
@@ -319,7 +324,7 @@ if SIMULATE:
                 RX_bw_IMU=RX_bw_IMU,
                 RX_bw_IMU_MDS=RX_bw_IMU_MDS
                 )
-
+        '''
         
         build_map(
                 floaters_coordinates = RX_gt_Coordinates,
@@ -333,7 +338,7 @@ if SIMULATE:
                 RX_bw_IMU=RX_bw_IMU,
                 #RX_bw_IMU_MDS=RX_bw_IMU_MDS
                 )
-        '''
+
 
 
         for n in range(NUMBER_OF_FLOATERS):
@@ -424,6 +429,7 @@ estimated_bw_IMU = find_points(RX_bw_IMU,bearing_arrays,elevation_arrays)
 estimated_bw_IMU_MDS = find_points(RX_bw_IMU_MDS,bearing_arrays,elevation_arrays)
 
 #estimated_points = replace_outliers_mean(estimated_points,WIN_LEN=7)
+
 np.save("Synth/Estimated_Coordinates",estimated_points)
 np.save("Synth/Estimated_fw_IMU",estimated_fw_IMU)
 np.save("Synth/Estimated_fw_IMU_MDS",estimated_fw_IMU_MDS)
@@ -439,9 +445,9 @@ build_map(
         output_file="maps/map_folium.html",
         track_TX = True,
         track_estimated=True,
-        RX_fw_IMU=RX_fw_IMU,
-        RX_fw_IMU_MDS=RX_IMU_compensated,
-        RX_bw_IMU=RX_bw_IMU,
+        #RX_fw_IMU=RX_fw_IMU,
+        #RX_fw_IMU_MDS=RX_IMU_compensated,
+        #RX_bw_IMU=RX_bw_IMU,
         #RX_bw_IMU_MDS=RX_bw_IMU_MDS
         )
 
@@ -451,8 +457,8 @@ build_local_cartesian_map(
         TX_Coordinates,  
         estimated_points,
         center_coordinates=Center,
-        window_width_m=430, 
-        window_height_m=430,
+        window_width_m=480, 
+        window_height_m=480,
         output_file="maps/map_local.png",
         track_TX=True,
         track_estimated=True,
@@ -461,7 +467,7 @@ build_local_cartesian_map(
         #RX_bw_IMU=RX_bw_IMU,
         #RX_bw_IMU_MDS=RX_bw_IMU_MDS
         )
-'''
+
 
 
 if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
@@ -476,10 +482,13 @@ if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimate
                 track_TX=True, 
                 track_estimated=True)
 
-'''
+
+print(f"FORMA estimated {estimated_points.shape}")
+print(f"FORMA TX_Coordinates {TX_Coordinates.shape}")
+
 print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2],Lat_center,Lon_center):.1f}")
 #print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],Lat_center,Lon_center):.1f}")
 #print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
 #print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],Lat_center,Lon_center):.1f}")
 #print(f"RMSE estimated_bw_IMU_MDS: \t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],Lat_center,Lon_center):.1f}")
-#print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")
+print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")
