@@ -49,7 +49,7 @@ def replace_outliers_mean(coordinate, WIN_LEN=7):
     
     return filtered_coordinates
 
-def compute_flat_RMSE(st, gt, lat_rad_center=None, lon_rad_center=None):
+def compute_flat_RMSE(st, gt):
     mask = ~(np.isnan(gt).any(axis=1) | np.isnan(st).any(axis=1))
 
     gt_m = gt[mask].astype(float)
@@ -63,10 +63,11 @@ def compute_flat_RMSE(st, gt, lat_rad_center=None, lon_rad_center=None):
     # RMSE sulla distanza planare
     return np.sqrt(np.mean(np.sum(diff**2, axis=1)))
 
-'''
-Computes the RMSE error only along the depth coordinate of a series of 3D points
-'''
+
 def compute_depth_RMSE(depth_true, depth_pred):
+    '''
+    Computes the RMSE error only along the depth coordinate of a series of 3D points
+    '''
     depth_true = np.asarray(depth_true, dtype=float)
     depth_est = np.asarray(depth_pred, dtype=float)
 

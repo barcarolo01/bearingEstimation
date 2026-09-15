@@ -1,4 +1,5 @@
 import os
+from matplotlib import pyplot as plt
 import numpy as np
 from scipy.fft import rfft, irfft, next_fast_len
 from scipy.signal import resample_poly
@@ -110,7 +111,8 @@ def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
     for amp, phase, time in used_arrivals:
         sample = int(round(time * fs))
         if 0 <= sample < n:
-            h[sample] += amp * np.cos(phase)
+            h[sample] += amp * np.cos(np.deg2rad(phase))
+
 
     return h.astype(np.float32), used_arrivals
 
@@ -157,6 +159,12 @@ def from_arr_to_wav(input_folder: str,number_mic: int,source: str,out_folder: st
         h, used = build_ir(mic["arr"], mic["rd_vals"], mic["rr_max"], FS_OUT, n_arrivals=n_arrivals)
         ir_list.append(h)
 
+        '''
+        plot_ir(used, FS_OUT,
+                out_path=os.path.join(out_folder, f"ir_H{i}.pdf"),
+                title=f"Hydrophone {i} - range {mic['rr_max']:.1f} m",db_panel=False)
+            '''
+        
         nz = np.nonzero(h)[0]
         if nz.size == 0:
             raise ValueError(f"Hydrophone {i}: impulse response is null")
@@ -210,3 +218,82 @@ def from_arr_to_wav(input_folder: str,number_mic: int,source: str,out_folder: st
     for i, rx_out in enumerate(rx_out_list, start=1):
         out_path = os.path.join(out_folder, f"H{i}.npy")
         np.save(out_path, rx_out)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def plot_ir(used_arrivals, fs, out_path=None, db_panel=True, title=None):
+    """
+    Plots the channel impulse response as a stem plot.
+
+    Parameters
+    ----------
+    used_arrivals : list of (amp, phase_deg, time_s) as returned by build_ir
+    fs            : sampling frequency (Hz), used to mark the sampling grid
+    out_path      : if given, the figure is saved to this path (PDF recommended)
+    db_panel      : if True, adds a second panel with amplitudes in dB
+    title         : optional figure title
+    """
+    if not used_arrivals:
+        raise ValueError("Empty arrival list: nothing to plot")
+
+    amp = np.array([a[0] for a in used_arrivals])
+    phase = np.array([a[1] for a in used_arrivals])
+    time = np.array([a[2] for a in used_arrivals])
+
+    # Delays relative to the first arrival, in ms
+    t_rel = (time - time.min()) * 1e3
+    # Signed amplitude: this is exactly what enters the convolution
+    a_signed = amp * np.cos(np.deg2rad(phase))
+
+    nrows = 2 if db_panel else 1
+    fig, axes = plt.subplots(nrows, 1, figsize=(7, 5.0 if db_panel else 3.2),
+                             sharex=True)
+    axes = np.atleast_1d(axes)
+
+    ax = axes[0]
+    ax.stem(t_rel, a_signed, basefmt=" ", markerfmt="o", linefmt="-")
+    ax.axhline(0, lw=0.6, color="k")
+    ax.set_ylabel("Amplitude",fontsize=18)
+    ax.grid(alpha=0.3)
+
+
+
+    axes[-1].set_xlabel("Delay relative to the first arrival [ms]",fontsize=18)
+
+    fig.tight_layout()
+
+    if out_path:
+        fig.savefig(out_path, bbox_inches="tight")
+    return fig

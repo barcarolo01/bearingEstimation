@@ -1,18 +1,40 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from Positioning import estimate, move_error, reverse_node
-from Transmitter import Transmitter
+from Transmitter import * 
 
 # ===== DATASHEET PARAMETERS =====
 IMU_ACCEL_BIAS = np.ones(3) * 0
-#IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
-IMU_SIGMA_WHITENOISE = np.ones(3) * (0.3 / np.sqrt(3600 * 1))
+IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
 IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
+
+# ===== GYRO =====
+
+IMU_SIGMA_GYRO_WHITENOISE   = np.deg2rad(0.34) / np.sqrt(3600 * 1)
+SIGMA_GYRO_RANDOM_WALK      = np.deg2rad(8.0 / 3600.0) * np.sqrt(1 / 200) 
+IMU_GYRO_TURNON_BIAS_SIGMA  = np.deg2rad(0.2)
+SIGMA_YAW_RATE = np.deg2rad(3.0)
+
+'''
+IMU_SIGMA_GYRO_WHITENOISE   = 0
+SIGMA_GYRO_RANDOM_WALK      = 0
+IMU_GYRO_TURNON_BIAS_SIGMA  = 0
+SIGMA_YAW_RATE = 0
+'''
+
+RHO_YAW = 0.98
+
+# ==== E COMPASS ====
+USE_COMPASS     = True
+COMPASS_SIGMA   = np.deg2rad(2.0)       # Noise
+COMPASS_BIAS    = np.deg2rad(4.0)
+COMPASS_ALPHA   = 0.99
 
 DIM = 3
 
 # ===== FREQUENCY OF MDS (simulation steps) =====
-MDS_FREQ = 9999
-RESURFACE_FF = 210
+MDS_FREQ = 99999999
+RESURFACE_FF = 9999999
 
 RESURFACE_VELOCITY = 0.5
 
@@ -20,6 +42,17 @@ CONSTANT_DEPTH = True
 MIN_DEPTH = 1
 MAX_DEPTH = 100
 
+def wrap(a):
+    """Riporta un angolo nell'intervallo [-pi, pi)."""
+    return (a + np.pi) % (2 * np.pi) - np.pi
+
+
+def Rz(psi):
+    """Matrice di rotazione attorno a z: body -> nav quando psi e' l'heading."""
+    c, s = np.cos(psi), np.sin(psi)
+    return np.array([[c, -s, 0.0],
+                     [s,  c, 0.0],
+                     [0.0, 0.0, 1.0]])
 
 def distance_matrix(obs, N):
     D = np.full((N, N), np.nan)
@@ -38,8 +71,11 @@ class Floater(Transmitter):
     This class emulates a floater, its motion model and its self-positioning algorithm based on 
     a simulated Inertial Movement Unit (IMU).
     """
-    def __init__(self, ID, gt_x, gt_y, gt_z, NF, dt=1.0):
+    def __init__(self, ID, gt_x, gt_y, gt_z, NF, dt=1.0,rot_seed=1):
         super().__init__(ID=ID, gt_x=gt_x, gt_y=gt_y, gt_z=gt_z, dt=dt)
+
+        self.rng_true = np.random.default_rng([rot_seed, ID, 0])   # True rotation
+        self.rng_rot = np.random.default_rng([rot_seed, ID])       # Gyro + compass
 
         self.NF = NF
         self.ONGOING_RESURFACE = False
@@ -72,9 +108,9 @@ class Floater(Transmitter):
         self.est_a = np.zeros(DIM, dtype=float)
         
         # === Motion model parameters ===
-        #self.Rho = 0.0
-        #self.sigma = np.zeros(DIM, dtype=float)
-        #self.gt_v = np.zeros(DIM, dtype=float)
+        self.Rho = 0.0
+        self.sigma = np.zeros(DIM, dtype=float)
+        self.gt_v = np.zeros(DIM, dtype=float)
         
         # === IMU parameters ===
         # == Contribution 1: constant bias
@@ -86,6 +122,38 @@ class Floater(Transmitter):
         # == Contribution 3: bias random walk (cumulative error)
         self.sigma_bias_driving = IMU_SIGMA_BIAS_DRIVING
         self.bias_random_walk = np.zeros(DIM, dtype=float) # Initially zeros
+
+        ##############################
+        # === Stato rotazionale VERO ===
+        self.gt_psi   = 0
+        self.gt_omega = 0
+        self.rho_yaw = RHO_YAW
+        self.sigma_yaw_rate = SIGMA_YAW_RATE
+
+        # === Gyro (z axis) ===
+        self.gyro_bias               = self.rng_rot.normal(0, IMU_GYRO_TURNON_BIAS_SIGMA)
+        self.gyro_bias_random_walk   = 0
+        self.sigma_gyro_bias_driving = SIGMA_GYRO_RANDOM_WALK
+        self.sigma_gyro_white_noise  = IMU_SIGMA_GYRO_WHITENOISE
+
+        # === E-compass ===
+        if USE_COMPASS:
+            self.compass_bias  = self.rng_rot.normal(0, COMPASS_BIAS)
+            self.sigma_compass = COMPASS_SIGMA
+            self.alpha_compass = COMPASS_ALPHA
+        else:
+            self.compass_bias  = None
+            self.sigma_compass = None
+            self.alpha_compass = None
+
+        self.est_psi = self.gt_psi
+        self.psi_err = 0
+
+        # History rotation
+        self.psi_history     = {0: self.gt_psi}
+        self.psi_est_history = {0: self.est_psi}
+        self.psi_err_history = {0: self.psi_err}        
+
                 
         # === Previous acceleration value (used for integration) ===
         self.a_gt = np.zeros(DIM, dtype=float)
@@ -105,9 +173,8 @@ class Floater(Transmitter):
         self.nbr_hist_pos = {}
         self.nbr_hist_err = {}
 
-        # FOR RANGING
+        # For ranging
         self.clk = int(np.random.rand() * 10**6)
-        #self.clk = 0
 
         self.obs      = {}    # {(trasmettitore, osservatore): timestamp locale}
         self.round_id = 0     # round attualmente seguito
@@ -194,7 +261,7 @@ class Floater(Transmitter):
         for k, v in payload["obs"].items():
                 self.obs.setdefault(k, v)
 
-    def move2(self, gt_all=None, others_pos=None, others_err=None):
+    def move(self):
         """Perform a single motion step: update true position and IMU-based estimate"""
         # Step increment
         self.steps_counter += 1
@@ -208,7 +275,13 @@ class Floater(Transmitter):
             print(f"f{self.ID} - t{self.steps_counter}- STORED {self.depth_before_resurface}")
             self.ONGOING_RESURFACE = True
             self.ONGOING_IMMERSION = False
-        
+
+
+        # Angular velocity update
+        e_w = self.rng_true.normal(0, self.sigma_yaw_rate)
+        self.gt_omega = self.gt_omega * self.rho_yaw + e_w * np.sqrt(1 - self.rho_yaw**2)
+        self.gt_psi = wrap(self.gt_psi + self.gt_omega * self.dt) # PSI update
+
         # Keep track of the old velocity values
         self.v_prev = self.gt_v.copy()
 
@@ -225,7 +298,35 @@ class Floater(Transmitter):
         self.a_gt = (self.gt_v - self.v_prev) / self.dt
         
         # Update true position
-        self.gt_pos += self.gt_v * self.dt
+        self.gt_pos = self.gt_pos + self.gt_v * self.dt
+
+        ########################
+        self.gyro_bias_random_walk += self.rng_rot.normal(0, self.sigma_gyro_bias_driving)
+
+        omega_MEASURED = (self.gt_omega
+                          + self.gyro_bias
+                          + self.gyro_bias_random_walk
+                          + self.rng_rot.normal(0, self.sigma_gyro_white_noise))
+
+        # Propagazione (dead reckoning dell'assetto)
+        psi_gyro = wrap(self.est_psi + omega_MEASURED * self.dt)
+
+
+        #4. Bussola
+        if USE_COMPASS:
+            psi_COMPASS = wrap(self.gt_psi
+                               + self.compass_bias
+                               + self.rng_rot.normal(0, self.sigma_compass))
+            # wrap OBBLIGATORIO sull'innovazione: gestisce il salto +/-pi
+            innovation = wrap(psi_COMPASS - psi_gyro)
+            self.est_psi = wrap(psi_gyro + (1.0 - self.alpha_compass) * innovation)
+        else:
+            self.est_psi = psi_gyro
+
+        self.psi_err = wrap(self.est_psi - self.gt_psi)
+
+        ########################
+        a_body = Rz(self.gt_psi).T @ self.a_gt
 
         # === SIMULATE MEASURED ACCELERATION (with IMU errors) ===
         white_noise = np.random.normal(0, self.sigma_white_noise)
@@ -233,13 +334,13 @@ class Floater(Transmitter):
         
         # Accumulate random walk bias
         self.bias_random_walk += bias_drift
-        
-        # MEASURED acceleration = true acceleration + errors
+
+        a_body_MEASURED = a_body + self.accel_bias + white_noise + self.bias_random_walk
+        a_MEASURED = Rz(self.est_psi) @ a_body_MEASURED
+
         if CONSTANT_DEPTH or self.ONGOING_IMMERSION or self.ONGOING_RESURFACE:
-            a_MEASURED = np.zeros(self.a_gt.shape)
-            a_MEASURED[:2] = self.a_gt[:2] + self.accel_bias[:2] + white_noise[:2] + self.bias_random_walk[:2]
-        else:
-            a_MEASURED = self.a_gt + self.accel_bias + white_noise + self.bias_random_walk
+            a_MEASURED[2] = 0
+            self.est_v[2] = 0        
         
         # === INTEGRATE ESTIMATED VELOCITY (trapezoidal rule) ===
         #self.est_v += 0.5 * (self._prev_est_a + a_MEASURED) * self.dt
@@ -248,10 +349,9 @@ class Floater(Transmitter):
         # === INTEGRATE ESTIMATED POSITION ===
         estimated_movement = self.est_v * self.dt
 
-
         # Increment both estimated positions by the same quantity
-        self.est_pos += estimated_movement
-        self.est_pos_mds += estimated_movement
+        self.est_pos = self.est_pos+estimated_movement
+        self.est_pos_mds = self.est_pos_mds+estimated_movement
 
         if DIM == 3:
             if self.ONGOING_IMMERSION:
@@ -307,17 +407,17 @@ class Floater(Transmitter):
         self.err_history[self.steps_counter]     = self.est_error
         self.pos_history_mds[self.steps_counter] = self.est_pos_mds.copy()
         self.err_history_mds[self.steps_counter] = self.est_error_mds
+        self.psi_history[self.steps_counter]     = self.gt_psi
+        self.psi_est_history[self.steps_counter] = self.est_psi
+        self.psi_err_history[self.steps_counter] = self.psi_err
 
         self.pos_history_compensated[self.steps_counter] = self.est_pos.copy()
 
         self.gt_history[self.steps_counter]      = self.gt_pos.copy()
-        
             
         # Save the current acceleration (for the next iteration)
         self._prev_est_a = a_MEASURED.copy()
         self.est_a = a_MEASURED.copy()
-
-
 
         return TRIGGER_RANGING
 
@@ -338,19 +438,24 @@ class Floater(Transmitter):
                         pos_all[j] = self.est_pos_mds       # nessuna info
                         err_all[j] = 1e6                    # errore enorme
         return pos_all, err_all
+
+
+    def set_initial_velocity(self, *args):
+        super().set_initial_velocity(*args)
+        self.est_v = self.gt_v.copy()
     
-    def return_results(self, gps_sigma=0.0, fuse=True):
+    def return_results(self, fuse=True):
         """
         Computes estimated positions and errors performing the backward analysis
         and returns the results as a set of dicts: name -> (pos (I+1,dim), err (I+1,))
         """
 
         rev_imu = reverse_node(self, self.pos_history, self.err_history,
-                            use_mds=False, gps_sigma=gps_sigma, fuse=fuse,
+                            use_mds=False, gps_sigma=0, fuse=fuse,
                             nbr_hist_pos=self.nbr_hist_pos, nbr_hist_err=self.nbr_hist_err)
         
         rev_mds = reverse_node(self, self.pos_history_mds, self.err_history_mds,
-                            use_mds=True,  gps_sigma=gps_sigma, fuse=fuse,
+                            use_mds=True,  gps_sigma=0, fuse=fuse,
                                 nbr_hist_pos=self.nbr_hist_pos, nbr_hist_err=self.nbr_hist_err)
 
         self.pos_history_compensated = {k: np.asarray(v, float).copy()
@@ -377,6 +482,10 @@ class Floater(Transmitter):
             'imu_mds_rev':     rev_mds,
             'imu_compensated': _dict_to_array(self.pos_history_compensated),
             'gt':              _dict_to_array(self.gt_history),
+
+            'psi_gt':   _dict_to_array_scalar(self.psi_history),      
+            'psi_est':  _dict_to_array_scalar(self.psi_est_history),  # auto-stimato
+            'psi_err':  _dict_to_array_scalar(self.psi_err_history),  # est - gt, in [-180, 180)
         }
 
 
@@ -389,8 +498,8 @@ class Floater(Transmitter):
         self.est_v = self.gt_v.copy()
 
         # Accelerazions are zeroed
-        self.est_a = self.a_gt
-        self._prev_est_a = self.a_gt
+        self.est_a = self.a_gt.copy()
+        self._prev_est_a = self.a_gt.copy()
 
         # Random walk (i.e. cumulative error) is zeroed
         self.bias_random_walk = np.zeros(DIM, dtype=float)
@@ -402,10 +511,17 @@ class Floater(Transmitter):
         self.est_error = 0.0
         self.est_error_mds = 0.0
 
+        self.est_psi = self.gt_psi
+        self.psi_err = 0.0
+        self.gyro_bias_random_walk = 0.0
+
         self.pos_history[self.steps_counter]     = self.est_pos.copy()
-        self.err_history[self.steps_counter]     = 0.0
+        self.err_history[self.steps_counter]     = 0
         self.pos_history_mds[self.steps_counter] = self.est_pos_mds.copy()
-        self.err_history_mds[self.steps_counter] = 0.0
+        self.err_history_mds[self.steps_counter] = 0
+        self.psi_history[self.steps_counter] = self.gt_psi
+        self.psi_est_history[self.steps_counter] = self.est_psi
+        self.psi_err_history[self.steps_counter] = 0
         self.Resurface_index.append(self.steps_counter)
                     
    
@@ -431,3 +547,10 @@ class Floater(Transmitter):
 def _dict_to_array(d):
     keys = sorted(d)
     return np.asarray([d[k] for k in keys], dtype=float)
+
+
+def _dict_to_array_scalar(d, deg=True):
+    """dict {step: float} -> np.array (I+1,) ordinato per step."""
+    keys = sorted(d.keys())
+    arr = np.array([d[k] for k in keys], dtype=float)
+    return np.rad2deg(arr) if deg else arr

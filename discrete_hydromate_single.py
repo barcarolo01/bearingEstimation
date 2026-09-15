@@ -27,6 +27,7 @@ def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, dept
     Floater_hydrophones[:,[0,1]] = Floater_hydrophones[:,[1,0]]
 
     TX_position = np.asarray([Lon_TX,Lat_TX,depth_TX])
+
     app = AppBellhop("HM_out",
                     np.asarray(TX_position),
                     np.asarray(Floater_hydrophones),

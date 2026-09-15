@@ -9,6 +9,13 @@ def math_to_bearing(math_angle_deg: float) -> float:
     """
     return (90.0 - math_angle_deg) % 360.0
 
+def wrap_degrees(angle_deg):
+    """
+    This function takes as an input a value of an angle (in degrees) and wrap it 
+    in order to keep it inside the range [0;360)
+    """
+    return (angle_deg + 180) % 360
+
 def _flat_earth_intersection(
     lat1: float, lon1: float, brg1: float,
     lat2: float, lon2: float, brg2: float,

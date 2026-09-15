@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 from coordinate_generator import *
 from discrete_hydromate_single import run_discrete_hydromate_single
 from filter_trajectory import *
-from findpoint import *
+from point_estimation import *
 from maps.build_folium_map import build_folium_map, build_map
 from maps.build_local_3D import build_local_cartesian_map_3d
 from maps.build_local_map import build_local_cartesian_map
 from maps.map_common import Track
-from ping_all import *
+from floater_ping import *
 from utils_runner import *
 from Floater import *
 
@@ -18,9 +18,9 @@ FONTSIZE = 18
 RESURFACE_FREQ = 999
 TX_LIMIT = 2
 
-SKIPhydromate = False
 SIMULATE = True
 ANALYZE_WAVS = False
+ADD_PSI_ERROR = True
 
 class Simulation:
         def __init__(self, transmitter, Floaters, Steps, Center, seed=256123):
@@ -53,8 +53,6 @@ class Simulation:
 
                 np.save("Synth/Center_Coordinates.npy",self.Center)
 
-
-
                 round_active  = False
                 round_order   = []     # sequenza di trasmettitori, lunga 2N-1
                 round_step    = 0
@@ -74,21 +72,22 @@ class Simulation:
                                 if (i % RESURFACE_FREQ == 0 and i != 0) or  (i == self.SIMULATION_STEPS):
                                         self.Floaters[n].resurface()
 
-                                mustTX[n] = self.Floaters[n].move2()
+                                mustTX[n] = self.Floaters[n].move()
 
                                 # At the end of the simulation, the floater emerges
                                 if( i == self.SIMULATION_STEPS - 1):
                                         self.Floaters[n].resurface()
                                 
                                 # Hydromate simulation
-                                if not SKIPhydromate:
-                                        run_discrete_hydromate_single(TX_Coordinates[i,0],
-                                                                TX_Coordinates[i,1],
-                                                                TX_Coordinates[i,2],
-                                                                RX_gt_Coordinates[i,n,0],
-                                                                RX_gt_Coordinates[i,n,1],
-                                                                RX_gt_Coordinates[i,n,2],
-                                                                (n+1))
+                                run_discrete_hydromate_single(TX_Coordinates[i,0],
+                                                        TX_Coordinates[i,1],
+                                                        TX_Coordinates[i,2],
+                                                        RX_gt_Coordinates[i,n,0],
+                                                        RX_gt_Coordinates[i,n,1],
+                                                        RX_gt_Coordinates[i,n,2],
+                                                        (n+1))
+
+                                
                                 
                         self.transmitter.move() # Vessel motion
                 
@@ -155,7 +154,10 @@ class Simulation:
                                                         continue
 
                                                 # TODO: Compute the distance using hydromate
-                                                d    = ((np.linalg.norm(positions[tx] - positions[m]))/1500) * 1000
+                                                d = ping_pair(local_to_geo(self.Center,positions[tx]),
+                                                              local_to_geo(self.Center,positions[m]))
+                                                print(f"distanza {d}")
+                                                #d    = ((np.linalg.norm(positions[tx] - positions[m]))/1500) * 1000
 
                                                 t_rx = clocks[m] + d + math.ceil(1000/TX_LIMIT)
                                                 self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
@@ -165,17 +167,23 @@ class Simulation:
                                 if round_step == len(round_order):
                                         round_active = False
                                         print(f"SIMSTEP {i}, ended rangeing")
+
+                        
                                         
 
 
                 colors = ['tab:blue', 'tab:green', 'tab:orange']
                 targets = [RX_fw_IMU, RX_fw_IMU_MDS, RX_IMU_compensated]
                 names   = ['imu', 'imu_mds', 'imu_compensated']
-
                 results = []  # cache: evita di ricalcolare tutto nel loop RMSE
 
+                psi_error_arrays = np.zeros((self.NUMBER_OF_FLOATERS, self.SIMULATION_STEPS))
+
                 for n in range(self.NUMBER_OF_FLOATERS):
-                        res = self.Floaters[n].return_results(gps_sigma=0, fuse=False)
+                        res = self.Floaters[n].return_results(fuse=False)
+                        # TODO FIX movement order
+                        psi_error_arrays[n,:] = res['psi_err'][:-1].copy()
+                        print(f"floater{i} psierr: {psi_error_arrays[n,:]}")
                         results.append(res)
 
                         gt = res['gt'][1:]
@@ -220,33 +228,6 @@ class Simulation:
 
 
 
-                # 2               
-                build_local_cartesian_map(
-                        floater_coordinates=RX_gt_Coordinates,
-                        TX_coordinates=TX_Coordinates,
-                        estimated_vessel_coordinates=None,
-                        tracks=[
-                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
-                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
-                                Track("Compensated", RX_IMU_compensated, "#FF8822"),
-                                ],
-                                output_file="maps/map_local.png"
-                )
-
-                '''
-                build_folium_map(
-                        floater_coordinates=RX_gt_Coordinates,
-                        TX_coordinates=TX_Coordinates,
-                        estimated_vessel_coordinates=None,
-                        tracks=[
-                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
-                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
-                                Track("Compensated", RX_IMU_compensated, "#FF8822"),
-                                ],
-                        output_file="maps/map_folium.html"
-                )
-                '''
-
                 for n in range(self.NUMBER_OF_FLOATERS):
                         for j in range(self.NUMBER_OF_HYDROPHONES):
                                 array = np.load(f'Synth/F{n+1}_H{j+1}.npy')
@@ -273,33 +254,17 @@ class Simulation:
                 RX_bw_IMU_MDS = np.load("Synth/RX_bw_IMU_MDS.npy")
 
                 if SIMULATE or ANALYZE_WAVS:
-                        # Create the bearing angle array for each floater: this stores the bearing angle array of each floater in H{i}.npy.
-                        if self.NUMBER_OF_HYDROPHONES == 3:
-                                first_bearing = compute_bearing_angle_array(1)
-                                elevation_arrays = np.zeros((self.NUMBER_OF_FLOATERS,len(first_bearing)))   
-                        elif self.NUMBER_OF_HYDROPHONES == 4:
-                                first_bearing = compute_bearing_angle_array_square(1)
-                                elevation_arrays = np.zeros((self.NUMBER_OF_FLOATERS,len(first_bearing)))   
-                        else:
-                                first_bearing,first_elevation = compute_bearing_angle_array_complete(1)
-
-                        # Creating bearing and elevation arrays on the base of the number of event previously fetched
-                        N_events = len(first_bearing)
-                        bearing_arrays = np.zeros((self.NUMBER_OF_FLOATERS, N_events))
-                        elevation_arrays = np.full((self.NUMBER_OF_FLOATERS,N_events),np.nan)
-                        bearing_arrays[0,:] = first_bearing
-                        np.save(f"Synth/F1_azimuth.npy",first_bearing)
-                        
-                        if self.NUMBER_OF_HYDROPHONES == 5:
-                                elevation_arrays[0,:] = first_elevation
-
-                        for i in range(1, self.NUMBER_OF_FLOATERS):
+                        bearing_arrays = np.zeros((self.NUMBER_OF_FLOATERS, self.SIMULATION_STEPS))
+                        elevation_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS),np.nan)        
+                
+                        for i in range(0, self.NUMBER_OF_FLOATERS):
                                 if self.NUMBER_OF_HYDROPHONES == 3:
                                         bearing_arrays[i,:] = compute_bearing_angle_array(i + 1)
                                 elif self.NUMBER_OF_HYDROPHONES == 4:
                                         bearing_arrays[i,:] = compute_bearing_angle_array_square(i + 1)
                                 else:
                                         bearing_arrays[i,:], elevation_arrays[i,:] = compute_bearing_angle_array_complete(i + 1)
+
 
                                 np.save(f"Synth/F{i+1}_azimuth.npy",bearing_arrays[i,:])
                                 np.save(f"Synth/F{i+1}_elevation.npy",elevation_arrays[i,:])
@@ -319,6 +284,12 @@ class Simulation:
                                 if self.NUMBER_OF_HYDROPHONES == 5:
                                         elevation_arrays[i,:] = np.load(f"Synth/F{i+1}_elevation.npy")
 
+                psi_error_arrays[0,0] = 90
+
+                if ADD_PSI_ERROR:
+                        bearing_arrays += psi_error_arrays
+
+                bearing_arrays = wrap_degrees(wrap_degrees)
 
                 estimated_points = find_points(RX_gt_Coordinates,bearing_arrays,elevation_arrays)
                 estimated_fw_IMU = find_points(RX_fw_IMU,bearing_arrays,elevation_arrays)
@@ -344,23 +315,10 @@ class Simulation:
                                 Track("RX IMU+MDS", np.load("Synth/RX_fw_IMU_MDS.npy"), "#2AB040"),
                                 Track("Compensated", np.load("Synth/RX_bw_IMU.npy"), "#FF8822"),
                                 ],
-                        track_TX=True
+                        output_file="maps/local_map.png"
                 )
  
-                build_folium_map(
-                        floater_coordinates=RX_gt_Coordinates,
-                        TX_coordinates=TX_Coordinates,
-                        estimated_vessel_coordinates=estimated_points,
-                        tracks=[
-                        Track("RX IMU", np.load("Synth/RX_fw_IMU.npy"), "#0000FF"),
-                        Track("RX IMU+MDS", np.load("Synth/RX_fw_IMU_MDS.npy"), "#2AB040"),
-                        Track("Compensated", np.load("Synth/RX_bw_IMU.npy"), "#FF8822"),
-                        ],
-                        output_file="map.html",
-                        track_TX=True,
-                        track_estimated=True,
-                )
-
+                '''
                 if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
                         build_local_cartesian_map_3d(
                                 RX_gt_Coordinates, 
@@ -372,12 +330,9 @@ class Simulation:
                                 max_depth_m=100.0, # Limite dell'asse Z per la visualizzazione
                                 track_TX=True, 
                                 track_estimated=True)
+                '''
 
-
-                print(f"FORMA estimated {estimated_points.shape}")
-                print(f"FORMA TX_Coordinates {TX_Coordinates.shape}")
-
-                print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2],self.Center[0],self.Center[1]):.1f}")
+                print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2]):.1f}")
                 #print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],self.Center[0],self.Center[1]):.1f}")
                 #print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],self.Center[0],self.Center[1]):.1f}")
                 #print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],self.Center[0],self.Center[1]):.1f}")

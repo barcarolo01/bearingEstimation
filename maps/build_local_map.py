@@ -212,7 +212,9 @@ def build_local_cartesian_map(
         frameon=True, facecolor="white", edgecolor="grey", fontsize=FONTSIZE,
     )
 
+
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
     print(f"Local map saved in: {output_file}")
 

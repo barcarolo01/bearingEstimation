@@ -170,8 +170,6 @@ def format_bearings(array,window_duration,perc_to_trim):
     array = array_trimmed - 360
     return array
     
-
-
 def clean_temporary_files():
     if os.path.isdir("TMP"):
         shutil.rmtree("TMP")

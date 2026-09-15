@@ -1,4 +1,4 @@
-from findpoint import *
+from point_estimation import *
 from utils_runner import *
 
 import numpy as np
@@ -138,55 +138,45 @@ def generate_grid_of_samples(lat_orig, lon_orig, depth_constant, W, N):
 def compute_TX_circle_trajectory(
     Center,
     constant_depth: float,
-    start_deg: float,  # Angolo di inizio da NORD (0-360)
-    end_deg: float,    # Angolo di fine da NORD (0-360)
+    start_deg: float,  
+    end_deg: float,  
     n_steps: int,
     radius_m: float,
-    clockwise: bool = True, # Se True va in senso orario, se False in senso antiorario
-) -> np.ndarray:
+    clockwise: bool = True):
     """
-    Calcola i punti lungo un arco di circonferenza tra start_deg e end_deg.
-    Gli angoli sono misurati a partire da NORD in senso orario.
-    
-    Ritorna un numpy array di forma (n_steps, 3) con colonne [Lat, Lon, Depth].
+    This function returns a set of equally spaced points on a circumference
+    between the specified angles (measured from North, clockwise)
     """
     Lat_center, Lon_center = Center[0], Center[1]
 
-    # Raggio medio della Terra in metri
     R_EARTH = 6371000.0
-    
-    # Normalizziamo gli angoli di input nel range [0, 360) per sicurezza
+
+    # Angle normalization
     start_deg = start_deg % 360.0
     end_deg = end_deg % 360.0
     
     if clockwise:
-        # In senso orario: l'angolo cresce. 
-        # Se l'angolo finale è minore di quello iniziale, abbiamo scavalcato il Nord (0°)
         if end_deg < start_deg:
             actual_end_deg = end_deg + 360.0
         else:
             actual_end_deg = end_deg
     else:
-        # In senso antiorario: l'angolo decresce.
-        # Se l'angolo finale è maggiore di quello iniziale, abbiamo scavalcato il Nord al contrario
         if end_deg > start_deg:
             actual_end_deg = end_deg - 360.0
         else:
             actual_end_deg = end_deg
 
-    # Generiamo gli angoli orari intermedi (lineari tra inizio e fine modificata)
+    # Generate a series of n_steps equally-spaced angles
     clock_angles_deg = np.linspace(start_deg, actual_end_deg, n_steps)
-    
-    # Conversione da angoli bussola (orari, Nord=0) ad angoli trigonometrici (antiorari, Est=0)
+
+    # Angle conversion from Geographic (North = 0, clockwise) to mathematical convention (East = 0, anticlockwise)
     trig_angles_deg = 90.0 - clock_angles_deg
     trig_angles_rad = np.radians(trig_angles_deg)
     
-    # Calcolo delle distorsioni geometriche per la proiezione piatta locale
+    
     lat_center_rad = np.radians(Lat_center)
     delta_lat_deg = (radius_m / R_EARTH) * (180.0 / np.pi)
     delta_lon_deg = delta_lat_deg / np.cos(lat_center_rad)
-    
-    # Calcolo coordinate assolute
     d_lat = delta_lat_deg * np.sin(trig_angles_rad)
     d_lon = delta_lon_deg * np.cos(trig_angles_rad)
     

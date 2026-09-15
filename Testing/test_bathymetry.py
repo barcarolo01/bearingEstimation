@@ -6,8 +6,12 @@ import xarray as xr
 FOR TESTING: Query a point to find its find the depth
 """
 
-lon_query = 55.141862749665
-lat_query = 25.903322371762606
+## TX
+#lon_query = 152.15160115499555
+#lat_query = -34.19175869808876
+
+lon_query = 153
+lat_query = -35
 
 
 load_dotenv()
