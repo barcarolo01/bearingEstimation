@@ -6,8 +6,6 @@ from coordinate_generator import *
 from discrete_hydromate_single import run_discrete_hydromate_single
 from filter_trajectory import *
 from point_estimation import *
-from maps.build_folium_map import build_folium_map, build_map
-from maps.build_local_3D import build_local_cartesian_map_3d
 from maps.build_local_map import build_local_cartesian_map
 from maps.map_common import Track
 from floater_ping import *
@@ -15,12 +13,19 @@ from utils_runner import *
 from Floater import *
 
 FONTSIZE = 18
-RESURFACE_FREQ = 999
 TX_LIMIT = 2
 
-SIMULATE = True
-ANALYZE_WAVS = False
-ADD_PSI_ERROR = True
+ADD_PSI_ERROR = False
+HYDROMATE_SIMULATION = False
+
+colors = {
+                'imu':  "#0000FF",
+                'imu_mds':  "#2AB040",
+                'imu_rev':  "#FC03D3",
+                'imu_mds_rev':  "#D6940F",
+                'imu_compensated': "#FF1111"
+         }
+
 
 class Simulation:
         def __init__(self, transmitter, Floaters, Steps, Center, seed=256123):
@@ -33,6 +38,12 @@ class Simulation:
                 self.SIMULATION_STEPS = Steps
                 self.NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
                 self.SAMPLING_FREQUENCY = int(os.getenv('SAMPLING_FREQUENCY'))
+
+                # Floater data for vessel DoA estimation
+                self.bearing_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
+                self.elevation_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
+                self.psi_error_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
+
         
         def run_simulation(self):
                 TX_Coordinates = np.zeros((self.SIMULATION_STEPS,3))
@@ -41,56 +52,50 @@ class Simulation:
                 RX_bw_IMU     = np.zeros((self.SIMULATION_STEPS, self.NUMBER_OF_FLOATERS, 3))
                 RX_bw_IMU_MDS = np.zeros((self.SIMULATION_STEPS, self.NUMBER_OF_FLOATERS, 3))
                 RX_IMU_compensated = np.zeros((self.SIMULATION_STEPS, self.NUMBER_OF_FLOATERS, 3))
+
+                targets = {
+                        'imu':  RX_fw_IMU,
+                        'imu_mds':  RX_fw_IMU_MDS,
+                        'imu_rev':  RX_bw_IMU,
+                        'imu_mds_rev':  RX_bw_IMU_MDS,
+                        'imu_compensated': RX_IMU_compensated
+                }
                 GT = np.zeros((self.SIMULATION_STEPS, self.NUMBER_OF_FLOATERS, 3))
-
-
                 RX_gt_Coordinates = np.zeros((self.SIMULATION_STEPS,self.NUMBER_OF_FLOATERS,3))
-                RX_est_plain_Coordinates = np.zeros((self.SIMULATION_STEPS,self.NUMBER_OF_FLOATERS,3))
 
                 if os.path.isdir("Synth"):
                         shutil.rmtree("Synth")
                 os.makedirs("Synth")
 
-                np.save("Synth/Center_Coordinates.npy",self.Center)
-
                 round_active  = False
-                round_order   = []     # sequenza di trasmettitori, lunga 2N-1
+                round_order   = []     # Floater transmitting sequence (2N-1 long)
                 round_step    = 0
                 round_id      = 0
-                already_fired = set()  # ID dei nodi che hanno già innescato un round
 
+                mustTX = [False] * self.NUMBER_OF_FLOATERS
                 for i in range(self.SIMULATION_STEPS):
-                        print(f"Simulation step n. {i+1}/{self.SIMULATION_STEPS}")
-                        #transmissions_in_round = 0
                         TX_Coordinates[i,:] = local_to_geo(self.Center,self.transmitter.gt_pos)        
-                        mustTX = [False] * self.NUMBER_OF_FLOATERS
 
                         for n in range(self.NUMBER_OF_FLOATERS):
-                                print(f"# Simulation step {i}, Floater {n} #")
+                                print(f"# Simulation step {i+1}/{self.SIMULATION_STEPS}, Floater {n} #")
                                 RX_gt_Coordinates[i,n,:] = local_to_geo(self.Center,self.Floaters[n].gt_pos)
-                                
-                                if (i % RESURFACE_FREQ == 0 and i != 0) or  (i == self.SIMULATION_STEPS):
-                                        self.Floaters[n].resurface()
 
-                                mustTX[n] = self.Floaters[n].move()
-
-                                # At the end of the simulation, the floater emerges
-                                if( i == self.SIMULATION_STEPS - 1):
-                                        self.Floaters[n].resurface()
-                                
                                 # Hydromate simulation
-                                run_discrete_hydromate_single(TX_Coordinates[i,0],
-                                                        TX_Coordinates[i,1],
-                                                        TX_Coordinates[i,2],
-                                                        RX_gt_Coordinates[i,n,0],
-                                                        RX_gt_Coordinates[i,n,1],
-                                                        RX_gt_Coordinates[i,n,2],
-                                                        (n+1))
+                                if HYDROMATE_SIMULATION:
+                                        run_discrete_hydromate_single(TX_Coordinates[i,0],
+                                                                TX_Coordinates[i,1],
+                                                                TX_Coordinates[i,2],
+                                                                RX_gt_Coordinates[i,n,0],
+                                                                RX_gt_Coordinates[i,n,1],
+                                                                RX_gt_Coordinates[i,n,2],
+                                                                (n+1))
 
-                                
-                                
-                        self.transmitter.move() # Vessel motion
-                
+                                        # Save as wav segment
+                                        for j in range(self.NUMBER_OF_HYDROPHONES):
+                                                hydrophone_track = np.load(os.path.join('TMP',f'H{j+1}.npy'))
+                                                wav.write(f'Synth/T{i}_F{n+1}_H{j+1}.wav', self.SAMPLING_FREQUENCY, hydrophone_track)
+                                                                
+                                        self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
 
                         # Current shapshot
                         positions = np.array([f.gt_pos for f in self.Floaters])
@@ -101,14 +106,12 @@ class Simulation:
                                 triggers = []
 
                                 for n in range(self.NUMBER_OF_FLOATERS):
-                                        if mustTX[n]:# and floaters[n].ID not in already_fired:
+                                        if mustTX[n]:
                                                 triggers.append(n)
 
                                 if triggers:
                                         print(f"[step {i}] TRIGGER → round {round_id+1}")
                                         t = triggers[0] # The first node triggering the ranging become the round initiator
-                                        #for k in triggers:
-                                                #already_fired.add(self.Floaters[k].ID)     
 
                                         round_id  += 1 # Increment MDS round counter
 
@@ -153,48 +156,46 @@ class Simulation:
                                                 if m == tx:
                                                         continue
 
-                                                # TODO: Compute the distance using hydromate
-                                                d = ping_pair(local_to_geo(self.Center,positions[tx]),
-                                                              local_to_geo(self.Center,positions[m]))
-                                                print(f"distanza {d}")
-                                                #d    = ((np.linalg.norm(positions[tx] - positions[m]))/1500) * 1000
+                                                #d = ping_pair(local_to_geo(self.Center,positions[tx]),local_to_geo(self.Center,positions[m]))
+                                                d = np.linalg.norm(positions[tx]-positions[m])
 
                                                 t_rx = clocks[m] + d + math.ceil(1000/TX_LIMIT)
                                                 self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
                                                 
-
                                         round_step += 1
                                 if round_step == len(round_order):
                                         round_active = False
                                         print(f"SIMSTEP {i}, ended rangeing")
 
-                        
+                        # Advance the simulation for the next step
+                        mustTX = [False] * self.NUMBER_OF_FLOATERS
+                        for n in range(self.NUMBER_OF_FLOATERS):
+                                # At the end of the simulation, the floater emerges
+                                if i != (self.SIMULATION_STEPS-1):
+                                        mustTX[n] = self.Floaters[n].move()
                                         
+                        self.transmitter.move() # Vessel motion
 
-
-                colors = ['tab:blue', 'tab:green', 'tab:orange']
-                targets = [RX_fw_IMU, RX_fw_IMU_MDS, RX_IMU_compensated]
-                names   = ['imu', 'imu_mds', 'imu_compensated']
-                results = []  # cache: evita di ricalcolare tutto nel loop RMSE
-
-                psi_error_arrays = np.zeros((self.NUMBER_OF_FLOATERS, self.SIMULATION_STEPS))
+                        
+     
+                names   = ['imu', 'imu_mds', 'imu_rev', 'imu_mds_rev', 'imu_compensated']
+                results = [] 
 
                 for n in range(self.NUMBER_OF_FLOATERS):
                         res = self.Floaters[n].return_results(fuse=False)
-                        # TODO FIX movement order
-                        psi_error_arrays[n,:] = res['psi_err'][:-1].copy()
-                        print(f"floater{i} psierr: {psi_error_arrays[n,:]}")
+
+                        self.psi_error_arrays[n,:] = res['psi_err'].copy()
                         results.append(res)
 
-                        gt = res['gt'][1:]
+                        gt = res['gt']
                         GT[:, n, :] = gt
 
                         fig, ax = plt.subplots(figsize=(9, 5))
 
-                        for name, color, arr in zip(names, colors, targets):
-                                pos = res[name][1:]
-                                arr[:, n, :] = pos
-                                ax.plot(np.linalg.norm(pos - gt, axis=1), color=color, lw=1.8, label=name)
+                        for name in names:
+                                pos = res[name]
+                                targets[name][:, n, :] = pos
+                                ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
 
                         ax.set_title("Positioning error vs ground truth")
                         ax.set_xlabel("Simulation steps")
@@ -226,115 +227,25 @@ class Simulation:
                         e = np.concatenate(e_all)
                         print(f"{name:22s} {np.sqrt((e**2).mean()):10.3f}")
 
+                clean_temporary_files()
+                if ADD_PSI_ERROR and HYDROMATE_SIMULATION:
+                        self.bearing_arrays = wrap_degrees(self.bearing_arrays + self.psi_error_arrays)
 
-
-                for n in range(self.NUMBER_OF_FLOATERS):
-                        for j in range(self.NUMBER_OF_HYDROPHONES):
-                                array = np.load(f'Synth/F{n+1}_H{j+1}.npy')
-                                wav.write(f'Synth/F{n+1}_H{j+1}.wav', self.SAMPLING_FREQUENCY, array)
-                                                
-                                        
-
-
-                # End of simulation: save coordinates
-                np.save("Synth/TX_Coordinates.npy",TX_Coordinates)
-                np.save("Synth/RX_gt_Coordinates.npy",RX_gt_Coordinates)
-                np.save("Synth/RX_fw_IMU.npy",RX_fw_IMU)
-                np.save("Synth/RX_fw_IMU_MDS.npy",RX_fw_IMU_MDS)
-                np.save("Synth/RX_bw_IMU.npy",RX_bw_IMU)
-                np.save("Synth/RX_bw_IMU_MDS.npy",RX_bw_IMU_MDS)
-                
-        
-                #Load coordinates
-                TX_Coordinates = np.load("Synth/TX_Coordinates.npy")
-                RX_gt_Coordinates = np.load("Synth/RX_gt_Coordinates.npy")
-                RX_fw_IMU = np.load("Synth/RX_fw_IMU.npy")
-                RX_fw_IMU_MDS = np.load("Synth/RX_fw_IMU_MDS.npy")
-                RX_bw_IMU = np.load("Synth/RX_bw_IMU.npy")
-                RX_bw_IMU_MDS = np.load("Synth/RX_bw_IMU_MDS.npy")
-
-                if SIMULATE or ANALYZE_WAVS:
-                        bearing_arrays = np.zeros((self.NUMBER_OF_FLOATERS, self.SIMULATION_STEPS))
-                        elevation_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS),np.nan)        
-                
-                        for i in range(0, self.NUMBER_OF_FLOATERS):
-                                if self.NUMBER_OF_HYDROPHONES == 3:
-                                        bearing_arrays[i,:] = compute_bearing_angle_array(i + 1)
-                                elif self.NUMBER_OF_HYDROPHONES == 4:
-                                        bearing_arrays[i,:] = compute_bearing_angle_array_square(i + 1)
-                                else:
-                                        bearing_arrays[i,:], elevation_arrays[i,:] = compute_bearing_angle_array_complete(i + 1)
-
-
-                                np.save(f"Synth/F{i+1}_azimuth.npy",bearing_arrays[i,:])
-                                np.save(f"Synth/F{i+1}_elevation.npy",elevation_arrays[i,:])
-                                
-                        # Deleting the temporary files and folder
-                        clean_temporary_files()
-
-                else:
-                        fist_azimuth = np.load(f"Synth/F1_azimuth.npy")
-                        first_elevation = np.load(f"Synth/F1_elevation.npy")
-
-                        bearing_arrays = np.zeros([self.NUMBER_OF_FLOATERS,len(fist_azimuth)])
-                        elevation_arrays = np.zeros([self.NUMBER_OF_FLOATERS,len(first_elevation)])
-
-                        for i in range(self.NUMBER_OF_FLOATERS):
-                                bearing_arrays[i,:] = np.load(f"Synth/F{i+1}_azimuth.npy")
-                                if self.NUMBER_OF_HYDROPHONES == 5:
-                                        elevation_arrays[i,:] = np.load(f"Synth/F{i+1}_elevation.npy")
-
-                psi_error_arrays[0,0] = 90
-
-                if ADD_PSI_ERROR:
-                        bearing_arrays += psi_error_arrays
-
-                bearing_arrays = wrap_degrees(wrap_degrees)
-
-                estimated_points = find_points(RX_gt_Coordinates,bearing_arrays,elevation_arrays)
-                estimated_fw_IMU = find_points(RX_fw_IMU,bearing_arrays,elevation_arrays)
-                estimated_fw_IMU_MDS = find_points(RX_fw_IMU_MDS,bearing_arrays,elevation_arrays)
-                estimated_bw_IMU = find_points(RX_bw_IMU,bearing_arrays,elevation_arrays)
-                estimated_bw_IMU_MDS = find_points(RX_bw_IMU_MDS,bearing_arrays,elevation_arrays)
-
-                #estimated_points = replace_outliers_mean(estimated_points,WIN_LEN=7)
-
-                np.save("Synth/Estimated_Coordinates",estimated_points)
-                np.save("Synth/Estimated_fw_IMU",estimated_fw_IMU)
-                np.save("Synth/Estimated_fw_IMU_MDS",estimated_fw_IMU_MDS)
-                np.save("Synth/Estimated_estimated_bw_IMU",estimated_bw_IMU)
-                np.save("Synth/Estimated_",estimated_bw_IMU_MDS)
-
+                estimated_points = find_points(RX_gt_Coordinates,self.bearing_arrays,self.elevation_arrays)
+ 
                 # Plotting points on the map                
                 build_local_cartesian_map(
                         floater_coordinates=RX_gt_Coordinates,
                         TX_coordinates=TX_Coordinates,
                         estimated_vessel_coordinates=estimated_points,
                         tracks=[
-                                Track("RX IMU", np.load("Synth/RX_fw_IMU.npy"), "#0000FF"),
-                                Track("RX IMU+MDS", np.load("Synth/RX_fw_IMU_MDS.npy"), "#2AB040"),
-                                Track("Compensated", np.load("Synth/RX_bw_IMU.npy"), "#FF8822"),
+                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
+                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
+                                Track("Compensated", RX_bw_IMU, "#FF8822"),
                                 ],
                         output_file="maps/local_map.png"
                 )
- 
-                '''
-                if RX_gt_Coordinates.shape[2] == 3 and TX_Coordinates.shape[1] == 3 and estimated_points.shape[1] == 3:
-                        build_local_cartesian_map_3d(
-                                RX_gt_Coordinates, 
-                                TX_Coordinates, 
-                                estimated_points, 
-                                self.Center, 
-                                500, 
-                                500, 
-                                max_depth_m=100.0, # Limite dell'asse Z per la visualizzazione
-                                track_TX=True, 
-                                track_estimated=True)
-                '''
 
-                print(f"RMSE estimated_points:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_points[:,:2]):.1f}")
-                #print(f"RMSE estimated_fw_IMU:\t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU[:,:2],self.Center[0],self.Center[1]):.1f}")
-                #print(f"RMSE estimated_fw_IMU_MDS:\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_fw_IMU_MDS[:,:2],self.Center[0],self.Center[1]):.1f}")
-                #print(f"RMSE estimated_bw_IMU: \t\t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU[:,:2],self.Center[0],self.Center[1]):.1f}")
-                #print(f"RMSE estimated_bw_IMU_MDS: \t {compute_flat_RMSE(TX_Coordinates[:,:2],estimated_bw_IMU_MDS[:,:2],self.Center[0],self.Center[1]):.1f}")
-                print(f"RMSE depth: {compute_depth_RMSE(TX_Coordinates[:,2],estimated_points[:,2])}")
+                rmse_flat, rmse_depth = compute_RMSE(TX_Coordinates,estimated_points)
+                print(f"RMSE estimated_points:\t {rmse_flat:.1f}")
+                print(f"RMSE depth:\t\t {rmse_depth:.1f}")

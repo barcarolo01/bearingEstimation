@@ -14,13 +14,13 @@ It analyses the three tracks synthetized for each of the hydrophone of that floa
 applies a window-based analysis and estimates the bearing angle for each window.
 An array of bearing angle is produces and saved as a file (numpy array).
 '''
-def compute_bearing_angle_array(H_index):
+def compute_bearing_angle_array(F_index):
     d=0.3
     precompute_bearing_angles_triangle(d)
     
-    fs, sig1 = wav.read(f'Synth/F{H_index}_H1.wav')
-    _, sig2 = wav.read(f'Synth/F{H_index}_H2.wav')
-    _, sig3 = wav.read(f'Synth/F{H_index}_H3.wav')
+    fs, sig1 = wav.read(f'Synth/F{F_index}_H1.wav')
+    _, sig2 = wav.read(f'Synth/F{F_index}_H2.wav')
+    _, sig3 = wav.read(f'Synth/F{F_index}_H3.wav')
 
     
     # Parametri finestra
@@ -47,16 +47,16 @@ def compute_bearing_angle_array(H_index):
 
     estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
 
-    np.save(f"Synth/F{H_index}",estimated_azimuth)
+    np.save(f"Synth/F{F_index}",estimated_azimuth)
     return estimated_azimuth
 
-def compute_bearing_angle_array_square(H_index):
+def compute_bearing_angle_array_square(F_index):
     d=0.3
     precompute_bearing_angles_square(d)
-    fs, sig1 = wav.read(f'Synth/F{H_index}_H1.wav')
-    _, sig2 = wav.read(f'Synth/F{H_index}_H2.wav')
-    _, sig3 = wav.read(f'Synth/F{H_index}_H3.wav')
-    _, sig4 = wav.read(f'Synth/F{H_index}_H4.wav')
+    fs, sig1 = wav.read(f'Synth/F{F_index}_H1.wav')
+    _, sig2 = wav.read(f'Synth/F{F_index}_H2.wav')
+    _, sig3 = wav.read(f'Synth/F{F_index}_H3.wav')
+    _, sig4 = wav.read(f'Synth/F{F_index}_H4.wav')
 
     # Parametri finestra
     durata_finestra = 0.05 # Secondi
@@ -84,34 +84,34 @@ def compute_bearing_angle_array_square(H_index):
                                                    time_delay_41[i],time_delay_42[i],time_delay_43[i])
         
     estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
-    np.save(f"Synth/F{H_index}",estimated_azimuth)
+    np.save(f"Synth/F{F_index}",estimated_azimuth)
     return estimated_azimuth
 
-def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
+def compute_bearing_angle_array_complete(wav_folder, timestamp, F_index, DESIRED_SNR = 999):
     d = 0.228 / math.sqrt(2)
     precompute_bearing_angles_complete(d)
 
-    fs, sig1 = wav.read(f'Synth/F{H_index}_H1.wav')
-    _, sig2 = wav.read(f'Synth/F{H_index}_H2.wav')
-    _, sig3 = wav.read(f'Synth/F{H_index}_H3.wav')
-    _, sig4 = wav.read(f'Synth/F{H_index}_H4.wav')
-    _, sig5 = wav.read(f'Synth/F{H_index}_H5.wav')
+    '''
+    fs, sig1 = wav.read(os.path.join(wav_folder,f'F{F_index}_H1.wav'))
+    _, sig2 = wav.read(os.path.join(wav_folder,f'F{F_index}_H2.wav'))
+    _, sig3 = wav.read(os.path.join(wav_folder,f'F{F_index}_H3.wav'))
+    _, sig4 = wav.read(os.path.join(wav_folder,f'F{F_index}_H4.wav'))
+    _, sig5 = wav.read(os.path.join(wav_folder,f'F{F_index}_H5.wav'))
+    '''
+
+    sig1 = np.load(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.npy'))
+    sig2 = np.load(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.npy'))
+    sig3 = np.load(os.path.join(wav_folder,f'T{timestamp}_F{timestamp}_H3.npy'))
+    sig4 = np.load(os.path.join(wav_folder,f'T{timestamp}_F{timestamp}_H4.npy'))
+    sig5 = np.load(os.path.join(wav_folder,f'T{timestamp}_F{timestamp}_H5.npy'))
+    fs = 96000
 
     
-    if DESIRED_SNR < 999:
-        sig1 = add_white_noise(sig1,snr_db=DESIRED_SNR,seed=1)
-        sig2 = add_white_noise(sig2,snr_db=DESIRED_SNR,seed=2)
-        sig3 = add_white_noise(sig3,snr_db=DESIRED_SNR,seed=3)
-        sig4 = add_white_noise(sig4,snr_db=DESIRED_SNR,seed=4)
-        sig5 = add_white_noise(sig5,snr_db=DESIRED_SNR,seed=5)
-        
-    
-    # Parametri finestra
-    durata_finestra = 0.05  # Secondi
+    durata_finestra = 0.05  # Seconds
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.0
     
-    # Ritardi tra H1–H4 (invariati)
+    # Delays between hydrophones H1–H4 
     _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
@@ -119,13 +119,13 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
 
-    # Ritardi con H5 → informazione sull'angolo verticale
+    # Delays with respect to H5 
     _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
 
-    # Conversione in secondi
+    # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
     time_delay_31 = sample_delay_31 / fs
@@ -155,10 +155,9 @@ def compute_bearing_angle_array_complete(H_index, DESIRED_SNR = 999):
     estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
     estimated_elevation = format_bearings(estimated_elevation,durata_finestra,0.1)
 
-    np.save(f"Synth/F{H_index}_azimuth",   estimated_azimuth)
-    np.save(f"Synth/F{H_index}_elevation", estimated_elevation)
+    np.save(f"Synth/F{F_index}_azimuth",   estimated_azimuth)
+    np.save(f"Synth/F{F_index}_elevation", estimated_elevation)
     return estimated_azimuth, estimated_elevation
-
 
 def format_bearings(array,window_duration,perc_to_trim):
     final_length = int(1/window_duration)
@@ -177,3 +176,96 @@ def clean_temporary_files():
     for j in range(5):
         if os.path.isdir(f"HM_OUT_{j+1}"):
                 shutil.rmtree(f"HM_OUT_{j+1}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
+    d = 0.228 / math.sqrt(2)
+    precompute_bearing_angles_complete(d)
+
+    fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+    _, sig4 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H4.wav'))
+    _, sig5 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H5.wav'))
+    
+    durata_finestra = 0.05  # Seconds
+    campioni_finestra = int(durata_finestra * fs)
+    quality_threshold = 0.0
+    
+    # Delays between hydrophones H1–H4 
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
+    # Delays with respect to H5 
+    _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
+    # Samples to seconds
+    time_delay_21 = sample_delay_21 / fs
+    time_delay_32 = sample_delay_32 / fs
+    time_delay_31 = sample_delay_31 / fs
+    time_delay_41 = sample_delay_41 / fs
+    time_delay_42 = sample_delay_42 / fs
+    time_delay_43 = sample_delay_43 / fs
+    time_delay_51 = sample_delay_51 / fs
+    time_delay_52 = sample_delay_52 / fs
+    time_delay_53 = sample_delay_53 / fs
+    time_delay_54 = sample_delay_54 / fs
+
+    # Estimation array: azimuth and elevation for each window
+    estimated_azimuth   = np.zeros(len(times))
+    estimated_elevation = np.zeros(len(times))
+
+    for i in range(len(times)):
+        az, el = find_bearing_complete(
+            time_delay_32[i], time_delay_21[i], time_delay_31[i],
+            time_delay_41[i], time_delay_42[i], time_delay_43[i],
+            time_delay_51[i], time_delay_52[i], time_delay_53[i], time_delay_54[i]
+        )
+        estimated_azimuth[i]   = az
+        estimated_elevation[i] = el
+
+    # Obtaining a single value for bearing and elevation angle    
+    bearing = circular_trim_mean(estimated_azimuth,0.2)
+    elevation = circular_trim_mean(estimated_elevation,0.2)
+
+    return bearing, elevation
+
+
+
+def circular_trim_mean(angles, proportiontocut=0.1):
+    """
+    This function takes as input an array of angles (in degrees),
+    sorts them maintaining the wrap-around between 0° and 360°,
+    removes the percentage (proportiontocut) of values at the extremes,
+    and finally return the mean value of the remaining ones
+    """
+    angles = np.sort(np.asarray(angles, dtype=float) % 360)
+    # Gap between consecutive angles
+    gaps = np.diff(np.append(angles, angles[0] + 360))
+    i = np.argmax(gaps)
+    start = (i + 1) % len(angles)
+    unwrapped = np.concatenate([angles[start:], angles[:start] + 360])
+    mean_angle = stats.trim_mean(unwrapped, proportiontocut) % 360
+    return mean_angle 

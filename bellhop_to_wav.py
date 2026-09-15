@@ -210,10 +210,6 @@ def from_arr_to_wav(input_folder: str,number_mic: int,source: str,out_folder: st
 
         rx_out_list.append(rx_out)
 
-    # Global normalization
-    #gmax = max(np.max(np.abs(s)) for s in rx_out_list)
-    #rx_out_list = [(s / gmax).astype(np.float32) for s in rx_out_list]
-
     # Save the convolved track (one per hydrophone) in numpy array format (.npy)
     for i, rx_out in enumerate(rx_out_list, start=1):
         out_path = os.path.join(out_folder, f"H{i}.npy")
@@ -274,6 +270,7 @@ def plot_ir(used_arrivals, fs, out_path=None, db_panel=True, title=None):
 
     # Delays relative to the first arrival, in ms
     t_rel = (time - time.min()) * 1e3
+    
     # Signed amplitude: this is exactly what enters the convolution
     a_signed = amp * np.cos(np.deg2rad(phase))
 

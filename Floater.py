@@ -5,7 +5,7 @@ from Transmitter import *
 
 # ===== DATASHEET PARAMETERS =====
 IMU_ACCEL_BIAS = np.ones(3) * 0
-IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
+IMU_SIGMA_WHITENOISE = np.ones(3) * (0.537 / np.sqrt(3600 * 1))
 IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
 
 # ===== GYRO =====
@@ -33,11 +33,12 @@ COMPASS_ALPHA   = 0.99
 DIM = 3
 
 # ===== FREQUENCY OF MDS (simulation steps) =====
-MDS_FREQ = 99999999
-RESURFACE_FF = 9999999
+MDS_FREQ = 50
 
+RESURFACE_FREQUENCY = 100
 RESURFACE_VELOCITY = 0.5
 
+INCREMENTAL_RESURFACE = True
 CONSTANT_DEPTH = True
 MIN_DEPTH = 1
 MAX_DEPTH = 100
@@ -45,7 +46,6 @@ MAX_DEPTH = 100
 def wrap(a):
     """Riporta un angolo nell'intervallo [-pi, pi)."""
     return (a + np.pi) % (2 * np.pi) - np.pi
-
 
 def Rz(psi):
     """Matrice di rotazione attorno a z: body -> nav quando psi e' l'heading."""
@@ -64,7 +64,6 @@ def distance_matrix(obs, N):
                 continue
             D[a,b] = D[b,a] = v
     return D
-
 
 class Floater(Transmitter):
     """
@@ -269,13 +268,15 @@ class Floater(Transmitter):
         self.steps_since_fix += 1
         self.clk += 1000
         TRIGGER_RANGING = self.steps_counter % MDS_FREQ == 0
-        TRIGGER_RESURFACE = self.steps_counter % RESURFACE_FF == 0 and self.steps_counter != 1
-        if TRIGGER_RESURFACE:
-            self.depth_before_resurface = self.gt_pos[2]
-            print(f"f{self.ID} - t{self.steps_counter}- STORED {self.depth_before_resurface}")
-            self.ONGOING_RESURFACE = True
-            self.ONGOING_IMMERSION = False
+        TRIGGER_RESURFACE = self.steps_counter % RESURFACE_FREQUENCY == 0 and self.steps_counter != 1
 
+        if TRIGGER_RESURFACE:
+            if INCREMENTAL_RESURFACE:
+                self.depth_before_resurface = self.gt_pos[2]
+                self.ONGOING_RESURFACE = True
+                self.ONGOING_IMMERSION = False
+            else:
+                 self.resurface()
 
         # Angular velocity update
         e_w = self.rng_true.normal(0, self.sigma_yaw_rate)
@@ -473,13 +474,12 @@ class Floater(Transmitter):
             for k in range(res_prec, p):
                     w = (k - res_prec) / span          # 0 a res_prec, 1 a p-1
                     self.pos_history_compensated[k] = self.pos_history[k] - DELTA * w**2
-
-
+        
         return {
             'imu':             _dict_to_array(self.pos_history),
-            'imu_rev':         rev_imu,
+            'imu_rev':         _dict_to_array(rev_imu[0]),
             'imu_mds':         _dict_to_array(self.pos_history_mds),
-            'imu_mds_rev':     rev_mds,
+            'imu_mds_rev':     _dict_to_array(rev_mds[0]),
             'imu_compensated': _dict_to_array(self.pos_history_compensated),
             'gt':              _dict_to_array(self.gt_history),
 

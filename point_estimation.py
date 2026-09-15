@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-def math_to_bearing(math_angle_deg: float) -> float:
+def math_to_bearing(math_angle_deg):
     """
     This function convert an angle expressed in the mathematical convention
     (0° = EAST, angles increasing in anti-clockwise sense) into an angle measured
@@ -14,7 +14,7 @@ def wrap_degrees(angle_deg):
     This function takes as an input a value of an angle (in degrees) and wrap it 
     in order to keep it inside the range [0;360)
     """
-    return (angle_deg + 180) % 360
+    return (angle_deg + 180) % 360 - 180
 
 def _flat_earth_intersection(
     lat1: float, lon1: float, brg1: float,
@@ -184,7 +184,7 @@ def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.nd
 
     
     positions = np.full((n_simulations, 3), np.nan)
-    brgs = np.vectorize(math_to_bearing)(bearings)
+    brgs = math_to_bearing(bearings)
 
     # Iteration over the N simulation steps
     for n in range(n_simulations):

@@ -3,7 +3,7 @@ from coordinate_generator import geo_to_local
 from simulation import *
 
 if __name__ == '__main__':
-        NUMBER_OF_FLOATERS = 2
+        NUMBER_OF_FLOATERS = 5
         Center = [20.832813, 88.698390] # India, low depth
 
         # === Transmitter initialization ===
@@ -14,7 +14,7 @@ if __name__ == '__main__':
                         dt=1.0)
         TX.set_rho(1.0)
         TX.set_sigma(0.20, 0.20, 0.0)
-        TX.set_initial_velocity(3,3,0)
+        TX.set_initial_velocity(0,0,0)
         
         L  = 100
 
@@ -29,10 +29,17 @@ if __name__ == '__main__':
                                         gt_z=37,
                                         NF=NUMBER_OF_FLOATERS,
                                         dt=1.0)
-                else:
+                elif n == 1:
                         f = Floater(ID = n,
                                         gt_x=L,
                                         gt_y=0,
+                                        gt_z=37,
+                                        NF=NUMBER_OF_FLOATERS,
+                                        dt=1.0)
+                else:
+                        f = Floater(ID = n,
+                                        gt_x=np.random.uniform()*100,
+                                        gt_y=np.random.uniform()*100,
                                         gt_z=37,
                                         NF=NUMBER_OF_FLOATERS,
                                         dt=1.0)
@@ -45,7 +52,7 @@ if __name__ == '__main__':
 
         sim = Simulation(transmitter=TX,
                         Floaters=floaters,
-                        Steps=1,
+                        Steps=200,
                         Center=Center,
                         seed=5)
 
