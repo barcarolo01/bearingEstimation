@@ -194,7 +194,7 @@ def mds_algo(pos, dist, dist_w, pos_w):
     # MDS
     embedding = MDS(
         n_components=n,        # Maintain the same number of dimensions
-        n_init=1,              # One initialization
+        n_init=5,              # One initialization
         max_iter=ITER,         # Number of iterations
         eps=0,                 
         metric='precomputed',  # Dist is already a distance matrix

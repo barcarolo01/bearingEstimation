@@ -11,7 +11,7 @@ load_dotenv()
 NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
 HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
 
-def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, depth_RX, H_index):
+def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, depth_RX, H_index, PSI_RX = 0):
 
     # Create TMP folder if not exists
     if not os.path.isdir("TMP"):
@@ -21,7 +21,7 @@ def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, dept
     if NUMBER_OF_HYDROPHONES not in [3,4,5]:
         raise ValueError(f"NUMBER_OF_HYDROPHONES bust be either 3, 4 or 5 (while it is {NUMBER_OF_HYDROPHONES}).")
 
-    Floater_hydrophones = get_hydrophones_coordinates(Lat_RX,Lon_RX,depth_RX,NUMBER_OF_HYDROPHONES)
+    Floater_hydrophones = get_hydrophones_coordinates(Lat_RX,Lon_RX,depth_RX,NUMBER_OF_HYDROPHONES, PSI_RX)
     
     # Swap latitude and longitude (for HYDROMATE compatibility)
     Floater_hydrophones[:,[0,1]] = Floater_hydrophones[:,[1,0]]

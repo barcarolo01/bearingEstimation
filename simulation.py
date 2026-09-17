@@ -13,10 +13,10 @@ from utils_runner import *
 from Floater import *
 
 FONTSIZE = 18
-TX_LIMIT = 2
+TX_LIMIT = 9
 
-ADD_PSI_ERROR = False
-HYDROMATE_SIMULATION = False
+ADD_PSI_ERROR = True
+HYDROMATE_SIMULATION = True
 
 colors = {
                 'imu':  "#0000FF",
@@ -88,7 +88,8 @@ class Simulation:
                                                                 RX_gt_Coordinates[i,n,0],
                                                                 RX_gt_Coordinates[i,n,1],
                                                                 RX_gt_Coordinates[i,n,2],
-                                                                (n+1))
+                                                                (n+1),
+                                                                PSI_RX=self.Floaters[n].gt_psi)
 
                                         # Save as wav segment
                                         for j in range(self.NUMBER_OF_HYDROPHONES):
@@ -96,9 +97,9 @@ class Simulation:
                                                 wav.write(f'Synth/T{i}_F{n+1}_H{j+1}.wav', self.SAMPLING_FREQUENCY, hydrophone_track)
                                                                 
                                         self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                        self.bearing_arrays[n,i] = wrap_degrees(self.bearing_arrays[n,i] + self.Floaters[n].gt_psi)
 
-                        # Current shapshot
-                        positions = np.array([f.gt_pos for f in self.Floaters])
+                        # Current clock shapshot
                         clocks    = np.array([f.clk    for f in self.Floaters])
 
                         # If the network is not already performing a ranging operation
@@ -156,10 +157,8 @@ class Simulation:
                                                 if m == tx:
                                                         continue
 
-                                                #d = ping_pair(local_to_geo(self.Center,positions[tx]),local_to_geo(self.Center,positions[m]))
-                                                d = np.linalg.norm(positions[tx]-positions[m])
-
-                                                t_rx = clocks[m] + d + math.ceil(1000/TX_LIMIT)
+                                                delay_ms = ping_pair(local_to_geo(self.Center,self.Floaters[tx].gt_pos),local_to_geo(self.Center,self.Floaters[m].gt_pos))
+                                                t_rx = clocks[m] + delay_ms + math.ceil(1000/TX_LIMIT)
                                                 self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
                                                 
                                         round_step += 1
@@ -171,14 +170,17 @@ class Simulation:
                         mustTX = [False] * self.NUMBER_OF_FLOATERS
                         for n in range(self.NUMBER_OF_FLOATERS):
                                 # At the end of the simulation, the floater emerges
-                                if i != (self.SIMULATION_STEPS-1):
+                                if i == (self.SIMULATION_STEPS-1):
+                                        self.Floaters[n].resurface()
+                                else:
                                         mustTX[n] = self.Floaters[n].move()
+                                        
                                         
                         self.transmitter.move() # Vessel motion
 
                         
      
-                names   = ['imu', 'imu_mds', 'imu_rev', 'imu_mds_rev', 'imu_compensated']
+                names   = ['imu', 'imu_mds',  'imu_compensated']
                 results = [] 
 
                 for n in range(self.NUMBER_OF_FLOATERS):
@@ -199,7 +201,7 @@ class Simulation:
 
                         ax.set_title("Positioning error vs ground truth")
                         ax.set_xlabel("Simulation steps")
-                        ax.set_ylabel("Metri")
+                        ax.set_ylabel("Meters")
                         ax.grid(True, ls='--', alpha=.5)
                         for k in self.Floaters[n].Resurface_index:
                                 if 1 <= k <= self.SIMULATION_STEPS:
@@ -228,6 +230,7 @@ class Simulation:
                         print(f"{name:22s} {np.sqrt((e**2).mean()):10.3f}")
 
                 clean_temporary_files()
+
                 if ADD_PSI_ERROR and HYDROMATE_SIMULATION:
                         self.bearing_arrays = wrap_degrees(self.bearing_arrays + self.psi_error_arrays)
 

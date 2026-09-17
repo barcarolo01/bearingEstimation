@@ -79,13 +79,21 @@ def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, d, c=1500, 
 
         # Search only in the physically possible range (+-tau_max_samples)
         search = cc[center - tau_max_samples : center + tau_max_samples + 1]
-        peak   = np.max(search)
+        k    = np.argmax(search)
+        peak = search[k]
 
-        # Quality check
-        if peak >= quality_threshold:
-            lag = np.argmax(search) - tau_max_samples  # Number of samples (relatie to lag=0)
+        if peak >= quality_threshold:   # Quality check
+            delta = 0.0
+            if 0 < k < len(search) - 1:
+                y0, y1, y2 = search[k - 1], search[k], search[k + 1]
+                den = y0 - 2 * y1 + y2
+                if den != 0:
+                    delta = 0.5 * (y0 - y2) / den
+            lag = (k - tau_max_samples) + delta
         else:
-            lag = np.nan # Low quality: the delay values is discarded
+            lag = np.nan    # Low quality: the delay values is discarded
+
+
 
         sample_delay.append(lag)
         searches.append(search)

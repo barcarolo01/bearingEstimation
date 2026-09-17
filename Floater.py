@@ -2,11 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Positioning import estimate, move_error, reverse_node
 from Transmitter import * 
+from scipy.spatial.distance import cdist
 
 # ===== DATASHEET PARAMETERS =====
 IMU_ACCEL_BIAS = np.ones(3) * 0
-IMU_SIGMA_WHITENOISE = np.ones(3) * (0.537 / np.sqrt(3600 * 1))
+IMU_SIGMA_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
 IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
+#IMU_SIGMA_WHITENOISE = np.ones(3) * (0.0 / np.sqrt(3600 * 1))
+#IMU_SIGMA_BIAS_DRIVING =  np.ones(3) * (0 * 9.81 * np.sqrt(1 / 200.0))
 
 # ===== GYRO =====
 
@@ -33,12 +36,12 @@ COMPASS_ALPHA   = 0.99
 DIM = 3
 
 # ===== FREQUENCY OF MDS (simulation steps) =====
-MDS_FREQ = 50
+MDS_FREQ = 200
+RESURFACE_FREQUENCY = 9999
 
-RESURFACE_FREQUENCY = 100
 RESURFACE_VELOCITY = 0.5
 
-INCREMENTAL_RESURFACE = True
+INCREMENTAL_RESURFACE = False
 CONSTANT_DEPTH = True
 MIN_DEPTH = 1
 MAX_DEPTH = 100
@@ -396,7 +399,29 @@ class Floater(Transmitter):
             self.MDS_index.append(self.steps_counter)
             self.dist_matrices[self.steps_counter] = D_m
 
+
+            ##
+            D_true = cdist(pos_all, pos_all)
+            print("D_m")
+            print(D_m)
+            print("D_true")
+            print(D_true)
+            mask = D_true > 0
+            print("rapporto D_m / D_true:", np.round(D_m[mask] / D_true[mask], 3))
+            ##
+
+            print(f"===========FLOATER {self.ID}=====")
+            print("POSITIONE PERSONALE:")
+            print(self.gt_pos)
+            print("POSITIONI")
+            print(pos_all)
+            print("ERRORI")
+            print(err_all)
+            
             new_pos, new_err = estimate(pos_all, err_all, D_m)
+            print("NEW POS")
+            print(new_pos)
+
             self.est_pos_mds   = new_pos[self.ID].copy()
             self.est_error_mds = float(new_err[self.ID])
             self.steps_since_fix = 0
@@ -531,17 +556,6 @@ class Floater(Transmitter):
             self.accel_bias = np.array(args, dtype=float)
         else:
             raise ValueError(f"Expected {DIM} bias values, got {len(args)}")
-    
-    def _forward_mds(self, D, others_pos, others_err):
-        pos_all = np.asarray(others_pos, dtype=float).copy()
-        err_all = np.asarray(others_err, dtype=float).copy()
-        pos_all[self.ID] = self.est_pos_mds
-        err_all[self.ID] = self.est_error_mds
-        new_pos, new_err = estimate(pos_all, err_all, D)
-        self.est_pos_mds   = new_pos[self.ID].copy()
-        self.est_error_mds = float(new_err[self.ID])
-        self.steps_since_fix = 0
-        self._err_at_fix = self.est_error_mds
 
 
 def _dict_to_array(d):

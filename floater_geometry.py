@@ -71,14 +71,18 @@ def precompute_bearing_angles_complete(d):
             lut_tau53[az_idx, el_idx] = np.dot(H3 - H5, direction) / c
             lut_tau54[az_idx, el_idx] = np.dot(H4 - H5, direction) / c
 
-'''
-This method receives as an input the geographical coordinates of the center of a floater and returns 
-the coordinates of each hydrophone
-'''
-def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hydrohpones):
+
+
+def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hydrohpones, PSI_RX=0):
+    '''
+    This method receives as an input the geographical coordinates of the center of a floater and returns 
+    the coordinates of each hydrophone
+    '''
     # From meters to degrees
     meters_per_deg_lat = 111319.9
     meters_per_deg_lon = 111319.9 * math.cos(math.radians(lat_center))
+
+    psi_rad = math.radians(PSI_RX)
     
     match number_of_hydrohpones:
         case 3:
@@ -88,20 +92,32 @@ def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hyd
             r = L / (2 * math.sqrt(3))
 
             # H1
-            delta_lat_H1 = R / meters_per_deg_lat
-            delta_lon_H1 = 0.0
+            x_H1 = 0.0
+            y_H1 = R
+            x_H1_rot = x_H1 * math.cos(psi_rad) - y_H1 * math.sin(psi_rad)
+            y_H1_rot = x_H1 * math.sin(psi_rad) + y_H1 * math.cos(psi_rad)
+            delta_lat_H1 = y_H1_rot / meters_per_deg_lat
+            delta_lon_H1 = x_H1_rot / meters_per_deg_lon
             lat_H1 = lat_center + delta_lat_H1
             lon_H1 = lon_center + delta_lon_H1
 
             # H2
-            delta_lat_H2 = -r / meters_per_deg_lat
-            delta_lon_H2 = -(L / 2) / meters_per_deg_lon
+            x_H2 = -(L / 2)
+            y_H2 = -r
+            x_H2_rot = x_H2 * math.cos(psi_rad) - y_H2 * math.sin(psi_rad)
+            y_H2_rot = x_H2 * math.sin(psi_rad) + y_H2 * math.cos(psi_rad)
+            delta_lat_H2 = y_H2_rot / meters_per_deg_lat
+            delta_lon_H2 = x_H2_rot / meters_per_deg_lon
             lat_H2 = lat_center + delta_lat_H2
             lon_H2 = lon_center + delta_lon_H2
 
             # H3
-            delta_lat_H3 = -r / meters_per_deg_lat
-            delta_lon_H3 = +(L / 2) / meters_per_deg_lon
+            x_H3 = +(L / 2)
+            y_H3 = -r
+            x_H3_rot = x_H3 * math.cos(psi_rad) - y_H3 * math.sin(psi_rad)
+            y_H3_rot = x_H3 * math.sin(psi_rad) + y_H3 * math.cos(psi_rad)
+            delta_lat_H3 = y_H3_rot / meters_per_deg_lat
+            delta_lon_H3 = x_H3_rot / meters_per_deg_lon
             lat_H3 = lat_center + delta_lat_H3
             lon_H3 = lon_center + delta_lon_H3
 
@@ -113,24 +129,45 @@ def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hyd
             L = 0.228 / math.sqrt(2) # In meters
             half = L / 2
 
-            delta_lat = half / meters_per_deg_lat
-            delta_lon = half / meters_per_deg_lon
-
             # H1: Nord-Ovest
-            lat_H1 = lat_center + delta_lat
-            lon_H1 = lon_center - delta_lon
+            x_H1 = -half
+            y_H1 = half
+            x_H1_rot = x_H1 * math.cos(psi_rad) - y_H1 * math.sin(psi_rad)
+            y_H1_rot = x_H1 * math.sin(psi_rad) + y_H1 * math.cos(psi_rad)
+            delta_lat_H1 = y_H1_rot / meters_per_deg_lat
+            delta_lon_H1 = x_H1_rot / meters_per_deg_lon
+            lat_H1 = lat_center + delta_lat_H1
+            lon_H1 = lon_center + delta_lon_H1
 
             # H2: Nord-Est
-            lat_H2 = lat_center + delta_lat
-            lon_H2 = lon_center + delta_lon
+            x_H2 = half
+            y_H2 = half
+            x_H2_rot = x_H2 * math.cos(psi_rad) - y_H2 * math.sin(psi_rad)
+            y_H2_rot = x_H2 * math.sin(psi_rad) + y_H2 * math.cos(psi_rad)
+            delta_lat_H2 = y_H2_rot / meters_per_deg_lat
+            delta_lon_H2 = x_H2_rot / meters_per_deg_lon
+            lat_H2 = lat_center + delta_lat_H2
+            lon_H2 = lon_center + delta_lon_H2
 
             # H3: Sud-Est
-            lat_H3 = lat_center - delta_lat
-            lon_H3 = lon_center + delta_lon
+            x_H3 = half
+            y_H3 = -half
+            x_H3_rot = x_H3 * math.cos(psi_rad) - y_H3 * math.sin(psi_rad)
+            y_H3_rot = x_H3 * math.sin(psi_rad) + y_H3 * math.cos(psi_rad)
+            delta_lat_H3 = y_H3_rot / meters_per_deg_lat
+            delta_lon_H3 = x_H3_rot / meters_per_deg_lon
+            lat_H3 = lat_center + delta_lat_H3
+            lon_H3 = lon_center + delta_lon_H3
 
             # H4: Sud-Ovest
-            lat_H4 = lat_center - delta_lat
-            lon_H4 = lon_center - delta_lon
+            x_H4 = -half
+            y_H4 = -half
+            x_H4_rot = x_H4 * math.cos(psi_rad) - y_H4 * math.sin(psi_rad)
+            y_H4_rot = x_H4 * math.sin(psi_rad) + y_H4 * math.cos(psi_rad)
+            delta_lat_H4 = y_H4_rot / meters_per_deg_lat
+            delta_lon_H4 = x_H4_rot / meters_per_deg_lon
+            lat_H4 = lat_center + delta_lat_H4
+            lon_H4 = lon_center + delta_lon_H4
 
             return np.asarray([ (lat_H1, lon_H1,depth_center),
                                 (lat_H2, lon_H2,depth_center),
@@ -142,28 +179,55 @@ def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hyd
 
             half = L / 2
 
-            delta_lat = half / meters_per_deg_lat
-            delta_lon = half / meters_per_deg_lon
-
             # H1: Nord-Ovest
-            lat_H1 = lat_center + delta_lat
-            lon_H1 = lon_center - delta_lon
+            x_H1 = -half
+            y_H1 = half
+            x_H1_rot = x_H1 * math.cos(psi_rad) - y_H1 * math.sin(psi_rad)
+            y_H1_rot = x_H1 * math.sin(psi_rad) + y_H1 * math.cos(psi_rad)
+            delta_lat_H1 = y_H1_rot / meters_per_deg_lat
+            delta_lon_H1 = x_H1_rot / meters_per_deg_lon
+            lat_H1 = lat_center + delta_lat_H1
+            lon_H1 = lon_center + delta_lon_H1
 
             # H2: Nord-Est
-            lat_H2 = lat_center + delta_lat
-            lon_H2 = lon_center + delta_lon
+            x_H2 = half
+            y_H2 = half
+            x_H2_rot = x_H2 * math.cos(psi_rad) - y_H2 * math.sin(psi_rad)
+            y_H2_rot = x_H2 * math.sin(psi_rad) + y_H2 * math.cos(psi_rad)
+            delta_lat_H2 = y_H2_rot / meters_per_deg_lat
+            delta_lon_H2 = x_H2_rot / meters_per_deg_lon
+            lat_H2 = lat_center + delta_lat_H2
+            lon_H2 = lon_center + delta_lon_H2
 
             # H3: Sud-Est
-            lat_H3 = lat_center - delta_lat
-            lon_H3 = lon_center + delta_lon
+            x_H3 = half
+            y_H3 = -half
+            x_H3_rot = x_H3 * math.cos(psi_rad) - y_H3 * math.sin(psi_rad)
+            y_H3_rot = x_H3 * math.sin(psi_rad) + y_H3 * math.cos(psi_rad)
+            delta_lat_H3 = y_H3_rot / meters_per_deg_lat
+            delta_lon_H3 = x_H3_rot / meters_per_deg_lon
+            lat_H3 = lat_center + delta_lat_H3
+            lon_H3 = lon_center + delta_lon_H3
 
             # H4: Sud-Ovest
-            lat_H4 = lat_center - delta_lat
-            lon_H4 = lon_center - delta_lon
+            x_H4 = -half
+            y_H4 = -half
+            x_H4_rot = x_H4 * math.cos(psi_rad) - y_H4 * math.sin(psi_rad)
+            y_H4_rot = x_H4 * math.sin(psi_rad) + y_H4 * math.cos(psi_rad)
+            delta_lat_H4 = y_H4_rot / meters_per_deg_lat
+            delta_lon_H4 = x_H4_rot / meters_per_deg_lon
+            lat_H4 = lat_center + delta_lat_H4
+            lon_H4 = lon_center + delta_lon_H4
 
             # H5: Middle point of H4-H3
-            lat_H5 = lat_center - delta_lat
-            lon_H5 = lon_center
+            x_H5 = 0.0
+            y_H5 = -half
+            x_H5_rot = x_H5 * math.cos(psi_rad) - y_H5 * math.sin(psi_rad)
+            y_H5_rot = x_H5 * math.sin(psi_rad) + y_H5 * math.cos(psi_rad)
+            delta_lat_H5 = y_H5_rot / meters_per_deg_lat
+            delta_lon_H5 = x_H5_rot / meters_per_deg_lon
+            lat_H5 = lat_center + delta_lat_H5
+            lon_H5 = lon_center + delta_lon_H5
 
             return np.asarray([ (lat_H1, lon_H1,depth_center),
                                 (lat_H2, lon_H2,depth_center),
