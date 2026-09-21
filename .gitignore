@@ -8,3 +8,4 @@ AIS_DATA
 FiguresAndPlots
 Testing
 .venv
+*.png

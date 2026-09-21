@@ -1,0 +1,13 @@
+numpy
+auto_mix_prep
+folium
+Jinja2
+matplotlib
+opencv_python
+Pillow
+pyproj
+python-dotenv
+scikit_learn
+scipy
+soundfile
+xarray

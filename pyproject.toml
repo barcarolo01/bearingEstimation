@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "digitalshadow"
+version = "0.0.0"
+
+dependencies = [
+    "numpy",
+    "auto_mix_prep",
+    "folium",
+    "Jinja2",
+    "matplotlib",
+    "opencv_python",
+    "Pillow",
+    "pyproj",
+    "python-dotenv",
+    "scikit_learn",
+    "scipy",
+    "soundfile",
+    "xarray"
+
+]
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]

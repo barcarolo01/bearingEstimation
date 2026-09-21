@@ -1,10 +1,10 @@
-from Floater import *
-from coordinate_generator import geo_to_local
+from digitalshadow.devices.Floater import *
+from digitalshadow.devices.Transmitter import *
 from simulation import *
 
 if __name__ == '__main__':
         NUMBER_OF_FLOATERS = 4
-        STEPS = 1
+        STEPS = 100
         Center = [20.832813, 88.698390] # India, low depth
 
         # === Transmitter initialization ===
@@ -13,7 +13,7 @@ if __name__ == '__main__':
                         gt_y=0,
                         gt_z=20,
                         dt=1.0)
-        TX.set_rho(1.0)
+        TX.Rho = 1
         TX.set_sigma(0.20, 0.20, 0.0)
         TX.set_initial_velocity(0,0,0)
         
@@ -56,14 +56,14 @@ if __name__ == '__main__':
         
 
                 f.set_initial_velocity(0.2, 0.2, 0.0)
-                f.set_rho(1)
+                f.Rho = 1
                 f.set_sigma(0.2, 0.2, 0.0)
                 floaters.append(f)
 
-        sim = Simulation(transmitter=TX,
-                        Floaters=floaters,
+        sim = Simulation(Floaters=floaters,
                         Steps=STEPS,
                         Center=Center,
+                        transmitter=TX,
                         seed=5)
 
         sim.run_simulation()

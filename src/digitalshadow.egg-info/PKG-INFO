@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: digitalshadow
+Version: 0.0.0
+Requires-Python: >=3.11
+Requires-Dist: numpy
+Requires-Dist: auto_mix_prep
+Requires-Dist: folium
+Requires-Dist: Jinja2
+Requires-Dist: matplotlib
+Requires-Dist: opencv_python
+Requires-Dist: Pillow
+Requires-Dist: pyproj
+Requires-Dist: python-dotenv
+Requires-Dist: scikit_learn
+Requires-Dist: scipy
+Requires-Dist: soundfile
+Requires-Dist: xarray
