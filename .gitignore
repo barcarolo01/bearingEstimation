@@ -3,9 +3,9 @@ __pycache__
 TMP
 Synth
 .env
-AIS_DATA
 .vscode
 FiguresAndPlots
 Testing
 .venv
 *.png
+*.egg-info
