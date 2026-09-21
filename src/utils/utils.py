@@ -1,6 +1,7 @@
 import os
 import shutil
 import numpy as np
+from utils.gcc_phat import *
 import math
 from scipy import stats
 import scipy.io.wavfile as wav
@@ -193,7 +194,7 @@ def clean_temporary_files():
 
 
 
-def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
+def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
     d = 0.228 / math.sqrt(2)
     precompute_bearing_angles_complete(d)
 
@@ -206,6 +207,13 @@ def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
     durata_finestra = 0.05  # Seconds
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.0
+
+    if SNR_desired < 999:
+        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
+        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
+        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
+        sig4 = add_white_noise(sig4,SNR_desired,seed=seed+4)
+        sig5 = add_white_noise(sig5,SNR_desired,seed=seed+5)
     
     # Delays between hydrophones H1–H4 
     _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
@@ -270,9 +278,6 @@ def circular_trim_mean(angles, proportiontocut=0.1):
     mean_angle = stats.trim_mean(unwrapped, proportiontocut) % 360
     return mean_angle 
 
-
-    import numpy as np
-from utils.gcc_phat import *
 
 def check_snr(sig, noisy_sig):
     """

@@ -133,7 +133,7 @@ def synth_rx(src, arrivals, fs, n_out, t0, phase_sign=+1, chunk=16):
 
     return irfft(X * H, n=nfft)[:n_out]
 
-
+'''
 def check_calibration(rx, src, arrivals, n_out, sl_db, label=""):
     """
     Energy check: received level vs SL - TL_incoherent, TL_inc = -10 log10(sum A^2).
@@ -149,7 +149,7 @@ def check_calibration(rx, src, arrivals, n_out, sl_db, label=""):
           f"RL={rl_db:6.1f} dB  (SL-TL={sl_db - tl_inc if sl_db is not None else np.nan:6.1f})  "
           f"diff={gain_db + tl_inc:+5.2f} dB")
     return rl_db, tl_inc
-
+'''
 
 # ===============================================================================================
 def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder: str,
@@ -184,10 +184,11 @@ def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder:
     t0 = min(min(a[2] for a in used) for used in arrivals_per_mic)
 
     # == Synthesis + calibration check
+    
     n_out = FS_OUT
     for i, used in enumerate(arrivals_per_mic, start=1):
         rx = synth_rx(src, used, FS_OUT, n_out, t0, phase_sign=phase_sign)
-        check_calibration(rx, src, used, n_out, sl_db, label=f"H{i}")
+        #check_calibration(rx, src, used, n_out, sl_db, label=f"H{i}")
         np.save(os.path.join(out_folder, f"H{i}.npy"), rx)   # float64, Pa, NO normalization
 
 
