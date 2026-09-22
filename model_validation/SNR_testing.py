@@ -2,7 +2,7 @@ from digitalshadow.Positioning.coordinate_generator import sposta
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
 import scipy.io.wavfile as wav
 import matplotlib.pyplot as plt
-from utils.utils import clean_temporary_files, compute_single_bearing_angle_complete
+from digitalshadow.utils.utils import clean_temporary_files, compute_single_bearing_angle_complete
 
 if __name__ == "__main__":
     TX_Coordinates = np.asarray([20.832813, 88.698390, 30])

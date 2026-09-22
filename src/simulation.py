@@ -9,14 +9,14 @@ from digitalshadow.Positioning.point_estimation import *
 from digitalshadow.maps.build_local_map import build_local_cartesian_map
 from digitalshadow.maps.map_common import Track
 from digitalshadow.underwater_sim.floater_ping import *
-from utils.utils import *
+from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
 
 FONTSIZE = 18
 TX_LIMIT = 9
 
 ADD_PSI_ERROR = True
-HYDROMATE_SIMULATION = False
+HYDROMATE_SIMULATION = True
 
 colors = {
                 'imu':  "#0000FF",
@@ -123,10 +123,21 @@ class Simulation:
                                         for j in range(self.NUMBER_OF_HYDROPHONES):
                                                 hydrophone_track = np.load(os.path.join('TMP',f'H{j+1}.npy'))
                                                 wav.write(f'Synth/T{i}_F{n+1}_H{j+1}.wav', self.SAMPLING_FREQUENCY, hydrophone_track)
-                                                                
-                                        self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
-                                        self.bearing_arrays[n,i] = wrap_degrees(self.bearing_arrays[n,i] + self.Floaters[n].gt_psi)
 
+
+                                        if NUMBER_OF_HYDROPHONES == 3:
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_triangle(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                        if NUMBER_OF_HYDROPHONES == 5:
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                        
+
+                                        #self.bearing_arrays[n,i] = wrap_degrees(self.bearing_arrays[n,i] + self.Floaters[n].gt_psi)
+
+                                        print()
+                                        print()
+                                        print(self.bearing_arrays)
+                                        print()
+                                        
                         # Current clock shapshot
                         clocks    = np.array([f.clk    for f in self.Floaters])
 
@@ -266,17 +277,33 @@ class Simulation:
  
                 # Plotting points on the map                
                 build_local_cartesian_map(
-                        floater_coordinates=RX_gt_Coordinates,
-                        TX_coordinates=self.TX_Coordinates,
-                        estimated_vessel_coordinates=estimated_points,
-                        tracks=[
-                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
-                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
-                                Track("Compensated", RX_bw_IMU, "#FF8822"),
-                                ],
-                        output_file="maps/local_map.png"
+                        floater_coordinates=geo_to_local(self.Center,RX_gt_Coordinates),
+                        TX_coordinates=geo_to_local(self.Center,self.TX_Coordinates),
+                        estimated_vessel_coordinates=geo_to_local(self.Center,estimated_points),
+                        #tracks=[
+                                #Track("RX IMU", RX_fw_IMU, "#0000FF"),
+                                #Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
+                                #Track("Compensated", RX_bw_IMU, "#FF8822"),
+                                #],
+                        output_file="local_map.png",
+                        LEGEND=False
                 )
+                '''
+                build_local_cartesian_map(
+                        floater_coordinates=geo_to_local(self.Center,RX_gt_Coordinates),
+                        TX_coordinates=geo_to_local(self.Center,self.TX_Coordinates),
+                        estimated_vessel_coordinates=geo_to_local(self.Center,estimated_points),
+                        #tracks=[
+                                #Track("RX IMU", RX_fw_IMU, "#0000FF"),
+                                #Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
+                                #Track("Compensated", RX_bw_IMU, "#FF8822"),
+                                #],
+                        output_file="local_map1.png",
+                        Win = 250,
+                        LEGEND=False
+                )
+                '''
 
                 rmse_flat, rmse_depth = compute_RMSE(self.TX_Coordinates,estimated_points)
-                #print(f"RMSE estimated_points:\t {rmse_flat:.1f}")
+                print(f"RMSE estimated_points:\t {rmse_flat:.1f}")
                 #print(f"RMSE depth:\t\t {rmse_depth:.1f}")

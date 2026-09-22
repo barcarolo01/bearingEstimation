@@ -13,7 +13,7 @@ def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
     estimated_angle = np.argmin(E)
     error = (lut_tau21[estimated_angle,90]-measured_tau21)**2 + (lut_tau32[estimated_angle,90]-measured_tau32)**2 + (lut_tau31[estimated_angle,90]-measured_tau31)**2
 
-    return estimated_angle,error
+    return estimated_angle
 
 def find_bearing_square(measured_tau32, measured_tau21, measured_tau31, measured_tau41,measured_tau42,measured_tau43):
     E  = (measured_tau32 - lut_tau32[:,90])**2

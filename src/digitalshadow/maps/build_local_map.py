@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -6,7 +5,6 @@ from digitalshadow.maps.map_common import (
     Track,
     as_multi,
     as_points,
-    first_valid_location,
     normalize_tracks,
     valid_points,
 )
@@ -17,12 +15,6 @@ FLOATER_COLOR = "#FF0000"
 TX_COLOR = "#FFD700"
 EST_COLOR = "#00CC66"
 
-# Image formats handled by matplotlib (the local map cannot produce HTML)
-SUPPORTED_EXTENSIONS = {
-    "png", "pdf", "svg", "svgz", "eps", "ps", "jpg", "jpeg",
-    "tif", "tiff", "webp", "raw", "rgba", "pgf",
-}
-
 
 def build_local_cartesian_map(
     floater_coordinates=None,
@@ -31,26 +23,32 @@ def build_local_cartesian_map(
     tracks=None,
     output_file="map_local.png",
     track_alpha=0.7,
-    center_coordinates=None,
     window_width_m=None,
     window_height_m=None,
+    Win=None,
+    LEGEND=True
 ):
     """
-    Draw the map on a local cartesian plane (equirectangular projection centered
-    on `center_coordinates`) and save it as an image.
+    Draw the map on a local cartesian plane and save it as an image.
 
-    Parameters shared with `build_folium_map`
-    -----------------------------------------
+    All inputs are ALREADY expressed in a local cartesian frame (meters),
+    not in geographic coordinates. The image is always centered on the
+    origin (0, 0) of that frame.
+
+    Parameters
+    ----------
     floater_coordinates : array-like (N, M, 2|3) or (M, 2|3), or None
-        N = time steps, M = number of floaters, columns [lat, lon, (depth)].
+        N = time steps, M = number of floaters, columns [x, y, (depth)].
         An (M, 2|3) array is treated as a single time step (N = 1).
         Each floater has its own trajectory: different floaters are never connected.
     TX_coordinates : array-like (K, 2|3), or None
+        Columns [x, y, (depth)].
     estimated_vessel_coordinates : array-like (K, 2|3), or None
+        Columns [x, y, (depth)].
     tracks : Track | dict | tuple | sequence of those, or None
         Generic series of points. Each element holds:
           - name  : str, label of the series
-          - points: array (NUMBER_STEPS, 2|3) or (NUMBER_STEPS, M, 2|3)
+          - points: array (NUMBER_STEPS, 2|3) or (NUMBER_STEPS, M, 2|3), columns [x, y, (depth)]
           - color : str, hexadecimal color
         With the 3-dimensional shape, M independent series sharing name and color
         are drawn: points are connected along the step axis only, never across
@@ -58,60 +56,23 @@ def build_local_cartesian_map(
     output_file : str
     track_alpha : float
         Transparency of the series in `tracks`.
-
-    Parameters specific to the local map
-    ------------------------------------
-    center_coordinates : (lat, lon), or None
-        Origin of the local frame. When None, the first available valid point is
-        used (floaters -> TX -> estimated -> tracks).
     window_width_m, window_height_m : float, or None
-        Window size in meters. When None they are derived from the data.
+        Window size in meters, centered on (0, 0). When None they are derived
+        from the data so that every point is visible.
+    Win : float, or None
+        Half-size of the window in meters. When given, the view is forced to
+        [-Win, Win] on both axes, overriding window_width_m / window_height_m.
 
-    Depth: the depth column is optional; -999 values are treated as missing.
+    x = Easting [m], y = Northing [m]. Depth: the depth column is optional;
+    -999 values are treated as missing.
     """
 
-    # --- Output format check ---
-    ext = os.path.splitext(str(output_file))[1].lower().lstrip(".")
-    if ext not in SUPPORTED_EXTENSIONS:
-        raise ValueError(
-            f"'{output_file}': format '{ext or 'missing'}' is not supported by the local map. "
-            f"Use one of these extensions: {', '.join(sorted(SUPPORTED_EXTENSIONS))}. "
-            "HTML files must be passed to build_folium_map()."
-        )
-
-    # --- Normalize every input to a single [lat, lon, depth] layout ---
-    floaters = as_multi(floater_coordinates)                    # (N, M, 3)
-    tx = as_points(TX_coordinates)                              # (K, 3)
-    estimated = as_points(estimated_vessel_coordinates)         # (K, 3)
-    track_list = normalize_tracks(tracks)                       # each .xyz is (N, M, 3)
-
-    if center_coordinates is None:
-        center_coordinates = first_valid_location(
-            floaters, tx, estimated, *[t.xyz for t in track_list]
-        )
-        if center_coordinates is None:
-            raise ValueError("No valid coordinate available to center the map.")
-
-    EARTH_RADIUS = 6371000.0
-    lat_ref = np.radians(float(center_coordinates[0]))
-    lon_ref = np.radians(float(center_coordinates[1]))
-
-    def _geo_to_local(arr):
-        """[lat, lon, depth] -> [x, y, depth] in meters relative to the center."""
-        arr = np.asarray(arr, dtype=float)
-        if arr.size == 0:
-            return np.empty(arr.shape)
-        orig_shape = arr.shape
-        flat = arr.reshape(-1, orig_shape[-1])
-        x = EARTH_RADIUS * (np.radians(flat[:, 1]) - lon_ref) * np.cos(lat_ref)
-        y = EARTH_RADIUS * (np.radians(flat[:, 0]) - lat_ref)
-        out = np.column_stack((x, y, flat[:, 2]))
-        return out.reshape(orig_shape)
-
-    xy_floaters = _geo_to_local(floaters)                       # (N, M, 3)
-    xy_tx = valid_points(_geo_to_local(tx))                     # (K, 3)
-    xy_estimated = valid_points(_geo_to_local(estimated))       # (K, 3)
-    xy_tracks = [(t, _geo_to_local(t.xyz)) for t in track_list]
+    # --- Normalize every input to a single [x, y, depth] layout ---
+    xy_floaters = as_multi(floater_coordinates)                          # (N, M, 3)
+    xy_tx = valid_points(as_points(TX_coordinates))                      # (K, 3)
+    xy_estimated = valid_points(as_points(estimated_vessel_coordinates)) # (K, 3)
+    xy_tracks = [(t, np.asarray(t.xyz, dtype=float))                     # each (N, M, 3)
+                 for t in normalize_tracks(tracks)]
 
     # --- Figure setup ---
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -139,7 +100,6 @@ def build_local_cartesian_map(
         if xy_multi.size == 0:
             continue
         for series_index in range(xy_multi.shape[1]):
-            # series `series_index`, in step order
             points = valid_points(xy_multi[:, series_index, :])
             if len(points) == 0:
                 continue
@@ -170,8 +130,13 @@ def build_local_cartesian_map(
                           boxstyle="circle,pad=0.2", linewidth=1.5),
             )
 
-    # --- Window size ---
-    if window_width_m is None or window_height_m is None:
+    # --- Window size (always symmetric around the origin) ---
+    if Win is not None:
+        Win = float(Win)
+        if Win <= 0:
+            raise ValueError("Win must be a positive number of meters.")
+        window_width_m = window_height_m = 2.0 * Win
+    elif window_width_m is None or window_height_m is None:
         all_xy = [xy_tx[:, :2], xy_estimated[:, :2]]
         for _, xy_multi in xy_tracks:
             if xy_multi.size > 0:
@@ -191,9 +156,7 @@ def build_local_cartesian_map(
     ax.set_aspect("equal", adjustable="box")
 
     # --- Legend ---
-    center_label = (f"Center coordinates\n"
-                    f"[{float(center_coordinates[0]):.5f}, {float(center_coordinates[1]):.5f}]")
-    ax.plot(0, 0, "kx", markersize=5, markeredgewidth=2, label=center_label)
+    #ax.plot(0, 0, "kx", markersize=5, markeredgewidth=2, label="Origin (0, 0)")
 
     if xy_floaters.size > 0:
         ax.plot([], [], marker="s", color=FLOATER_COLOR, linestyle="None", label="Floaters")
@@ -205,13 +168,13 @@ def build_local_cartesian_map(
         if xy_multi.size > 0:
             ax.plot([], [], color=track.color, linestyle="-", label=track.name)
 
-    ax.legend(
-        loc="upper left",
-        bbox_to_anchor=(1.02, 1),
-        borderaxespad=0,
-        frameon=True, facecolor="white", edgecolor="grey", fontsize=FONTSIZE,
-    )
-
+    if LEGEND:
+        ax.legend(
+            loc="upper left",
+            #bbox_to_anchor=(1.02, 1),
+            borderaxespad=0,
+            frameon=True, facecolor="white", edgecolor="grey", fontsize=FONTSIZE,
+        )
 
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     plt.show()
@@ -219,26 +182,3 @@ def build_local_cartesian_map(
     print(f"Local map saved in: {output_file}")
 
     return output_file
-
-
-# --- USAGE EXAMPLE ---
-if __name__ == "__main__":
-    RX_Coords = np.load("Synth/RX_Coordinates.npy")
-    TX_Coords = np.load("Synth/TX_Coordinates.npy")
-    Est_Coords = np.load("Synth/Estimated_Coordinates.npy")
-
-    build_local_cartesian_map(
-        floater_coordinates=RX_Coords,
-        TX_coordinates=TX_Coords,
-        estimated_vessel_coordinates=Est_Coords,
-        tracks=[
-            Track("RX IMU", np.load("Synth/RX_fw_IMU.npy"), "#0000FF"),
-            Track("RX IMU+MDS", np.load("Synth/RX_fw_IMU_MDS.npy"), "#2AB040"),
-            Track("Compensated", np.load("Synth/RX_bw_IMU.npy"), "#FF8822"),
-        ],
-        output_file="map_local.png",
-        # None -> automatically centered on the first valid point
-        center_coordinates=RX_Coords.reshape(-1, RX_Coords.shape[-1])[0, :2],
-        window_width_m=40,
-        window_height_m=40,
-    )

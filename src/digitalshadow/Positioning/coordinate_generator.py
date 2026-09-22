@@ -1,5 +1,5 @@
 from digitalshadow.Positioning.point_estimation import *
-from utils.utils import *
+from digitalshadow.utils.utils import *
 
 import numpy as np
 
@@ -135,6 +135,8 @@ def generate_grid_of_samples(lat_orig, lon_orig, depth_constant, W, N):
 
     return coordinate_coppie
 
+'''
+OLD (earth)
 def compute_TX_circle_trajectory(
     Center,
     constant_depth: float,
@@ -185,3 +187,38 @@ def compute_TX_circle_trajectory(
     depths = np.full(n_steps, constant_depth)
     
     return np.column_stack((lats, lons, depths))
+'''
+
+def compute_TX_circle_trajectory(
+    constant_depth: float,
+    start_deg: float,
+    end_deg: float,
+    n_steps: int,
+    radius_m: float,
+    clockwise: bool = True):
+    """
+    Returns a set of equally spaced points on a circumference centered at (0, 0),
+    between the specified angles (measured from North, clockwise).
+    Output columns: x (East, m), y (North, m), depth.
+    """
+    # Angle normalization
+    start_deg = start_deg % 360.0
+    end_deg = end_deg % 360.0
+
+    if clockwise:
+        actual_end_deg = end_deg + 360.0 if end_deg < start_deg else end_deg
+    else:
+        actual_end_deg = end_deg - 360.0 if end_deg > start_deg else end_deg
+
+    # Generate a series of n_steps equally-spaced angles
+    clock_angles_deg = np.linspace(start_deg, actual_end_deg, n_steps)
+
+    # Conversion from geographic (North = 0, clockwise) to mathematical convention (East = 0, anticlockwise)
+    trig_angles_rad = np.radians(90.0 - clock_angles_deg)
+
+    # Cartesian coordinates relative to the circle center
+    x = radius_m * np.cos(trig_angles_rad)   # East
+    y = radius_m * np.sin(trig_angles_rad)   # North
+    depths = np.full(n_steps, constant_depth)
+
+    return np.column_stack((x, y, depths))

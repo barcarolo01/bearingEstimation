@@ -1,13 +1,13 @@
 import os
 import shutil
 import numpy as np
-from utils.gcc_phat import *
+from digitalshadow.utils.gcc_phat import *
 import math
 from scipy import stats
 import scipy.io.wavfile as wav
-from utils.utils import *
+from digitalshadow.utils.utils import *
 from digitalshadow.devices.floater_geometry import *
-from utils.bearing_calculation import *
+from digitalshadow.utils.bearing_calculation import *
 
 '''
 This method receives as input the index of a floater.
@@ -44,7 +44,7 @@ def compute_bearing_angle_array(F_index):
     # Bearing estimation
     estimated_azimuth = np.zeros(len(times))
     for i in range(len(estimated_azimuth)):
-        estimated_azimuth[i],_ = find_bearing_triangle(time_delay_32[i],time_delay_21[i],time_delay_31[i])
+        estimated_azimuth[i] = find_bearing_triangle(time_delay_32[i],time_delay_21[i],time_delay_31[i])
 
     estimated_azimuth = format_bearings(estimated_azimuth,durata_finestra,0.1)
 
@@ -183,6 +183,47 @@ def clean_temporary_files():
 
 
 
+def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
+    d = 0.3
+    precompute_bearing_angles_triangle(d)
+
+    fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+
+    durata_finestra = 0.05  # Seconds
+    campioni_finestra = int(durata_finestra * fs)
+    quality_threshold = 0.0
+
+    if SNR_desired < 999:
+        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
+        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
+        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
+
+    # Delays between hydrophones H1–H4 
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
+    # Samples to seconds
+    time_delay_21 = sample_delay_21 / fs
+    time_delay_32 = sample_delay_32 / fs
+    time_delay_31 = sample_delay_31 / fs
+
+    # Estimation array: azimuth and elevation for each window
+    estimated_azimuth   = np.zeros(len(times))
+    estimated_elevation = np.zeros(len(times))
+
+    for i in range(len(times)):
+        az = find_bearing_triangle(time_delay_32[i], time_delay_21[i], time_delay_31[i])
+        estimated_azimuth[i]   = az
+        estimated_elevation[i] = 0
+
+    # Obtaining a single value for bearing and elevation angle    
+    bearing = circular_trim_mean(estimated_azimuth,0.2)
+    elevation = 0
+
+    return bearing, elevation
 
 
 
