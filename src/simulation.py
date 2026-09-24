@@ -13,10 +13,10 @@ from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
 
 FONTSIZE = 18
-TX_LIMIT = 9
+TX_LIMIT = 10
 
 ADD_PSI_ERROR = True
-HYDROMATE_SIMULATION = True
+HYDROMATE_SIMULATION = False
 
 colors = {
                 'imu':  "#0000FF",
@@ -127,6 +127,8 @@ class Simulation:
 
                                         if NUMBER_OF_HYDROPHONES == 3:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_triangle(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                        if NUMBER_OF_HYDROPHONES == 4:
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder='Synth',F_index=(n + 1))
                                         if NUMBER_OF_HYDROPHONES == 5:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
                                         
@@ -196,7 +198,8 @@ class Simulation:
                                                 if m == tx:
                                                         continue
 
-                                                delay_ms = ping_pair(local_to_geo(self.Center,self.Floaters[tx].gt_pos),local_to_geo(self.Center,self.Floaters[m].gt_pos))
+                                                #delay_ms = ping_pair(local_to_geo(self.Center,self.Floaters[tx].gt_pos),local_to_geo(self.Center,self.Floaters[m].gt_pos))
+                                                delay_ms = 1000* np.linalg.norm(self.Floaters[tx].gt_pos[:2]-self.Floaters[m].gt_pos[:2]) / 1500
                                                 t_rx = clocks[m] + delay_ms + math.ceil(1000/TX_LIMIT)
                                                 self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
                                                 
@@ -219,8 +222,11 @@ class Simulation:
 
                         
      
-                names   = ['imu', 'imu_mds',  'imu_compensated']
+                names   = ['imu', 'imu_mds']#,  'imu_compensated']
                 results = [] 
+
+                errors_imu = np.zeros((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS))
+                errors_imu_mds = np.zeros((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS))
 
                 for n in range(self.NUMBER_OF_FLOATERS):
                         res = self.Floaters[n].return_results(fuse=False)
@@ -233,10 +239,18 @@ class Simulation:
 
                         fig, ax = plt.subplots(figsize=(9, 5))
 
-                        for name in names:
+                        
+                  
+
+                        for j,name in enumerate(names):
                                 pos = res[name]
                                 targets[name][:, n, :] = pos
                                 ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
+                                if name == 'imu':
+                                        errors_imu[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
+                                elif name == 'imu_mds':
+                                        errors_imu_mds[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
+
 
                         ax.set_title("Positioning error vs ground truth")
                         ax.set_xlabel("Simulation steps")
@@ -246,17 +260,35 @@ class Simulation:
                                 if 1 <= k <= self.SIMULATION_STEPS:
                                         ax.axvline(k - 1, color='gray', ls=':', lw=.8)
                         ax.legend(loc="upper right", frameon=True)
+                        
 
                         fig.suptitle(f"Floater {n}", fontsize=14)
                         fig.tight_layout()
-                        plt.savefig(f"floater_{n}_errors.png", dpi=120)
+                        plt.savefig(f"floater_{n}_errors.png", dpi=300)
                         plt.close(fig)
 
-                RX_fw_IMU          = local_to_geo(self.Center, RX_fw_IMU)
-                RX_fw_IMU_MDS      = local_to_geo(self.Center, RX_fw_IMU_MDS)
-                RX_bw_IMU          = local_to_geo(self.Center, RX_bw_IMU)
-                RX_bw_IMU_MDS      = local_to_geo(self.Center, RX_bw_IMU_MDS)
-                RX_IMU_compensated = local_to_geo(self.Center, RX_IMU_compensated)
+
+                return {
+                        'errors_imu' : errors_imu,
+                        'errors_imu_mds' : errors_imu_mds
+                }
+                '''
+                plt.figure()
+                np.save("avg_imu.npy",avg_imu)
+                np.save("avg_imu_mds.npy",avg_imu_mds)
+
+                plt.plot(avg_imu,label='IMU',color='#0000ff')
+                plt.plot(avg_imu_mds,label='IMU+MDS',color='#2AB040')
+                plt.title("Average positioning error vs gound truth")
+                plt.xlabel("Simulation steps [seconds]")
+                plt.ylabel("Positioning error [meters]")
+                plt.grid(True, ls='--', alpha=.5)
+                plt.tight_layout()
+                plt.legend(loc="upper right", frameon=True)
+                plt.show()
+                '''
+
+
 
                 print(f"{'Version':22s} {'RMSE':>10s}")
                 for name in names:
@@ -275,20 +307,21 @@ class Simulation:
 
                 estimated_points = find_points(RX_gt_Coordinates,self.bearing_arrays,self.elevation_arrays)
  
-                # Plotting points on the map                
+                # Plotting points on the map 
+                '''               
                 build_local_cartesian_map(
                         floater_coordinates=geo_to_local(self.Center,RX_gt_Coordinates),
-                        TX_coordinates=geo_to_local(self.Center,self.TX_Coordinates),
+                        #TX_coordinates=geo_to_local(self.Center,self.TX_Coordinates),
                         estimated_vessel_coordinates=geo_to_local(self.Center,estimated_points),
-                        #tracks=[
-                                #Track("RX IMU", RX_fw_IMU, "#0000FF"),
-                                #Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
+                        tracks=[
+                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
+                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),],
                                 #Track("Compensated", RX_bw_IMU, "#FF8822"),
                                 #],
                         output_file="local_map.png",
                         LEGEND=False
                 )
-                '''
+                
                 build_local_cartesian_map(
                         floater_coordinates=geo_to_local(self.Center,RX_gt_Coordinates),
                         TX_coordinates=geo_to_local(self.Center,self.TX_Coordinates),

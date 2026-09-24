@@ -1,3 +1,4 @@
+from digitalshadow.devices.IMU_models import load_imu_model
 import numpy as np
 import matplotlib.pyplot as plt
 from digitalshadow.devices.Floater import *
@@ -36,6 +37,7 @@ if __name__ == "__main__":
         #rnd_run = np.random.default_rng(10+i**2)
 
         f = Floater(0, 0, 0, 0, 1, 1.0, imu_seed=i)
+        f = load_imu_model(f,'ADIS16470',dt=1.0)
         f.set_initial_velocity(0.5, 0.5, 0.0)
         f.Rho = 0.999
         f.Rho_yaw = 0.999

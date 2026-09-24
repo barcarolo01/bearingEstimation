@@ -1,10 +1,11 @@
+from digitalshadow.devices.IMU_models import load_imu_model
 import numpy as np
 import matplotlib.pyplot as plt
 from digitalshadow.devices.Floater import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 200
+NUMBER_OF_RUNS = 20
 STEPS = 3600
 
 FONTSIZE = 14
@@ -12,19 +13,22 @@ FONTSIZE_LEGEND = 12
 
 ALPHAS = [0.0, 0.5, 0.9, 0.98, 0.995, 0.999]
 
+USE_CALIBRATED_GYROSCOPE = True
+
 def build_floater(seed, alpha=None):
     """Still floater; alpha = None means gyroscope only (no compass)."""
     np.random.seed(seed)
     f = Floater(0, 0, 0, 0, 1, 1.0, imu_seed=seed)
-
+    f = load_imu_model(f,'ADIS16470',dt=1.0)
+    
     f.set_initial_velocity(0.0, 0.0, 0.0)
     f.Rho = 1
     f.set_sigma(0.0, 0.0, 0.0)
     f.sigma_yaw_rate = 0.0
 
-    if GYRO_BIAS_SIGMA is not None:
-        f.sigma_gyro_bias = GYRO_BIAS_SIGMA
-        f.gyro_bias = f.rnd_compass.normal(0, GYRO_BIAS_SIGMA)
+    if USE_CALIBRATED_GYROSCOPE:
+        f.sigma_gyro_bias = 0
+        f.gyro_bias = 0
 
     if alpha is None:
         f.use_compass = False

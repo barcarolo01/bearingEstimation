@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from digitalshadow.devices.Floater import *
+from digitalshadow.devices.IMU_models import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 200
+NUMBER_OF_RUNS = 20
 STEPS = 3600
 
 FONTSIZE = 14
@@ -37,9 +38,11 @@ def build_floater(seed, cfg):
     f.set_sigma(0.0, 0.0, 0.0)
     f.sigma_yaw_rate = 0.0
 
+    f = load_imu_model(f,'ADIS16470',dt=1.0)
     # Simulator side: silence the sources that are off
     if not cfg["bias"]:
-        f.gyro_bias = 0.0
+        f.gyro_bias = 0
+        f.sigma_gyro_bias = 0
     if not cfg["white"]:
         f.sigma_gyro_white_noise = 0.0
     if not cfg["rw"]:
@@ -48,6 +51,12 @@ def build_floater(seed, cfg):
     # Estimator side: the analytical model must see the same configuration
     if not cfg["bias"]:
         f.sigma_gyro_bias = 0.0
+
+    f.accel_bias = np.zeros(3)
+    f.sigma_accel_bias = np.zeros(3)
+    f.sigma_accel_white_noise = np.zeros(3)
+    f.sigma_accel_bias_driving = np.zeros(3)
+    f.sigma = np.zeros(3)
 
     return f
 

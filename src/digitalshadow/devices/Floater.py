@@ -1,22 +1,11 @@
 import numpy as np
 from digitalshadow.Positioning.Positioning import *
-from digitalshadow.devices.Transmitter import *
-
-# ===== DATASHEET ACCELEROMETER =====
-ACCEL_BIAS_SIGMA = np.ones(3) * (4e-3)   # 4 mg da datasheet
-ACCEL_SIGMA_SINGLE_WHITENOISE = np.ones(3) * (0.037 / np.sqrt(3600 * 1))
-ACCEL_SIGMA_CUM_WHITENOISE =  np.ones(3) * (13e-6 * 9.81 * np.sqrt(1 / 200.0))
-
-# ===== DATASHEET GYROSCOPE =====
-GYRO_BIAS_SIGMA  = np.deg2rad(0.2) 
-GYRO_SIGMA_SINGLE_WHITENOISE   = np.deg2rad(0.34) / np.sqrt(3600 * 1)
-GYRO_SIGMA_CUM_WHITENOISE      = np.deg2rad(8.0 / 3600.0) * np.sqrt(1 / 200) 
+from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====
-COMPASS_SIGMA_NOISE   = np.deg2rad(0.3)
-COMPASS_BIAS    = np.deg2rad(2.0)
-COMPASS_ALPHA   = 0.9
-
+COMPASS_SIGMA_NOISE   = np.deg2rad(3)
+COMPASS_BIAS    = np.deg2rad(1.0)
+COMPASS_ALPHA   = 0.995
 
 CONSTANT_DEPTH = True
 MIN_DEPTH = 1
@@ -47,10 +36,11 @@ class Floater(Transmitter):
         self.gt_omega = 0           # Initial ground truth angular velocity
 
         # === RANDOM NUMBER GENERATORS ===
-        self.rnd_gt = np.random.default_rng([imu_seed, ID, 0])   
+        self.rnd_gt = np.random.default_rng([imu_seed, ID, 0])      # Random generator for gt value
         self.rnd_gyro = np.random.default_rng([imu_seed, ID, 1])    # Gyroscope
         self.rnd_accel = np.random.default_rng([imu_seed, ID, 2])   # Accelerometer
         self.rnd_compass = np.random.default_rng([imu_seed, ID, 3]) # E-compass
+        self.rnd_clk = np.random.default_rng([imu_seed, ID, 4])     # Random clock generator
 
 
         self.NF = NF # Number of floaters
@@ -87,9 +77,11 @@ class Floater(Transmitter):
         self.est_error_mds = 0                  # Current estimated error (IMU + MDS)
         
         self.est_psi = self.gt_psi              # Estimated heading
+        self.psi_COMPASS = self.gt_psi
     
         self.psi_err = 0
         self.psi_err_unwrapped = 0
+        self.est_v = self.gt_v
         
         
     
@@ -105,28 +97,28 @@ class Floater(Transmitter):
         
         # === ACCELEROMETER parameters ===
         # == Contribution 1: constant bias
-        self.sigma_accel_bias = ACCEL_BIAS_SIGMA
-        self.accel_bias = self.rnd_accel.normal(0,self.sigma_accel_bias)
+        self.sigma_accel_bias = np.zeros(3)
+        self.accel_bias = 0
 
         # == Contribution 2: white noise
-        self.sigma_accel_white_noise = ACCEL_SIGMA_SINGLE_WHITENOISE
+        self.sigma_accel_white_noise = np.zeros(3)
         
         # == Contribution 3: bias random walk (cumulative error)
-        self.sigma_accel_bias_driving = ACCEL_SIGMA_CUM_WHITENOISE
+        self.sigma_accel_bias_driving = np.zeros(3)
         self.accel_bias_random_walk = np.zeros(3)
 
 
         # === GYROSCOPE parameters (z-axis only) ===
         # == Contribution 1: constant bias
-        self.sigma_gyro_bias   = GYRO_BIAS_SIGMA
-        self.gyro_bias  = self.rnd_gyro.normal(0, self.sigma_gyro_bias)
+        self.sigma_gyro_bias   = 0
+        self.gyro_bias = 0
 
         # == Contribution 2: white noise
-        self.sigma_gyro_white_noise  = GYRO_SIGMA_SINGLE_WHITENOISE
+        self.sigma_gyro_white_noise  = 0
 
         # == Contribution 3: bias random walk (cumulative error)
-        self.sigma_gyro_bias_driving = GYRO_SIGMA_CUM_WHITENOISE
-        self.gyro_bias_random_walk   = 0
+        self.sigma_gyro_bias_driving = 0
+        self._gyro_bias_random_walk   = 0
 
         # === E-Compass ===
         self.use_compass = False
@@ -162,7 +154,7 @@ class Floater(Transmitter):
         self.psi_err_history = {0: self.psi_err}  
 
         # == For ranging
-        self.clk = int(np.random.rand() * 10**6) # Clock initialization: random value between 0 and 10^6
+        self.clk = int(self.rnd_clk.uniform() * 10**6) # Clock initialization: random value between 0 and 10^6
         self.obs      = {}    # {(transmitter, observer): local timestamp}
         self.round_id = 0     # Ongoing round ID
         self.events   = []
@@ -269,7 +261,7 @@ class Floater(Transmitter):
 
         # 2. TRANSLATIONAL UPDATE
         self.v_prev = self.gt_v.copy() # Keep track of the old velocity values
-        e = np.random.normal(0, self.sigma)
+        e = self.rnd_gt.normal(0, self.sigma)
         self.gt_v = self.gt_v * self.Rho + e * np.sqrt(1 - self.Rho**2)
 
         if self.ONGOING_RESURFACE:
@@ -284,12 +276,11 @@ class Floater(Transmitter):
         self.gt_pos = self.gt_pos + self.gt_v * self.dt
 
         # 3. GYROSCOPE ESTIMATION UPDATE
-        self.gyro_bias_random_walk += self.rnd_gyro.normal(0, self.sigma_gyro_bias_driving)
-      
+        self._gyro_bias_random_walk += self.rnd_gyro.normal(0, self.sigma_gyro_bias_driving)
         omega_MEASURED = (self.gt_omega
-                          + self.gyro_bias
-                          + self.gyro_bias_random_walk
-                          + self.rnd_gyro.normal(0, self.sigma_gyro_white_noise))
+                          + self.gyro_bias  # Gyro constant bias
+                          + self._gyro_bias_random_walk # Gyro cumulative noise
+                          + self.rnd_gyro.normal(0, self.sigma_gyro_white_noise)) # Gyro single white noise
 
         psi_gyro = wrap(self.est_psi + omega_MEASURED * self.dt)
         self.est_psi = psi_gyro
@@ -297,11 +288,11 @@ class Floater(Transmitter):
 
         # 4. COMPASS (if used)
         if self.use_compass:
-            psi_COMPASS = wrap(self.gt_psi
+            self.psi_COMPASS = wrap(self.gt_psi
                                + self.compass_bias
                                + self.rnd_compass.normal(0, self.sigma_compass))
             
-            innovation = wrap(psi_COMPASS - psi_gyro)
+            innovation = wrap(self.psi_COMPASS - psi_gyro)
             self.est_psi = wrap(psi_gyro + (1.0 - self.alpha_compass) * innovation)
 
         self.psi_err = wrap(self.est_psi - self.gt_psi) # PSI error w.r.t. ground truth
@@ -311,13 +302,12 @@ class Floater(Transmitter):
         # Rotate from navigation frame to body frame
         a_body = Rz(self.gt_psi).T @ self.a_gt
 
-        
-        white_noise = np.random.normal(0, self.sigma_accel_white_noise)
-        bias_drift = np.random.normal(0, self.sigma_accel_bias_driving, size=3)
-        
         # Accumulate random walk bias
-        self.accel_bias_random_walk += bias_drift
-        a_body_MEASURED = a_body + self.accel_bias + white_noise + self.accel_bias_random_walk
+        self.accel_bias_random_walk += self.rnd_accel.normal(0, self.sigma_accel_bias_driving, size=3)
+        a_body_MEASURED = (a_body
+                           + self.accel_bias # Accelerometer constant bias
+                           + self.accel_bias_random_walk    # Accelerometer cumulative noise
+                           + self.rnd_accel.normal(0, self.sigma_accel_white_noise)) # Accelerometer single white noise
 
         # Rotate back from body frame to navigation frame
         a_MEASURED = Rz(self.est_psi) @ a_body_MEASURED
@@ -524,7 +514,7 @@ class Floater(Transmitter):
 
         self.est_psi = self.gt_psi
         self.psi_err = 0.0
-        self.gyro_bias_random_walk = 0.0
+        self._gyro_bias_random_walk = 0.0
 
         self.pos_history[self.steps_counter]     = self.est_pos.copy()
         self.err_history[self.steps_counter]     = 0
@@ -539,12 +529,6 @@ class Floater(Transmitter):
         super().set_initial_velocity(*args)
         self.est_v = self.gt_v.copy()
 
-    def set_accel_bias(self, *args):
-        """Set constant acceleration bias for IMU"""
-        if len(args) == 3:
-            self.accel_bias = np.array(args, dtype=float)
-        else:
-            raise ValueError(f"Expected 3 bias values, got {len(args)}")
 
         
 def _dict_to_array(d):

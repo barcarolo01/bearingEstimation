@@ -233,6 +233,63 @@ def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_de
 
 
 
+def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
+    d = 0.228 / math.sqrt(2)
+    precompute_bearing_angles_complete(d)
+
+    fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+    _, sig4 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H4.wav'))
+
+    durata_finestra = 0.05  # Seconds
+    campioni_finestra = int(durata_finestra * fs)
+    quality_threshold = 0.0
+
+    if SNR_desired < 999:
+        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
+        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
+        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
+        sig4 = add_white_noise(sig4,SNR_desired,seed=seed+4)
+
+    # Delays between hydrophones H1–H4 
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
+    # Samples to seconds
+    time_delay_21 = sample_delay_21 / fs
+    time_delay_32 = sample_delay_32 / fs
+    time_delay_31 = sample_delay_31 / fs
+    time_delay_41 = sample_delay_41 / fs
+    time_delay_42 = sample_delay_42 / fs
+    time_delay_43 = sample_delay_43 / fs
+
+    # Estimation array: azimuth and elevation for each window
+    estimated_azimuth   = np.zeros(len(times))
+    estimated_elevation = np.zeros(len(times))
+
+    for i in range(len(times)):
+        az = find_bearing_square(
+            time_delay_32[i], time_delay_21[i], time_delay_31[i],
+            time_delay_41[i], time_delay_42[i], time_delay_43[i],
+        )
+        estimated_azimuth[i]   = az
+        estimated_elevation[i] = 0
+
+    # Obtaining a single value for bearing and elevation angle    
+    bearing = circular_trim_mean(estimated_azimuth,0.2)
+    elevation = 0
+
+    return bearing, elevation
+
+
+
+
+
 
 
 def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
