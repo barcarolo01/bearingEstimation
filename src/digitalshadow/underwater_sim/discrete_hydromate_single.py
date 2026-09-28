@@ -48,8 +48,9 @@ def run_discrete_hydromate_single(Lat_TX, Lon_TX, depth_TX, Lat_RX, Lon_RX, dept
                     number_mic=NUMBER_OF_HYDROPHONES,
                     source = 'AudioFiles/barca.wav',
                     out_folder = 'TMP',
-                    n_arrivals=0)
-
+                    n_arrivals=0,
+                    sl_db=150,
+                    add_noise=False)
 
     # If the file does not exist, it means it is the first simulation step for this floater
     if not os.path.isfile(f'Synth/F{H_index}_H1.npy'): 

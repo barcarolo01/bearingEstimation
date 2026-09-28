@@ -10,8 +10,8 @@ FOR TESTING: Query a point to find its find the depth
 #lon_query = 152.15160115499555
 #lat_query = -34.19175869808876
 
-lon_query = 153
-lat_query = -35
+lon_query = -34.635
+lat_query = 32.839
 
 
 load_dotenv()

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def load_imu_model(floater,model_name,dt=1.0):
     if model_name == 'ADIS16470':
         # Accelerometer
@@ -14,8 +13,6 @@ def load_imu_model(floater,model_name,dt=1.0):
         floater.gyro_bias = np.random.normal(0, floater.sigma_gyro_bias)
         floater.sigma_gyro_white_noise = np.deg2rad(0.34) / np.sqrt(3600 * dt)
         floater.sigma_gyro_bias_driving = np.deg2rad(8.0 / 3600.0) * np.sqrt(dt / 200) 
-
-        
 
     elif model_name == 'HG4930': # It is assumed an observation time of 200 seconds
         # Accelerometer

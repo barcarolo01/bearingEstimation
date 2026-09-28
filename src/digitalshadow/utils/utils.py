@@ -8,6 +8,7 @@ import scipy.io.wavfile as wav
 from digitalshadow.utils.utils import *
 from digitalshadow.devices.floater_geometry import *
 from digitalshadow.utils.bearing_calculation import *
+import matplotlib.pyplot as plt
 
 '''
 This method receives as input the index of a floater.
@@ -33,9 +34,13 @@ def compute_bearing_angle_array(F_index):
     
     quality_threshold = 0.0
     overlap = 0.0
-    _, sample_delay_21, times  = compute_sample_delay_array(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+    test, sample_delay_21, times  = compute_sample_delay_array(sig2,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
     _, sample_delay_32, _ = compute_sample_delay_array(sig3,sig2,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
     _, sample_delay_31, _ = compute_sample_delay_array(sig3,sig1,fs,campioni_finestra,d,quality_threshold=quality_threshold,overlap=overlap)
+
+    print()
+    print(test)
+    print()
 
     time_delay_21 = sample_delay_21 / fs
     time_delay_32 = sample_delay_32 / fs
@@ -160,15 +165,20 @@ def compute_bearing_angle_array_complete(wav_folder, timestamp, F_index, DESIRED
     np.save(f"Synth/F{F_index}_elevation", estimated_elevation)
     return estimated_azimuth, estimated_elevation
 
-def format_bearings(array,window_duration,perc_to_trim):
-    final_length = int(1/window_duration)
-    array += 360
-    N_adjusted = (len(array) // final_length) * final_length
-    dati_regolari = array[:N_adjusted]
-    segment_matrix = dati_regolari.reshape(-1, final_length)
-    array_trimmed = stats.trim_mean(segment_matrix, proportiontocut=perc_to_trim, axis=1)
-    array = array_trimmed - 360
-    return array
+def circular_trimmed_mean(angles_deg, perc_to_trim):
+    a = np.deg2rad(np.asarray(angles_deg, dtype=float))
+    ref = np.angle(np.mean(np.exp(1j * a)))        # media circolare di riferimento
+    dev = np.angle(np.exp(1j * (a - ref)))         # deviazioni in (-pi, pi]
+    dev = np.sort(dev)
+    k = int(perc_to_trim * len(dev))               # taglio per lato, come trim_mean
+    kept = dev[k:len(dev) - k] if k > 0 else dev
+    return np.rad2deg(ref + kept.mean()) % 360
+
+def format_bearings(bearings, window_duration, perc_to_trim, segment_duration=1.0):
+    n_per_segment = int(round(segment_duration / window_duration))
+    n_full = (len(bearings) // n_per_segment) * n_per_segment
+    segments = np.asarray(bearings[:n_full], dtype=float).reshape(-1, n_per_segment)
+    return np.array([circular_trimmed_mean(s, perc_to_trim) for s in segments])
     
 def clean_temporary_files():
     if os.path.isdir("TMP"):
@@ -187,23 +197,33 @@ def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_de
     d = 0.3
     precompute_bearing_angles_triangle(d)
 
-    fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
-    _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
-    _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+    fs, sig1_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    _, sig2_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    _, sig3_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
 
     durata_finestra = 0.05  # Seconds
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.0
 
     if SNR_desired < 999:
-        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
-        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
-        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
+        sig1 = add_white_noise(sig1_orig,SNR_desired,seed=seed+1)
+        sig2 = add_white_noise(sig2_orig,SNR_desired,seed=seed+2)
+        sig3 = add_white_noise(sig3_orig,SNR_desired,seed=seed+3)
+    else:
+        sig1 = sig1_orig
+        sig2 = sig2_orig
+        sig3 = sig3_orig
+
+    #print(f"{check_snr(sig1_orig,sig1)} {check_snr(sig2_orig,sig2)} {check_snr(sig3_orig,sig3)}")
 
     # Delays between hydrophones H1–H4 
-    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    test, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
     _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+
+    #plt.figure()
+    #plt.plot(sample_delay_21)
+    #plt.show()
 
     # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
@@ -224,11 +244,6 @@ def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_de
     elevation = 0
 
     return bearing, elevation
-
-
-
-
-
 
 
 

@@ -5,7 +5,7 @@ from digitalshadow.devices.Floater import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 20
+NUMBER_OF_RUNS = 100
 STEPS = 3600
 
 FONTSIZE = 14
@@ -13,7 +13,7 @@ FONTSIZE_LEGEND = 12
 
 ALPHAS = [0.0, 0.5, 0.9, 0.98, 0.995, 0.999]
 
-USE_CALIBRATED_GYROSCOPE = True
+USE_CALIBRATED_GYROSCOPE = False
 
 def build_floater(seed, alpha=None):
     """Still floater; alpha = None means gyroscope only (no compass)."""
@@ -44,6 +44,17 @@ def run_MC_simulations(alpha, NUMBER_OF_RUNS=NUMBER_OF_RUNS, steps=STEPS):
     for r in range(NUMBER_OF_RUNS):
         f = build_floater(r, alpha)
         for k in range(steps):
+            if k == steps//3:
+                f.gt_omega = np.deg2rad(90)
+            if k == steps//3 + 1:
+                f.gt_omega = np.deg2rad(0)
+                
+            if k == 2*steps//3:
+                f.gt_omega = np.deg2rad(-90)
+            if k == 2*steps//3 + 1:
+                f.gt_omega = np.deg2rad(0)
+                
+
             f.move()
             err[r, k] = f.psi_err
     return np.sqrt(np.mean(err**2, axis=0)), err

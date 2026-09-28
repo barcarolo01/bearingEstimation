@@ -1,14 +1,15 @@
 import os
+from digitalshadow.utils.checkcal import check_calibration
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.fft import rfft, irfft, rfftfreq, next_fast_len
 from scipy.signal import resample_poly
 from math import gcd
 import soundfile as sf
+from digitalshadow.underwater_sim.ambient_noise import get_noise_config, add_ambient_noise
 
 FS_OUT = 96000
 P_REF = 1e-6          # Pa  (0 dB re 1 µPa)
-
 
 def read_arr(filename):
     with open(filename) as f:
@@ -45,9 +46,6 @@ def read_arr(filename):
     return rr_values, rd_values, arrivals
 
 
-# ===============================================================================================
-# STEP 1 - Physical calibration
-# ===============================================================================================
 def active_rms(sig, fs, active_thresh_db=-40.0, frame_ms=20.0):
     """
     RMS computed only on 'active' frames, i.e. frames whose energy is within
@@ -89,9 +87,6 @@ def load_audio_source(filepath, fs_target, sl_db=None, active_thresh_db=-40.0):
 
 def select_arrivals(arrivals_dict, rd_values, rr_target, n_arrivals=0):
     """Returns the list of (amp, phase_deg, time_s) used for one hydrophone."""
-    if len(rd_values) > 1:
-        print(f"WARNING: {len(rd_values)} receiver depths in the .arr file: "
-              "their arrivals are summed into one channel. Is this intended?")
     used = []
     for rd in rd_values:
         arr_list = arrivals_dict.get((round(rd, 6), round(rr_target, 3)), [])
@@ -133,27 +128,11 @@ def synth_rx(src, arrivals, fs, n_out, t0, phase_sign=+1, chunk=16):
 
     return irfft(X * H, n=nfft)[:n_out]
 
-'''
-def check_calibration(rx, src, arrivals, n_out, sl_db, label=""):
-    """
-    Energy check: received level vs SL - TL_incoherent, TL_inc = -10 log10(sum A^2).
-    For broadband signals the cross terms between arrivals average out,
-    so the two numbers should agree within ~1 dB.
-    """
-    amp = np.asarray(arrivals)[:, 0]
-    tl_inc = -10 * np.log10(np.sum(amp ** 2))
-    x = src[:n_out]
-    gain_db = 10 * np.log10(np.sum(rx ** 2) / np.sum(x ** 2))
-    rl_db = sl_db + gain_db if sl_db is not None else np.nan
-    print(f"{label:>4s}  n_arr={len(amp):4d}  TL_inc={tl_inc:6.1f} dB  "
-          f"RL={rl_db:6.1f} dB  (SL-TL={sl_db - tl_inc if sl_db is not None else np.nan:6.1f})  "
-          f"diff={gain_db + tl_inc:+5.2f} dB")
-    return rl_db, tl_inc
-'''
 
 # ===============================================================================================
 def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder: str,
-                    n_arrivals=0, sl_db=None, phase_sign=+1):
+                    n_arrivals=0, sl_db=150, phase_sign=+1,
+                    add_noise=False, noise_seed=-1, save_clean=False):
     """
     Generates the received pressure [Pa] for N hydrophones from Bellhop .arr files.
 
@@ -166,6 +145,10 @@ def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder:
     n_arrivals   : number of arrivals per RD sorted by time (0 = all)
     sl_db        : source level, dB re 1 µPa @ 1 m (None = old arbitrary scale)
     phase_sign   : sign convention for Bellhop phases (+1 as in delayandsum.m)
+    add_noise    : True/False forza il rumore ambientale; None = usa il flag
+                   globale ADD_AMBIENT_NOISE (variabile d'ambiente)
+    noise_seed   : seed del rumore; None = usa NOISE_SEED (se definito) o casuale
+    save_clean   : se True salva anche le tracce senza rumore (H{i}_clean.npy)
     """
     os.makedirs(out_folder, exist_ok=True)
     src = load_audio_source(source, FS_OUT, sl_db=sl_db)
@@ -179,35 +162,39 @@ def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder:
             raise ValueError(f"Hydrophone {i}: no arrivals found")
         arrivals_per_mic.append(used)
 
-    # == Common time reference: earliest arrival over ALL hydrophones
-    #    (keeps the relative delays between channels untouched)
+    # == Common time reference: earliest arrival over all hydrophones
     t0 = min(min(a[2] for a in used) for used in arrivals_per_mic)
 
-    # == Synthesis + calibration check
-    
+    # == Synthesis + calibration check (in Pa)
     n_out = FS_OUT
+    clean = []
     for i, used in enumerate(arrivals_per_mic, start=1):
         rx = synth_rx(src, used, FS_OUT, n_out, t0, phase_sign=phase_sign)
-        #check_calibration(rx, src, used, n_out, sl_db, label=f"H{i}")
-        np.save(os.path.join(out_folder, f"H{i}.npy"), rx)   # float64, Pa, NO normalization
+        check_calibration(rx, src, used, FS_OUT, sl_db, label=f"H{i}")
+        clean.append(rx)
 
+    # == Ambient noise (Wenz), optional
+    cfg = get_noise_config()
 
-# ===============================================================================================
-def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
-    """Kept only for plotting (plot_ir). Not used for the synthesis anymore."""
-    used_arrivals = select_arrivals(arrivals_dict, rd_values, rr_target, n_arrivals)
-    if not used_arrivals:
-        print("No arrivals found for this range!")
-        return np.zeros(int(0.01 * fs), dtype=np.float32), []
+    if add_noise:
+        rng = np.random.default_rng(noise_seed)
+        print(f"Ambient noise ON: shipping={cfg['shipping']}, wind={cfg['wind']} m/s, "
+              f"extra={cfg['extra_db']:+.1f} dB, band {cfg['f_low']:.0f}-{cfg['f_high']:.0f} Hz, "
+              f"seed={noise_seed}")
+        out, _ = add_ambient_noise(clean, FS_OUT,
+                                   shipping=cfg["shipping"], wind=cfg["wind"],
+                                   extra_db=cfg["extra_db"], rng=rng,
+                                   f_low=cfg["f_low"], f_high=cfg["f_high"])
+    else:
+        print("Ambient noise OFF")
+        out = clean
 
-    max_time = max(a[2] for a in used_arrivals)
-    n = int(max_time * fs) + int(0.05 * fs)
-    h = np.zeros(n, dtype=np.float64)
-    for amp, phase, time in used_arrivals:
-        sample = int(round(time * fs))
-        if 0 <= sample < n:
-            h[sample] += amp * np.cos(np.deg2rad(phase))
-    return h.astype(np.float32), used_arrivals
+    # == Save
+    for i, rx in enumerate(out, start=1):
+        np.save(os.path.join(out_folder, f"H{i}.npy"), rx)
+        if save_clean and add_noise:
+            np.save(os.path.join(out_folder, f"H{i}_clean.npy"), clean[i - 1])
+
 
 
 def plot_ir(used_arrivals, fs, out_path=None, db_panel=True, title=None):
