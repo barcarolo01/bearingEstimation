@@ -17,99 +17,81 @@ def wrap_degrees(angle_deg):
     return angle_deg % 360
 
 def _flat_earth_intersection(
-    lat1: float, lon1: float, brg1: float,
-    lat2: float, lon2: float, brg2: float,
+    x1: float, z1: float, brg1: float,
+    x2: float, z2: float, brg2: float,
 ) -> tuple[float, float]:
     """
-    This function compute the intersection between two lines assuming the Earth to be flat.
+    This function compute the intersection between two lines in the local plane.
 
     Parameters
     ---------
-    lat1, lon1 : coordinates of the starting point of the first line
-    brg1       : first line direction
-    lat2, lon2 : coordinates of the starting point of the second line
-    brg2       : second line direction
+    x1, z1 : coordinates of the starting point of the first line
+    brg1   : first line direction
+    x2, z2 : coordinates of the starting point of the second line
+    brg2   : second line direction
 
     Returns
     -------
-    Coordintes (lat, lon) of the intersection point, or (nan, nan) if no intersection point is found.
+    Coordintes (x, z) of the intersection point, or (nan, nan) if no intersection point is found.
     """
-    # Longitude scaling factor in the local plane
-    cos_lat = math.cos(math.radians((lat1 + lat2) / 2))
-
-    # Compute the direction vector in the plane (x=East, y=North)
+    # Compute the direction vector in the plane (x=East, z=North)
     r = math.radians(brg1)
-    dx1, dy1 = math.sin(r), math.cos(r)
+    dx1, dz1 = math.sin(r), math.cos(r)
     r = math.radians(brg2)
-    dx2, dy2 = math.sin(r), math.cos(r)
-
-
-    # Coordinates in the local plane (degrees, with scaled longitude)
-    x1, y1 = lon1 * cos_lat, lat1
-    x2, y2 = lon2 * cos_lat, lat2
+    dx2, dz2 = math.sin(r), math.cos(r)
 
     # Intersection of two parametric lines:
     #   P1 + t * d1 = P2 + s * d2
     # Solved for t using Cramer's rule
-    denom = dx1 * dy2 - dy1 * dx2 # Determinant
+    denom = dx1 * dz2 - dz1 * dx2 # Determinant
 
     if abs(denom) < 1e-12:      # Lines are parallel or coincident lines
         return math.nan, math.nan
 
-    t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / denom
+    t = ((x2 - x1) * dz2 - (z2 - z1) * dx2) / denom
 
     if t < 0:                   # Line intersection is behind half-line 1
         return math.nan, math.nan
 
-    s = ((x2 - x1) * dy1 - (y2 - y1) * dx1) / denom
+    s = ((x2 - x1) * dz1 - (z2 - z1) * dx1) / denom
     if s < 0:                   # Line intersection is behind half-line 2
         return math.nan, math.nan
 
-    # Geographic coordinates of the intersection point
-    lon_out = (x1 + t * dx1) / cos_lat
-    lat_out =  y1 + t * dy1
+    # Local coordinates of the intersection point
+    x_out = x1 + t * dx1
+    z_out = z1 + t * dz1
 
-    return lat_out, lon_out
+    return x_out, z_out
 
 def _least_squares_point_n(
-    lats: np.ndarray,
-    lons: np.ndarray,
+    xs: np.ndarray,
+    zs: np.ndarray,
     brgs: np.ndarray,
 ) -> tuple[float, float] | None:
     """
     Finds the point that minimizes the sum of squared distances
-    from the N geodetic half-lines (flat-earth approximation).
+    from the N half-lines in the local plane.
 
     Parameters
     ---------
-    lats, lons : array (N,) of floater coordinates in degrees.
-    brgs       : array (N,) of geographic bearings in degrees (clockwise from North).
+    xs, zs : array (N,) of floater coordinates in metres.
+    brgs   : array (N,) of geographic bearings in degrees (clockwise from North).
 
     Returns
     -------
-    (lat, lon) of the optimal point, or None if the system is singular.
+    (x, z) of the optimal point, or None if the system is singular.
     """
-    # Unit directions of the lines in (dx=East, dy=North) coordinates
+    # Unit directions of the lines in (dx=East, dz=North) coordinates
     brgs_rad = np.deg2rad(brgs)
     dx = np.sin(brgs_rad)  # East component
-    dy = np.cos(brgs_rad)  # North component
-
-    # Use approximate metric coordinates centred on the floaters position
-    lat0 = np.mean(lats)
-    lon0 = np.mean(lons)
-    R = 6371000.0  # Earth radius in metres
-    lat0_rad = np.deg2rad(lat0)
-
-    # Converts lat/lon -> metres relative to the centre
-    x0 = np.deg2rad(lons - lon0) * R * np.cos(lat0_rad)
-    y0 = np.deg2rad(lats - lat0) * R
+    dz = np.cos(brgs_rad)  # North component
 
     A = np.zeros((2, 2))
     b = np.zeros(2)
-    for i in range(len(lats)):
-        d = np.array([dx[i], dy[i]])
+    for i in range(len(xs)):
+        d = np.array([dx[i], dz[i]])
         P_orth = np.eye(2) - np.outer(d, d)
-        h = np.array([x0[i], y0[i]])
+        h = np.array([xs[i], zs[i]])
         A += P_orth
         b += P_orth @ h
 
@@ -121,19 +103,13 @@ def _least_squares_point_n(
     if not np.all(np.isfinite(p)):
         return None
 
-    # Converts metres -> degrees
-    lon_opt = lon0 + np.rad2deg(p[0] / (R * np.cos(lat0_rad)))
-    lat_opt = lat0 + np.rad2deg(p[1] / R)
+    return float(p[0]), float(p[1])
 
-    return float(lat_opt), float(lon_opt)
-
-def compute_flat_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Distance in meters between two points (flat-earth approximation)"""
-    meters_per_deg_lat = 111_319.9
-    meters_per_deg_lon = 111_319.9 * np.cos(np.deg2rad((lat1 + lat2) / 2))
-    dy = (lat2 - lat1) * meters_per_deg_lat
-    dx = (lon2 - lon1) * meters_per_deg_lon
-    return np.sqrt(dx**2 + dy**2)
+def compute_flat_distance(x1: float, z1: float, x2: float, z2: float) -> float:
+    """Distance in meters between two points in the local plane"""
+    dx = x2 - x1
+    dz = z2 - z1
+    return np.sqrt(dx**2 + dz**2)
 
 def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.ndarray =None):
     """
@@ -143,7 +119,8 @@ def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.nd
     Parameters
     ---------
     floaters : np.ndarray of shape (N, M, 2) or (N, M, 3)
-        N simulation steps, each with M floaters. Coordinates must be in form [lat, lon] or [lat, lon, depth_m].
+        N simulation steps, each with M floaters. Coordinates must be in form [x, z] or [x, z, depth_m],
+        expressed in metres in the local plane.
     bearings : np.ndarray of shape (M, N)
         Horizontal angles (degrees) for each of the M floaters and for each of the N simulation steps.
     elevation_array : np.ndarray of shape (M, N)
@@ -152,7 +129,7 @@ def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.nd
     Returns
     -------
     positions : np.ndarray of shape (N, 3)
-        A triple [latitude, longitude, depth_m] for each of the N simulation steps
+        A triple [x, z, depth_m] in the local plane for each of the N simulation steps
     """
 
     floaters = np.asarray(floaters, dtype=float)
@@ -193,33 +170,33 @@ def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.nd
         floaters_n = floaters[n]
         brg_n = brgs[:, n] # Shape (M,) (i.e.: one angle for each floater)
         
-        lats = floaters_n[:, 0]
-        lons = floaters_n[:, 1]
+        xs = floaters_n[:, 0]
+        zs = floaters_n[:, 1]
         floater_depths = floaters_n[:, 2] if has_depth else None
 
         # If only two floaters are present, the point of minimum distance is the intersection of the bearing lines
         if n_floaters == 2:
-            lat_i, lon_i = _flat_earth_intersection(
-                lats[0], lons[0], brg_n[0],
-                lats[1], lons[1], brg_n[1],
+            x_i, z_i = _flat_earth_intersection(
+                xs[0], zs[0], brg_n[0],
+                xs[1], zs[1], brg_n[1],
             )
-            if not np.isnan(lat_i):
-                positions[n, 0] = lat_i
-                positions[n, 1] = lon_i
+            if not np.isnan(x_i):
+                positions[n, 0] = x_i
+                positions[n, 1] = z_i
 
         # If more than two floaters are used, estimate the point minimizing the distance between all bearing lines
         else:
             candidates = []
             for i in range(n_floaters):
                 for j in range(i + 1, n_floaters):
-                    lat_i, lon_i = _flat_earth_intersection(
-                        lats[i], lons[i], brg_n[i],
-                        lats[j], lons[j], brg_n[j],
+                    x_i, z_i = _flat_earth_intersection(
+                        xs[i], zs[i], brg_n[i],
+                        xs[j], zs[j], brg_n[j],
                     )
-                    if not np.isnan(lat_i):
-                        candidates.append((lat_i, lon_i))
+                    if not np.isnan(x_i):
+                        candidates.append((x_i, z_i))
 
-            opt = _least_squares_point_n(lats, lons, brg_n)
+            opt = _least_squares_point_n(xs, zs, brg_n)
 
             if opt is None:
                 if len(candidates) >= 2:
@@ -243,7 +220,7 @@ def find_points(floaters: np.ndarray,bearings: np.ndarray,elevation_array: np.nd
                 el_deg = elevation_array[i, n] #i-th floater, n-th simulation step
                 
                 el_rad = np.deg2rad(el_deg)
-                dist_h = compute_flat_distance(lats[i], lons[i], positions[n, 0], positions[n, 1])
+                dist_h = compute_flat_distance(xs[i], zs[i], positions[n, 0], positions[n, 1])
                 
                 delta_z = dist_h * np.tan(el_rad)
                 estimated_z = floater_depths[i] - delta_z

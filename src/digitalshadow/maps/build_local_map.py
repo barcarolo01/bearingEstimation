@@ -105,10 +105,8 @@ def build_local_cartesian_map(
                 continue
             if len(points) > 1:
                 ax.plot(points[:, 0], points[:, 1], color=track.color, linewidth=2,
-                        alpha=track_alpha, zorder=2)
-            ax.plot(points[:, 0], points[:, 1], marker="o", markersize=5, color=track.color,
-                    linestyle="None", markeredgecolor="black", markeredgewidth=0.5,
-                    alpha=track_alpha, zorder=4)
+                        alpha=track_alpha, zorder=2,linestyle="--")
+            #ax.plot(points[:, 0], points[:, 1], color=track.color,linestyle="--",linewidth=3, alpha=track_alpha, zorder=4)
 
     # --- Floaters: dashed trajectory + label on the first known position ---
     if xy_floaters.size > 0:
@@ -119,7 +117,7 @@ def build_local_cartesian_map(
 
             if len(trajectory) > 1:
                 ax.plot(trajectory[:, 0], trajectory[:, 1], color=FLOATER_COLOR,
-                        linewidth=1.5, linestyle="--", alpha=0.5, zorder=4)
+                        linewidth=2, alpha=0.5, zorder=4)
 
             first_point = trajectory[0]
             ax.text(
@@ -159,7 +157,7 @@ def build_local_cartesian_map(
     #ax.plot(0, 0, "kx", markersize=5, markeredgewidth=2, label="Origin (0, 0)")
 
     if xy_floaters.size > 0:
-        ax.plot([], [], marker="s", color=FLOATER_COLOR, linestyle="None", label="Floaters")
+        ax.plot([], [], marker="o", color=FLOATER_COLOR, linestyle="None", label="Floaters")
     if len(xy_tx) > 0:
         ax.plot([], [], marker="o", color=TX_COLOR, linestyle="None", label="Ground truth")
     if len(xy_estimated) > 0:
@@ -176,7 +174,8 @@ def build_local_cartesian_map(
             frameon=True, facecolor="white", edgecolor="grey", fontsize=FONTSIZE,
         )
 
-    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.tight_layout()
+    plt.savefig(output_file, dpi=900, bbox_inches="tight")
     plt.show()
     plt.close(fig)
     print(f"Local map saved in: {output_file}")

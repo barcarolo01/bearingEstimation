@@ -1,5 +1,4 @@
-from digitalshadow.Positioning.coordinate_generator import *
-from digitalshadow.Positioning.filter_trajectory import *
+from digitalshadow.Positioning.coordinate_generator import*
 from digitalshadow.Positioning.point_estimation import *
 from digitalshadow.underwater_sim.floater_ping import *
 from digitalshadow.utils.utils import *

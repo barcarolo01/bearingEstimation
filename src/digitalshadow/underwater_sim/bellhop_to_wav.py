@@ -106,25 +106,27 @@ def synth_rx(src, arrivals, fs, n_out, t0, phase_sign=+1, chunk=16):
     (same convention as delayandsum.m in the Acoustics Toolbox).
     """
     arr = np.asarray(arrivals, dtype=np.float64).reshape(-1, 3)
+
+    # Amplitude, phase and time of travel
     amp, ph, tau = arr[:, 0], arr[:, 1], arr[:, 2]
     d = tau - t0
 
-    # Arrivals delayed beyond the window cannot contribute to it
+    # keep only arrivals that contributes to the OUT file
     keep = (d >= 0) & (d < n_out / fs)
     amp, ph, d = amp[keep], ph[keep], d[keep]
 
+    # Input signal clipping
     x = np.zeros(n_out)
-    x[:min(n_out, len(src))] = src[:n_out]     # y[n], n < n_out, only depends on x[0..n_out)
+    x[:min(n_out, len(src))] = src[:n_out]
 
-    nfft = next_fast_len(2 * n_out)            # margin for fractional-delay tails
+    nfft = next_fast_len(2 * n_out) 
     X = rfft(x, n=nfft)
     f = rfftfreq(nfft, 1 / fs)
 
     c = amp * np.exp(1j * phase_sign * np.deg2rad(ph))
     H = np.zeros(len(f), dtype=np.complex128)
-    for k in range(0, len(c), chunk):          # chunked to limit memory
-        H += (c[k:k + chunk, None] *
-              np.exp(-2j * np.pi * np.outer(d[k:k + chunk], f))).sum(axis=0)
+    for k in range(0, len(c), chunk):
+        H += (c[k:k + chunk, None] * np.exp(-2j * np.pi * np.outer(d[k:k + chunk], f))).sum(axis=0)
 
     return irfft(X * H, n=nfft)[:n_out]
 
@@ -132,7 +134,7 @@ def synth_rx(src, arrivals, fs, n_out, t0, phase_sign=+1, chunk=16):
 # ===============================================================================================
 def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder: str,
                     n_arrivals=0, sl_db=150, phase_sign=+1,
-                    add_noise=False, noise_seed=-1, save_clean=False):
+                    add_noise=False, noise_seed=1, save_clean=False):
     """
     Generates the received pressure [Pa] for N hydrophones from Bellhop .arr files.
 
@@ -195,6 +197,24 @@ def from_arr_to_wav(input_folder: str, number_mic: int, source: str, out_folder:
         if save_clean and add_noise:
             np.save(os.path.join(out_folder, f"H{i}_clean.npy"), clean[i - 1])
 
+
+
+# ===============================================================================================
+def build_ir(arrivals_dict, rd_values, rr_target, fs, n_arrivals=1):
+    """Kept only for plotting (plot_ir). Not used for the synthesis anymore."""
+    used_arrivals = select_arrivals(arrivals_dict, rd_values, rr_target, n_arrivals)
+    if not used_arrivals:
+        print("No arrivals found for this range!")
+        return np.zeros(int(0.01 * fs), dtype=np.float32), []
+
+    max_time = max(a[2] for a in used_arrivals)
+    n = int(max_time * fs) + int(0.05 * fs)
+    h = np.zeros(n, dtype=np.float64)
+    for amp, phase, time in used_arrivals:
+        sample = int(round(time * fs))
+        if 0 <= sample < n:
+            h[sample] += amp * np.cos(np.deg2rad(phase))
+    return h.astype(np.float32), used_arrivals
 
 
 def plot_ir(used_arrivals, fs, out_path=None, db_panel=True, title=None):

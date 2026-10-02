@@ -3,8 +3,8 @@ from digitalshadow.Positioning.Positioning import *
 from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====
-COMPASS_SIGMA_NOISE   = np.deg2rad(3)
-COMPASS_BIAS    = np.deg2rad(1.0)
+COMPASS_SIGMA_NOISE   = np.deg2rad(2.0)
+COMPASS_BIAS    = np.deg2rad(0.3)
 COMPASS_ALPHA   = 0.995
 
 CONSTANT_DEPTH = True
@@ -46,7 +46,9 @@ class Floater(Transmitter):
         self.NF = NF # Number of floaters
         self.ONGOING_RESURFACE = False
         self.ONGOING_IMMERSION = False
+        self.ONGOING_MDS = False
         self.depth_before_resurface = 0
+        self.TX_LIMIT = 1
 
         # History dict: maintains all values for each simulation step, used as key
         self.pos_history     = {}   # IMU only position
@@ -131,6 +133,7 @@ class Floater(Transmitter):
         # == Frequency of resurface and MDS
         self.MDS_freq = np.inf
         self.RESURFACE_freq = np.inf
+        self.steps_from_mds_start = 0
 
               
         # === Previous acceleration value (used for integration) ===
@@ -158,7 +161,7 @@ class Floater(Transmitter):
         self.obs      = {}    # {(transmitter, observer): local timestamp}
         self.round_id = 0     # Ongoing round ID
         self.events   = []
-        self.mds_done = False
+        self.mds_done = True
         self.peer_pos = {}    # Dictionary: {Floater ID: estimated position (3D)}
         self.peer_err = {}    # Dictionary: {Floater ID: estimated error}
 
@@ -169,19 +172,27 @@ class Floater(Transmitter):
 
     def _build_distance_matrix(self):
         """Estrae la matrice NxN dei ritardi (ms) dai timestamp grezzi."""
-        D = np.zeros((self.NF, self.NF))
+        D = np.full((self.NF, self.NF), np.nan)
+        W = np.zeros((self.NF, self.NF))
+        np.fill_diagonal(D, 0.0)
+
         for a in range(self.NF):
                 for b in range(a + 1, self.NF):
-                        d = 0.5 * ((self.obs[(a, b)] - self.obs[(a, a)]) +
-                                   (self.obs[(b, a)] - self.obs[(b, b)]))
-                        D[a, b] = D[b, a] = d
-        return D
+                        if all(k in self.obs for k in ((a,a), (a,b), (b,a), (b,b))):
+                            d = 0.5 * ((self.obs[(a, b)] - self.obs[(a, a)]) +
+                                    (self.obs[(b, a)] - self.obs[(b, b)]))
+                            D[a, b] = D[b, a] = d
+                            W[a, b] = W[b, a] = 1.0
+
+        return D,W
 
 
     def start_round(self, round_id):
         self.obs      = {}
         self.round_id = round_id
         self.mds_done = False
+        self.ONGOING_MDS = True
+        self.steps_from_mds_start = 0
     
     def get_accumulated_error(self, N=None, anchor=None):
         if N is None:
@@ -362,25 +373,42 @@ class Floater(Transmitter):
                                             self.pos_at_fix)))
         
 
-        # If the observation matrix is complete, run MDS
-        if not self.mds_done and self._matrix_complete():
-            D_ms = self._build_distance_matrix()
-            D_m  = D_ms * 1500.0 / 1000.0
-            pos_all, err_all = self._assemble_priors()
 
-            self.nbr_history_pos[self.steps_counter] = pos_all.copy()
-            self.nbr_history_err[self.steps_counter] = err_all.copy()
-            self.MDS_index.append(self.steps_counter)
-            self.dist_matrices[self.steps_counter] = D_m
+        if self.ONGOING_MDS:
+            self.steps_from_mds_start += 1
 
-            new_pos, new_err = estimate(pos_all, err_all, D_m)
-
-            self.est_pos_mds   = new_pos[self.ID].copy()
-            self.est_error_mds = float(new_err[self.ID])
-            self.steps_since_fix = 0
-            self.pos_at_fix = self.est_pos_mds.copy()
-            self._err_at_fix = self.est_error_mds
+        # Run MDS if the matrix is completed or in case of timeout
+        MDS_timeout = self.ONGOING_MDS and self.steps_from_mds_start > (2*self.NF - 1) // self.TX_LIMIT
+        if not self.mds_done and (self._matrix_complete() or MDS_timeout):
             self.mds_done = True
+            self.ONGOING_MDS = False
+
+            D_ms, W = self._build_distance_matrix()
+
+            print(f"[F{self.ID} t{self.steps_counter}] MDS: "
+                        f"coppie_tot={int(W.sum()//2)} mie={int(W[self.ID].sum())} "
+                        f"timeout={MDS_timeout}")
+            
+            if W.sum() > 0:
+                D_m = np.nan_to_num(D_ms, nan=0.0) * 1500.0 / 1000.0
+                print(f"D_m: min {np.nanmin(D_m[W>0]):.1f}  max {np.nanmax(D_m[W>0]):.1f}")
+
+                pos_all, err_all = self._assemble_priors()
+                new_pos, new_err = estimate(pos_all, err_all, D_m, W)                
+                self.est_pos_mds   = new_pos[self.ID].copy()
+                self.est_error_mds = float(new_err[self.ID])
+                self.steps_since_fix = 0
+                self._err_at_fix = self.est_error_mds
+                
+                self.nbr_history_pos[self.steps_counter] = pos_all.copy()
+                self.nbr_history_err[self.steps_counter] = err_all.copy()
+                self.MDS_index.append(self.steps_counter)
+                self.dist_matrices[self.steps_counter] = D_m
+            
+                self.pos_at_fix = self.est_pos_mds.copy()
+            
+            
+            
 
         # History update
         self.pos_history[self.steps_counter]     = self.est_pos.copy()
@@ -400,9 +428,11 @@ class Floater(Transmitter):
 
     # === RANGING METHODS: To be executed upon transmission and receptions of packets ===
     def on_transmit(self, t_tx, tx_idx):
-        self.obs.setdefault((tx_idx, tx_idx), t_tx)
+        first = self.obs.setdefault((tx_idx, tx_idx), t_tx)
         return {
             "round_id": self.round_id,
+            "t_tx":     t_tx,      # istante di QUESTA trasmissione
+            "first_tx": first,     # istante della prima
             "obs": dict(self.obs),
             "src_pos": np.asarray(self.est_pos_mds, dtype=float).copy(),
             "src_err": float(self.est_error_mds),
@@ -423,7 +453,9 @@ class Floater(Transmitter):
         self.peer_pos[src_ID] = payload["src_pos"]
         self.peer_err[src_ID] = payload["src_err"]
 
-        self.obs.setdefault((tx_idx, my_idx), t_rx)
+        if payload["t_tx"] == payload["first_tx"]:
+            self.obs.setdefault((tx_idx, my_idx), t_rx)
+
         for k, v in payload["obs"].items():
                 self.obs.setdefault(k, v)
 
@@ -470,7 +502,7 @@ class Floater(Transmitter):
 
             # Drift osservato: l'ultimo step prima che resurface() sovrascriva
             DELTA = self.pos_history[p-1] - self.gt_history[p-1]
-
+            
             span = (p - 1) - res_prec
             for k in range(res_prec, p):
                     w = (k - res_prec) / span          # 0 a res_prec, 1 a p-1

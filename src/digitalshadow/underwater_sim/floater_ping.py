@@ -3,7 +3,7 @@ import shutil
 
 import numpy as np
 from digitalshadow.devices.Floater import *
-from digitalshadow.underwater_sim.bellhop_to_wav import build_ir, read_arr
+from digitalshadow.underwater_sim.bellhop_to_wav import *
 from hydromate.app_bellhop import AppBellhop
 
 FS_OUT = 96000
