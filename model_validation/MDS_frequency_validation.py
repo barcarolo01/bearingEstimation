@@ -5,14 +5,14 @@ from digitalshadow.devices.IMU_models import load_imu_model
 from digitalshadow.devices.Transmitter import Transmitter
 from simulation import Simulation
 
-SIMULATE = True
+SIMULATE = False
 RESULTS_FILE = "MDS_results.npz"
 
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
 NUMBER_OF_FLOATERS = 4
-N_SIMULATIONS = 2               # percentiles need enough runs: ~20-30 is a reasonable minimum
+N_SIMULATIONS = 10
 STEPS = 3600
 PERIODS = [60, 120, 180, 300, 600, 900, 1200, 1800]
 
@@ -25,8 +25,7 @@ def run_all():
     err_mds = np.zeros((N_PERIODS, N_SIMULATIONS))
 
     for p, period in enumerate(PERIODS):
-        # Same generator for every period: run k uses the same initial positions
-        # for all periods (common random numbers -> cleaner comparison)
+        # Same generator for every period
         rnd_sim = np.random.default_rng(256123)
 
         for seed in range(N_SIMULATIONS):
@@ -38,18 +37,17 @@ def run_all():
             floaters = []
             for i in range(NUMBER_OF_FLOATERS):
                 f = Floater(ID=i,
-                            gt_x=rnd_sim.uniform(0, 1000) - 500,
-                            gt_y=rnd_sim.uniform(0, 1000) - 500,
+                            gt_x=rnd_sim.uniform(-500, 500),
+                            gt_y=rnd_sim.uniform(-500, 500),
                             gt_z=10,
                             NF=NUMBER_OF_FLOATERS,
                             dt=1.0)
                 f = load_imu_model(f, 'ADIS16470', dt=1.0, param_seed=9999)
-                f.set_initial_velocity(rnd_sim.uniform(0, 2) - 1, rnd_sim.uniform(0, 2) - 1, 0.0)
-                f.set_sigma(0.1, 0.1, 0.0)
+                f.set_initial_velocity(rnd_sim.uniform(-1, 1), rnd_sim.uniform(-1, 1), 0.0)
+                f.set_sigma(rnd_sim.uniform(0, 0.1), rnd_sim.uniform(0, 0.1), 0.0)
                 f.use_compass = False
                 f.Rho = 0.999
                 f.Rho_yaw = 0.999
-                f.gt_omega = 0.05
                 f.MDS_freq = period
                 f.TX_LIMIT = 10
                 floaters.append(f)
@@ -61,8 +59,8 @@ def run_all():
                              seed=seed)
             sim.TX_LIMIT = 10
             sim.PACKET_LOSS = 0
-
             res = sim.run_simulation()
+
             err_imu[p, seed] = np.mean(res['errors_imu'])
             err_mds[p, seed] = np.mean(res['errors_imu_mds'])
 
@@ -93,11 +91,13 @@ def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
     
     # Median value label above each box
     medians = np.median(improvement, axis=1)
+    BOX_WIDTH = 0.5   # same value passed to boxplot(widths=...)
     for i in range(N_PERIODS):
         ax.annotate(f'{medians[i]:.1f}%',
-                    (x[i], improvement[i].max()),
-                    textcoords="offset points", xytext=(0, -5),
-                    ha='center', va='bottom', fontsize=FONTSIZE_LEGEND - 1)
+                    (x[i] + BOX_WIDTH / 2, medians[i]),   # right edge of box, at the median
+                    textcoords="offset points", xytext=(4, 0),
+                    ha='left', va='center', fontsize=FONTSIZE_LEGEND - 1,
+                    color='#1d7a2c')
 
     ax.set_ylabel("Error reduction with MDS [%]", fontsize=FONTSIZE)
     ax.set_xlabel("MDS period [seconds]", fontsize=FONTSIZE)
@@ -106,16 +106,16 @@ def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
     ax.margins(y=0.15)
     ax.plot([], [], 'D', markerfacecolor='white', markeredgecolor='black', label='mean')
     ax.plot([], [], '-', color='#1d7a2c', linewidth=2, label='median')
-    # Legend above the plot, on the right: never covers boxes or labels
-    ax.legend(fontsize=FONTSIZE_LEGEND, loc='lower right', bbox_to_anchor=(1.0, 1.0),
-              ncol=2, frameon=False, borderaxespad=0.2,
-              title_fontsize=FONTSIZE_LEGEND - 1)
+    
+
+    ax.legend(fontsize=FONTSIZE_LEGEND, loc='upper right',ncol=2, frameon=False, borderaxespad=0.2,
+              title_fontsize=FONTSIZE_LEGEND)
 
     # IMU-only baseline (identical for every period): shown as a reference
     imu_run = err_imu[0]
     b_lo, b_med, b_hi = np.percentile(imu_run, [lo, 50, hi])
-    ax.set_title(f"IMU-only error: median {b_med:.1f} m  "
-                 f"(IQR {b_lo:.1f}–{b_hi:.1f} m)",loc='left', fontsize=FONTSIZE_LEGEND)
+    ax.set_title(f"IMU-only error: median {b_med:.0f} m  "
+                 f"(IQR {b_lo:.0f}–{b_hi:.0f} m)",loc='left', fontsize=FONTSIZE_LEGEND)
 
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE)
     ax.grid(linestyle='--', alpha=0.5)
