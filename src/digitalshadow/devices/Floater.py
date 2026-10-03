@@ -337,6 +337,8 @@ class Floater(Transmitter):
         self.est_pos = self.est_pos+estimated_movement
         self.est_pos_mds = self.est_pos_mds+estimated_movement
 
+        self.est_pos[2]     = self.gt_pos[2]
+        self.est_pos_mds[2] = self.gt_pos[2]
 
         if self.ONGOING_IMMERSION:
             if self.gt_pos[2] > self.depth_before_resurface:
@@ -373,26 +375,21 @@ class Floater(Transmitter):
                                             self.pos_at_fix)))
         
 
-
         if self.ONGOING_MDS:
             self.steps_from_mds_start += 1
 
         # Run MDS if the matrix is completed or in case of timeout
         MDS_timeout = self.ONGOING_MDS and self.steps_from_mds_start > (2*self.NF - 1) // self.TX_LIMIT
-        if not self.mds_done and (self._matrix_complete() or MDS_timeout):
+        if not self.mds_done and (self._matrix_complete() ):#or MDS_timeout):
             self.mds_done = True
             self.ONGOING_MDS = False
-
             D_ms, W = self._build_distance_matrix()
 
-            print(f"[F{self.ID} t{self.steps_counter}] MDS: "
-                        f"coppie_tot={int(W.sum()//2)} mie={int(W[self.ID].sum())} "
-                        f"timeout={MDS_timeout}")
-            
-            if W.sum() > 0:
+            if not self._matrix_complete():
+                 print("INCOMPLETA")
+                 
+            if W.sum() > 0 or True:
                 D_m = np.nan_to_num(D_ms, nan=0.0) * 1500.0 / 1000.0
-                print(f"D_m: min {np.nanmin(D_m[W>0]):.1f}  max {np.nanmax(D_m[W>0]):.1f}")
-
                 pos_all, err_all = self._assemble_priors()
                 new_pos, new_err = estimate(pos_all, err_all, D_m, W)                
                 self.est_pos_mds   = new_pos[self.ID].copy()
@@ -477,21 +474,6 @@ class Floater(Transmitter):
         return pos_all, err_all
     
     def return_results(self, fuse=True):
-        """
-        Computes estimated positions and errors performing the backward analysis
-        and returns the results as a set of dicts: name -> (pos (I+1,dim), err (I+1,))
-        """
-
-        '''
-        rev_imu = reverse_node(self, self.pos_history, self.err_history,
-                            use_mds=False, gps_sigma=0, fuse=fuse,
-                            nbr_history_pos=self.nbr_history_pos, nbr_history_err=self.nbr_history_err)
-        
-        rev_mds = reverse_node(self, self.pos_history_mds, self.err_history_mds,
-                            use_mds=True,  gps_sigma=0, fuse=fuse,
-                                nbr_history_pos=self.nbr_history_pos, nbr_history_err=self.nbr_history_err)
-        '''
-
         self.pos_history_compensated = {k: np.asarray(v, float).copy()
                                     for k, v in self.pos_history.items()}
         for idx, p in enumerate(self.Resurface_index):
@@ -510,9 +492,7 @@ class Floater(Transmitter):
         
         return {
             'imu':             _dict_to_array(self.pos_history),
-            #'imu_rev':         _dict_to_array(rev_imu[0]),
             'imu_mds':         _dict_to_array(self.pos_history_mds),
-            #'imu_mds_rev':     _dict_to_array(rev_mds[0]),
             'imu_compensated': _dict_to_array(self.pos_history_compensated),
             'gt':              _dict_to_array(self.gt_history),
 

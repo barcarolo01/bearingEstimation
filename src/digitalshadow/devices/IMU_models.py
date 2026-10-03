@@ -1,6 +1,6 @@
 import numpy as np
 
-def load_imu_model(floater,model_name,param_seed=100,dt=1.0):
+def load_imu_model(floater,model_name,param_seed=1,dt=1.0):
     rnd_param = np.random.default_rng(param_seed)
     if model_name == 'ADIS16470':
         # Accelerometer

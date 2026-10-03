@@ -14,7 +14,7 @@ from digitalshadow.Positioning.kalman_filter import *
 from digitalshadow.Positioning.tracking_plots import *
 
 FONTSIZE = 18
-PACKET_LOSS = 0 # Packet loss factor (between 0 and 1)
+
 
 ADD_PSI_ERROR = True
 HYDROMATE_SIMULATION = False
@@ -65,6 +65,8 @@ class Simulation:
                 self.Center = Center
                 self.Floaters = Floaters
                 self.TX_LIMIT = TX_LIMIT
+                self.PACKET_LOSS = 0.0
+
                 for f in Floaters:
                         f.TX_LIMIT = TX_LIMIT
                 self.NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
@@ -167,7 +169,7 @@ class Simulation:
                                                 triggers.append(n)
 
                                 if triggers:
-                                        print(f"[step {i}] TRIGGER → round {round_id+1}")
+                                        print(f"[T {i}] TRIGGER MDS round {round_id+1}")
                                         t = triggers[0] # The first node triggering the ranging become the round initiator
 
                                         round_id  += 1 # Increment MDS round counter
@@ -189,7 +191,7 @@ class Simulation:
                                         for f in self.Floaters:          
                                                 f.start_round(round_id)
 
-                                        print(f"[Sim step {i}]: Rangin round {round_id} triggered by floater {self.Floaters[t].ID}")
+                                        print(f"[T {i}] Ranging round nr. {round_id} triggered by floater {self.Floaters[t].ID}")
 
         
                         # If a ranging round is ongoing
@@ -199,7 +201,7 @@ class Simulation:
                                                 break
                                         tx   = round_order[round_step] # ID of the scheduled transmitter
                                         t_tx = clocks[tx] + math.ceil(1000/self.TX_LIMIT)
-                                        print(f"SIMSTEP {i}, transmission of {tx}")
+                                        print(f"[T {i}] Transmission of floater {tx}")
                                         payload = self.Floaters[tx].on_transmit(t_tx, tx)
 
                                         self.Floaters[tx].events.append({
@@ -215,21 +217,19 @@ class Simulation:
                                                 if m == tx:
                                                         continue
 
-                                                if self.rnd_packetloss.uniform(0,1) >= PACKET_LOSS:
+                                                if self.rnd_packetloss.uniform(0,1) >= self.PACKET_LOSS:
                                                         #delay_ms = ping_pair(local_to_geo(self.Center,self.Floaters[tx].gt_pos),local_to_geo(self.Center,self.Floaters[m].gt_pos))
                                                         delay_ms = 1000* np.linalg.norm(self.Floaters[tx].gt_pos[:2]-self.Floaters[m].gt_pos[:2]) / 1500
                                                         t_rx = clocks[m] + delay_ms + math.ceil(1000/self.TX_LIMIT)
                                                         self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
                                                 else:
-                                                        #print("LOSS")
                                                         lost+=1
                                                 tot+=1
-                                        print(f"LOST {lost}/{tot}")
-                                                
+                                            
                                         round_step += 1
                                 if round_step == len(round_order):
                                         round_active = False
-                                        print(f"SIMSTEP {i}, ended rangeing")
+                                       
 
                         # Advance the simulation for the next step
                         mustTX = [False] * self.NUMBER_OF_FLOATERS
@@ -252,6 +252,9 @@ class Simulation:
                 names   = ['imu', 'imu_mds', 'imu_compensated']
                 results = [] 
 
+                errors_imu = np.zeros((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS))
+                errors_imu_mds = np.zeros((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS))
+
                 self.RX_positions = np.load(os.path.join(self.sim_name,"RXs.npy"))
                 self.TX_positions = np.load(os.path.join(self.sim_name,"TXs.npy"))
                 self.bearing_arrays = np.load(os.path.join(self.sim_name,"bearings.npy"))
@@ -264,13 +267,18 @@ class Simulation:
                         gt = res['gt']
                         GT[:, n, :] = gt
 
-                        fig, ax = plt.subplots(figsize=(9, 5))
+                        #fig, ax = plt.subplots(figsize=(9, 5))
 
                         for j,name in enumerate(names):
                                 pos = res[name]
                                 targets[name][:, n, :] = pos
-                                ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
+                                #ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
+                                if name == 'imu':
+                                        errors_imu[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
+                                elif name == 'imu_mds':
+                                        errors_imu_mds[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
 
+                        '''
                         ax.set_title("Positioning error vs ground truth")
                         ax.set_xlabel("Simulation steps")
                         ax.set_ylabel("Meters")
@@ -284,6 +292,7 @@ class Simulation:
                         fig.tight_layout()
                         plt.savefig(os.path.join(self.sim_name,f"floater_{n}_errors.png"), dpi=300)
                         plt.close(fig)
+                        '''
                 
                 print(f"{'Version':22s} {'RMSE':>10s}")
                 for name in names:
@@ -315,7 +324,7 @@ class Simulation:
                 build_local_cartesian_map(
                         floater_coordinates=self.RX_positions,
                         TX_coordinates=self.TX_positions,
-                        estimated_vessel_coordinates=res['raw'],
+                        #estimated_vessel_coordinates=res['raw'],
                         tracks=[
                                 Track("RX IMU", RX_fw_IMU, "#0000FF"),
                                 Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
@@ -325,6 +334,7 @@ class Simulation:
                         LEGEND=False
                 )
 
+                
                 build_local_cartesian_map(
                                         floater_coordinates=self.RX_positions,
                                         TX_coordinates=self.TX_positions,
@@ -339,5 +349,8 @@ class Simulation:
                         "TX_gt_pos": self.TX_positions,
                         "RX_imu": RX_fw_IMU,
                         "RX_imu_mds": RX_fw_IMU_MDS,
-                        "RX_imu_comp": RX_IMU_compensated
+                        "RX_imu_comp": RX_IMU_compensated,
+                        'errors_imu' : errors_imu,
+                        'errors_imu_mds' : errors_imu_mds
                 }
+        

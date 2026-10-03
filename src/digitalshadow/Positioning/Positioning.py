@@ -1,7 +1,6 @@
 import numpy as np
 
 DEF_WEIGHT = 0.00001  # Peso di default quando errore stima è infinito
-ITER = 50            # Iterazioni MDS per convergenza
 ERR_TH = 0.99         # Accetta se errore_nuovo < 0.99 * errore_vecchio
 
 def estimate(self_pos, self_err, dist, dist_w):
@@ -10,6 +9,7 @@ def estimate(self_pos, self_err, dist, dist_w):
     pos_w = mds_weights(self_pos, self_err, dist)
 
     estimated_pos = mds_algo(self_pos, dist, dist_w, pos_w)
+    #estimated_pos = mds_algo_3d(self_pos, dist, dist_w, pos_w)  
     return update_decision(self_pos, estimated_pos, dist, self_err, dist_w)
 
 def estimate_pos_error(pos, pos_new, dist, ref, mask):
@@ -42,8 +42,6 @@ def update_decision(pos, estimated_pos, dist, err, mask):
     pos[accept] = estimated_pos[accept]
     err[accept] = err[accept] * estimated_errors[accept]
 
-    print(f"  ratio per nodo: {np.round(estimated_errors, 4)}")
-    print(f"  accettati: {np.where(accept)[0]}")
     return pos, err
     
 
@@ -85,7 +83,7 @@ def roto_trans(pos, pos_MDS, weights):
     # ===== VERIFICA DETERMINANTE =====
     d = np.linalg.det(R)
     if d < 0:
-        V[2, :] *= -1  # Rifletti l'ultima riga di V
+        V[-1, :] *= -1  # Rifletti l'ultima riga di V
         R = np.dot(V.T, U.T)
     
     # TRANSLATION
@@ -96,53 +94,45 @@ def roto_trans(pos, pos_MDS, weights):
 
 def mds_algo(pos, dist, dist_w, pos_w):
     """
-    Algoritmo completo di MDS + Procrustes.
-    
-    Flusso:
-    1. Applica MDS per ricostruire posizioni locali da distanze
-    2. Calcola trasformazione rigida (rotazione + traslazione) per allinearle
-    3. Applica trasformazione per ottenere posizioni stimate nel frame globale
-    
-    Args:
-        pos (ndarray): matrice N x D delle posizioni attuali (stimate/reali)
-        dist (ndarray): matrice N x N delle distanze misurate
-        dist_w (ndarray): matrice N x N dei pesi per distanze
-        pos_w (ndarray): vettore N x 1 dei pesi per posizioni
-    
-    Returns:
-        ndarray: matrice N x D delle posizioni stimate (allineate)
-    """
-    n = np.shape(pos)[1]  # Numero di dimensioni
-        
-    # Weight normalization (they sum up to 1)
-    weights = dist_w / np.sum(dist_w)
-    
-    # MDS       
-    '''
-    embedding = MDS(
-        n_components=n,        # Maintain the same number of dimensions
-        n_init=5,              # One initialization
-        max_iter=ITER,         # Number of iterations
-        eps=0,                 
-        metric='precomputed',  # Dist is already a distance matrix
-        init='classical_mds'
-    )
-    pos_MDS = embedding.fit_transform(dist, weights, init=pos)
-    '''
-    pos_MDS = weighted_smacof(dist,weights,init=pos,n_iter=500)
+    MDS 2D con profondità nota + allineamento di Procrustes.
 
-    # Calculation of the maktranslation parameters
-    R, t = roto_trans(pos, pos_MDS, pos_w)
-    
-    # Apply the rigid motion to obtain the estimated positions
-    estimated_pos = R.dot(np.transpose(pos_MDS)) + np.reshape(t, [np.size(t), 1])
-    estimated_pos = np.transpose(estimated_pos)
-    
+    Le distanze misurate sono oblique: vengono proiettate sul piano
+    orizzontale usando le profondità, che si assumono note esattamente.
+    La z non viene mai stimata, solo riattaccata alla fine.
+
+    Args:
+        pos    (ndarray): N x 3, posizioni a priori (la colonna z è esatta)
+        dist   (ndarray): N x N, distanze oblique misurate (metri)
+        dist_w (ndarray): N x N, pesi / maschera di disponibilità
+        pos_w  (ndarray): N x 1, pesi per l'allineamento
+
+    Returns:
+        ndarray: N x 3, posizioni stimate (xy dall'MDS, z misurata)
+    """
+    pos = np.asarray(pos, dtype=float)
+    z   = pos[:, 2]
+
+    # Proiezione sul piano orizzontale: il max protegge dal rumore
+    # che renderebbe |dz| maggiore della distanza obliqua
+    dz     = z[:, None] - z[None, :]
+    dist_h = np.sqrt(np.maximum(dist**2 - dz**2, 0.0))
+
+    # SMACOF in due dimensioni, seminato dalle posizioni correnti
+    xy_MDS = weighted_smacof(dist_h, dist_w, init=pos[:, :2])
+
+    # Allineamento rigido sul piano
+    R, t = roto_trans(pos[:, :2], xy_MDS, pos_w)
+    xy   = (R.dot(np.transpose(xy_MDS)) + np.reshape(t, (-1, 1))).T
+
+    estimated_pos = np.column_stack([xy, z])
+
+    # Nodi senza alcuna distanza nota: nessuna informazione, resta il priore
     isolated = (dist_w.sum(axis=1) == 0)
     if isolated.any():
         estimated_pos[isolated] = pos[isolated]
 
     return estimated_pos
+
 
 def mds_weights(pos, err, dist):
     """
@@ -181,7 +171,7 @@ def mds_weights(pos, err, dist):
 
     return pos_w
 
-def weighted_smacof(D, W, init, n_iter=300, eps=1e-9):
+def weighted_smacof(D, W, init, n_iter=500, eps=1e-9):
     X = np.array(init, dtype=float)
     W = np.array(W, dtype=float); np.fill_diagonal(W, 0.0)
     D = np.nan_to_num(np.array(D, dtype=float), nan=0.0)
@@ -197,3 +187,34 @@ def weighted_smacof(D, W, init, n_iter=300, eps=1e-9):
         np.fill_diagonal(B, -B.sum(axis=1))
         X = Vp @ (B @ X)
     return X
+
+
+
+
+def mds_algo_3d(pos, dist, dist_w, pos_w):
+    """
+    MDS 3D + allineamento di Procrustes (versione precedente alla
+    proiezione sul piano orizzontale, tenuta per confronto).
+
+    Args:
+        pos    (ndarray): N x 3, posizioni a priori
+        dist   (ndarray): N x N, distanze oblique misurate (metri)
+        dist_w (ndarray): N x N, pesi / maschera di disponibilità
+        pos_w  (ndarray): N x 1, pesi per l'allineamento
+
+    Returns:
+        ndarray: N x 3, posizioni stimate
+    """
+    pos = np.asarray(pos, dtype=float)
+
+    pos_MDS = weighted_smacof(dist, dist_w, init=pos, n_iter=500)
+
+    R, t = roto_trans(pos, pos_MDS, pos_w)
+    estimated_pos = (R.dot(np.transpose(pos_MDS))
+                    + np.reshape(t, (-1, 1))).T
+
+    isolated = (dist_w.sum(axis=1) == 0)
+    if isolated.any():
+        estimated_pos[isolated] = pos[isolated]
+
+    return estimated_pos

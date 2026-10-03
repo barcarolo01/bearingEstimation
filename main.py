@@ -3,7 +3,7 @@ from digitalshadow.devices.IMU_models import load_imu_model
 from digitalshadow.devices.Transmitter import *
 from simulation import *
 
-TX_LIMIT = 1
+TX_LIMIT = 3
 
 if __name__ == '__main__':
         NUMBER_OF_FLOATERS = 10
@@ -25,10 +25,10 @@ if __name__ == '__main__':
         floaters = []
         for i in range(NUMBER_OF_FLOATERS):
                 f = Floater(ID = i,
-                                #gt_x=random_sim.uniform(-500,500),
-                                #gt_y=random_sim.uniform(-500,500),
-                                gt_x=(-100 if i==1 else 100),
-                                gt_y=0,
+                                gt_x=random_sim.uniform(-500,500),
+                                gt_y=random_sim.uniform(-500,500),
+                                #gt_x=(-100 if i==1 else 100),
+                                #gt_y=0,
                                 gt_z=10,
                                 NF=NUMBER_OF_FLOATERS,
                                 dt=1.0)
@@ -52,5 +52,7 @@ if __name__ == '__main__':
                         Center=Center,
                         transmitter=TX,
                         seed=100)
+
+        sim.PACKET_LOSS = 0.1
 
         sim.run_simulation()

@@ -1,110 +1,134 @@
-from digitalshadow.devices.Floater import *
-from digitalshadow.devices.Transmitter import *
-from simulation import *
+import numpy as np
+import matplotlib.pyplot as plt
+from digitalshadow.devices.Floater import Floater
+from digitalshadow.devices.IMU_models import load_imu_model
+from digitalshadow.devices.Transmitter import Transmitter
+from simulation import Simulation
 
 SIMULATE = True
+RESULTS_FILE = "MDS_results.npz"
 
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
-NUMBER_OF_FLOATERS = 6
-N_SIMULATIONS = 1
+NUMBER_OF_FLOATERS = 4
+N_SIMULATIONS = 2               # percentiles need enough runs: ~20-30 is a reasonable minimum
 STEPS = 3600
-PERIODS = [60,120,180,300,600,900,1200,1800]
+PERIODS = [60, 120, 180, 300, 600, 900, 1200, 1800]
+
+def run_all():
+    Center = [32.839, -34.635]
+    N_PERIODS = len(PERIODS)
+
+    # One value (error averaged over floaters and time) per (period, run) pair
+    err_imu = np.zeros((N_PERIODS, N_SIMULATIONS))
+    err_mds = np.zeros((N_PERIODS, N_SIMULATIONS))
+
+    for p, period in enumerate(PERIODS):
+        # Same generator for every period: run k uses the same initial positions
+        # for all periods (common random numbers -> cleaner comparison)
+        rnd_sim = np.random.default_rng(256123)
+
+        for seed in range(N_SIMULATIONS):
+            TX = Transmitter(-1, 0, 0, 0, 1.0)
+            TX.set_initial_velocity(1, 1, 0)
+            TX.set_sigma(0.1, 0.1, 0)
+            TX.Rho = 0.999
+
+            floaters = []
+            for i in range(NUMBER_OF_FLOATERS):
+                f = Floater(ID=i,
+                            gt_x=rnd_sim.uniform(0, 1000) - 500,
+                            gt_y=rnd_sim.uniform(0, 1000) - 500,
+                            gt_z=10,
+                            NF=NUMBER_OF_FLOATERS,
+                            dt=1.0)
+                f = load_imu_model(f, 'ADIS16470', dt=1.0, param_seed=9999)
+                f.set_initial_velocity(rnd_sim.uniform(0, 2) - 1, rnd_sim.uniform(0, 2) - 1, 0.0)
+                f.set_sigma(0.1, 0.1, 0.0)
+                f.use_compass = False
+                f.Rho = 0.999
+                f.Rho_yaw = 0.999
+                f.gt_omega = 0.05
+                f.MDS_freq = period
+                f.TX_LIMIT = 10
+                floaters.append(f)
+
+            sim = Simulation(Floaters=floaters,
+                             Steps=STEPS,
+                             Center=Center,
+                             transmitter=TX,
+                             seed=seed)
+            sim.TX_LIMIT = 10
+            sim.PACKET_LOSS = 0
+
+            res = sim.run_simulation()
+            err_imu[p, seed] = np.mean(res['errors_imu'])
+            err_mds[p, seed] = np.mean(res['errors_imu_mds'])
+
+
+    np.savez(RESULTS_FILE, periods=np.asarray(PERIODS), err_imu=err_imu, err_mds=err_mds)
+    return np.asarray(PERIODS), err_imu, err_mds
+
+
+def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
+    N_PERIODS, n_runs = err_imu.shape
+    x = np.arange(N_PERIODS) 
+    lo, hi = (25,75)
+
+    # Positive = MDS reduces the error
+    improvement = (err_imu - err_mds) / err_imu * 100
+
+    fig, ax = plt.subplots(figsize=(13, 6))
+
+    ax.axhline(0, color='grey', linewidth=1) # Grey line on y=0
+
+    # Boxplot for IQR
+    ax.boxplot(improvement.T, positions=x, widths=0.5,
+               whis=(lo, hi), showcaps=False, showmeans=False, showfliers=False,
+               patch_artist=True,boxprops=dict(facecolor='#2AB040', alpha=0.35, edgecolor='#1d7a2c'),
+               medianprops=dict(color='#1d7a2c', linewidth=2),
+               meanprops=dict(marker='D', markerfacecolor='white',markeredgecolor='black', markersize=6),
+               whiskerprops=dict(linewidth=0))
+    
+    # Median value label above each box
+    medians = np.median(improvement, axis=1)
+    for i in range(N_PERIODS):
+        ax.annotate(f'{medians[i]:.1f}%',
+                    (x[i], improvement[i].max()),
+                    textcoords="offset points", xytext=(0, -5),
+                    ha='center', va='bottom', fontsize=FONTSIZE_LEGEND - 1)
+
+    ax.set_ylabel("Error reduction with MDS [%]", fontsize=FONTSIZE)
+    ax.set_xlabel("MDS period [seconds]", fontsize=FONTSIZE)
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(p) for p in periods])
+    ax.margins(y=0.15)
+    ax.plot([], [], 'D', markerfacecolor='white', markeredgecolor='black', label='mean')
+    ax.plot([], [], '-', color='#1d7a2c', linewidth=2, label='median')
+    # Legend above the plot, on the right: never covers boxes or labels
+    ax.legend(fontsize=FONTSIZE_LEGEND, loc='lower right', bbox_to_anchor=(1.0, 1.0),
+              ncol=2, frameon=False, borderaxespad=0.2,
+              title_fontsize=FONTSIZE_LEGEND - 1)
+
+    # IMU-only baseline (identical for every period): shown as a reference
+    imu_run = err_imu[0]
+    b_lo, b_med, b_hi = np.percentile(imu_run, [lo, 50, hi])
+    ax.set_title(f"IMU-only error: median {b_med:.1f} m  "
+                 f"(IQR {b_lo:.1f}–{b_hi:.1f} m)",loc='left', fontsize=FONTSIZE_LEGEND)
+
+    ax.tick_params(axis="both", which="both", labelsize=FONTSIZE)
+    ax.grid(linestyle='--', alpha=0.5)
+
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=900)
+    plt.show()
+
 
 if __name__ == '__main__':
-        Center = [32.839, -34.635]      
-        periods_toplot = []
-        errors_imu_toplot = []
-        errors_imu_imu_toplot = []
-
-        for period in PERIODS:
-                imu_avg = np.zeros((N_SIMULATIONS,STEPS))
-                imu_mds_avg = np.zeros((N_SIMULATIONS,STEPS))
-
-                for seed in range(N_SIMULATIONS):               
-                        TX = Transmitter(-1,0,0,0,1.0)
-                        TX.set_initial_velocity(np.random.uniform(0.5),np.random.uniform(0.5),0)
-                        TX.set_sigma(0.1,0.1,0)
-                        TX.Rho = 0.999
-
-                        floaters = []
-                        for i in range(NUMBER_OF_FLOATERS):
-                                f = Floater(ID = i,
-                                                gt_x=np.random.uniform(1000)-500,
-                                                gt_y=np.random.uniform(1000)-500,
-                                                gt_z=10,
-                                                NF=NUMBER_OF_FLOATERS,
-                                                dt=1.0)
-
-                                f.set_initial_velocity(np.random.uniform(1)-0.5, np.random.uniform(1)-0.5, 0.0)
-                                f.set_sigma(np.random.uniform(0.1), np.random.uniform(0.1), 0.0)
-                                f.use_compass = True
-                                f.Rho = 0.999
-                                f.Rho_yaw = 0.999
-                                f.gt_omega = np.random.uniform(0.1)-0.05
-                                f.MDS_freq = period
-                                floaters.append(f)
-
-                        sim = Simulation(Floaters=floaters,
-                                        Steps=STEPS,
-                                        Center=Center,
-                                        transmitter=TX,
-                                        seed=seed)
-
-                        sim_result = sim.run_simulation()
-
-                        imu_avg[seed] = np.mean(np.mean(sim_result['errors_imu'],axis=0))
-                        imu_mds_avg[seed] = np.mean(np.mean(sim_result['errors_imu_mds'],axis=0))
-
-                periods_toplot.append(period)
-                errors_imu_toplot.append(np.mean(imu_avg))
-                errors_imu_imu_toplot.append(np.mean(imu_mds_avg))
-
-
-        periods_toplot = np.asarray(periods_toplot)
-        imu_values = np.asarray(errors_imu_toplot)
-        mds_values = np.asarray(errors_imu_imu_toplot)
-
-        plt.figure(figsize=(15, 5))
-        plt.plot(periods_toplot, np.ones(periods_toplot.shape)*np.mean(imu_values),'o-', label='IMU', color="#0000ff")
-        plt.plot(periods_toplot, mds_values,'o-', label='IMU+MDS', color="#2AB040")
-
-        # Percentuale di variazione IMU+MDS rispetto a IMU
-        percent_changes = (mds_values - imu_values) / imu_values * 100
-
-        # Etichette sotto i punti della seconda serie
-        for x, y, percentage in zip(periods_toplot, mds_values, percent_changes):
-                if x == 180:
-                        plt.annotate(
-                                f'{percentage:.1f}%',
-                                (x, y),
-                                textcoords="offset points",
-                                xytext=(12, -12),
-                                ha='center',
-                                va='top'
-                        )
-                else:
-                        plt.annotate(
-                                f'{percentage:.1f}%',
-                                (x, y),
-                                textcoords="offset points",
-                                xytext=(6, -12),
-                                ha='center',
-                                va='top'
-                        )
-
-        
-        plt.ylim(bottom=0)
-        plt.xlim(left=0)
-        plt.legend(fontsize=FONTSIZE_LEGEND, loc='lower right')
-        plt.tick_params(axis="both", which="major", labelsize=FONTSIZE)
-        plt.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
-        plt.xticks(periods_toplot)
-        plt.grid(axis='x',linestyle='--',alpha=0.5)
-        plt.grid(axis='y',linestyle='--',alpha=0.5)
-        plt.xlabel("MDS frequency [seconds]",fontsize=FONTSIZE)
-        plt.ylabel("Average positioning error [meters]",fontsize=FONTSIZE)
-        plt.tight_layout()
-        plt.savefig("MDS_example.png", dpi=900)
-        plt.show()
+    if SIMULATE:
+        periods, err_imu, err_mds = run_all()
+    else:
+        d = np.load(RESULTS_FILE)
+        periods, err_imu, err_mds = d['periods'], d['err_imu'], d['err_mds']
+    plot_results(periods, err_imu, err_mds)

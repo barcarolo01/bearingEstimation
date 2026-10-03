@@ -7,7 +7,7 @@ FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
 if __name__ == '__main__':
-        NUMBER_OF_SIMS = 30
+        NUMBER_OF_SIMS = 5
         STEPS = 1800
 
         IMU_avg_errs = np.zeros((NUMBER_OF_SIMS,STEPS))
@@ -66,6 +66,8 @@ if __name__ == '__main__':
                                 Center=Center,
                                 #transmitter_coordinates=compute_TX_circle_trajectory(10,0,350,35,200),
                                 seed=k+100)
+
+                sim.PACKET_LOSS = 0.0
 
                 res = sim.run_simulation()
 
