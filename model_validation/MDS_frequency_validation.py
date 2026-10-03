@@ -11,10 +11,10 @@ RESULTS_FILE = "MDS_results.npz"
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
-NUMBER_OF_FLOATERS = 4
-N_SIMULATIONS = 10
+NUMBER_OF_FLOATERS = 10
+N_SIMULATIONS = 30
 STEPS = 3600
-PERIODS = [60, 120, 180, 300, 600, 900, 1200, 1800]
+PERIODS = [60, 120, 180, 300, 600, 900, 1800]
 
 def run_all():
     Center = [32.839, -34.635]
@@ -25,6 +25,7 @@ def run_all():
     err_mds = np.zeros((N_PERIODS, N_SIMULATIONS))
 
     for p, period in enumerate(PERIODS):
+        print(f"Period {period}")
         # Same generator for every period
         rnd_sim = np.random.default_rng(256123)
 
@@ -42,10 +43,17 @@ def run_all():
                             gt_z=10,
                             NF=NUMBER_OF_FLOATERS,
                             dt=1.0)
-                f = load_imu_model(f, 'ADIS16470', dt=1.0, param_seed=9999)
+                f = load_imu_model(f, 'ADIS16470', dt=1.0, param_seed=9999+i)
+
+                f.accel_bias = np.zeros(3)
+                f.sigma_accel_bias = np.zeros(3)
+                f.gyro_bias = 0
+                f.sigma_gyro_bias = 0
+
                 f.set_initial_velocity(rnd_sim.uniform(-1, 1), rnd_sim.uniform(-1, 1), 0.0)
                 f.set_sigma(rnd_sim.uniform(0, 0.1), rnd_sim.uniform(0, 0.1), 0.0)
-                f.use_compass = False
+                f.use_compass = True
+                f.alpha_compass = 0.999
                 f.Rho = 0.999
                 f.Rho_yaw = 0.999
                 f.MDS_freq = period
@@ -66,6 +74,7 @@ def run_all():
 
 
     np.savez(RESULTS_FILE, periods=np.asarray(PERIODS), err_imu=err_imu, err_mds=err_mds)
+    print("END OF SIMULATION")
     return np.asarray(PERIODS), err_imu, err_mds
 
 
@@ -83,7 +92,7 @@ def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
 
     # Boxplot for IQR
     ax.boxplot(improvement.T, positions=x, widths=0.5,
-               whis=(lo, hi), showcaps=False, showmeans=False, showfliers=False,
+               whis=(lo, hi), showcaps=False, showmeans=True, showfliers=False,
                patch_artist=True,boxprops=dict(facecolor='#2AB040', alpha=0.35, edgecolor='#1d7a2c'),
                medianprops=dict(color='#1d7a2c', linewidth=2),
                meanprops=dict(marker='D', markerfacecolor='white',markeredgecolor='black', markersize=6),
@@ -92,11 +101,12 @@ def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
     # Median value label above each box
     medians = np.median(improvement, axis=1)
     BOX_WIDTH = 0.5   # same value passed to boxplot(widths=...)
+    box_tops = np.percentile(improvement, hi, axis=1)   # upper edge of each box
     for i in range(N_PERIODS):
         ax.annotate(f'{medians[i]:.1f}%',
-                    (x[i] + BOX_WIDTH / 2, medians[i]),   # right edge of box, at the median
-                    textcoords="offset points", xytext=(4, 0),
-                    ha='left', va='center', fontsize=FONTSIZE_LEGEND - 1,
+                    (x[i], box_tops[i]),   # top edge of box
+                    textcoords="offset points", xytext=(0, 3),
+                    ha='center', va='bottom', fontsize=FONTSIZE_LEGEND,
                     color='#1d7a2c')
 
     ax.set_ylabel("Error reduction with MDS [%]", fontsize=FONTSIZE)
@@ -119,6 +129,7 @@ def plot_results(periods, err_imu, err_mds, outfile="MDS_example.png"):
 
     ax.tick_params(axis="both", which="both", labelsize=FONTSIZE)
     ax.grid(linestyle='--', alpha=0.5)
+    ax.set_ylim(bottom=0)
 
     fig.tight_layout()
     fig.savefig(outfile, dpi=900)

@@ -1,3 +1,4 @@
+from digitalshadow.devices.IMU_models import load_imu_model
 import numpy as np
 import matplotlib.pyplot as plt
 from digitalshadow.devices.Floater import *
@@ -10,6 +11,8 @@ FONTSIZE_LEGEND = 12
 
 def floater_init():
     f = Floater(1,0,0,0,1,1.0)
+    f = load_imu_model(f,'ADIS16470',dt=1.0)
+    f.gyro_bias = np.deg2rad(0.1)
     f.Rho_yaw = 1
     f.gt_psi = 0
     f.sigma_yaw_rate = np.deg2rad(0.5)

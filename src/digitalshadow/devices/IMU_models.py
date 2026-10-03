@@ -30,3 +30,10 @@ def load_imu_model(floater,model_name,param_seed=1,dt=1.0):
     floater.accel_bias = rnd_param.normal(0,floater.sigma_accel_bias)
     floater.gyro_bias = rnd_param.normal(0, floater.sigma_gyro_bias)
     return floater
+
+def calibrate_flaoter(floater):
+    ''' Set to zero the 'constant bias' error source  for accelerometer and gyroscope'''
+    floater.accel_bias = np.zeros(3)
+    floater.sigma_accel_bias = np.zeros(3)
+    floater.gyro_bias = 0
+    floater.sigma_giro_bias = 0

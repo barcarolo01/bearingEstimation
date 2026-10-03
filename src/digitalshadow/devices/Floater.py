@@ -5,7 +5,7 @@ from digitalshadow.devices.Transmitter import Transmitter
 # ==== E COMPASS ====
 COMPASS_SIGMA_NOISE   = np.deg2rad(2.0)
 COMPASS_BIAS    = np.deg2rad(0.3)
-COMPASS_ALPHA   = 0.995
+COMPASS_ALPHA   = 0.5
 
 CONSTANT_DEPTH = True
 MIN_DEPTH = 1
