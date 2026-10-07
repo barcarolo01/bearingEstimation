@@ -1,5 +1,6 @@
 import os
 import shutil
+from dotenv import load_dotenv
 import numpy as np
 from digitalshadow.utils.gcc_phat import *
 import math
@@ -9,15 +10,36 @@ from digitalshadow.utils.utils import *
 from digitalshadow.devices.floater_geometry import *
 from digitalshadow.utils.bearing_calculation import *
 
-def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, d, c=1500, overlap=0.5, quality_threshold=0.1):
+MAX_HYDROPHONE_DISTANCE = 1 # Meters
+
+def add_white_noise(sig, snr_db, seed=None):
+    rng = np.random.default_rng(seed)
+
+    sig_float = sig.astype(np.float64)
+    sig_power = np.mean(sig_float ** 2)
+    snr_linear = 10 ** (snr_db / 10)
+    noise_power = sig_power / snr_linear
+
+
+    noise = rng.normal(0, np.sqrt(noise_power), size=sig_float.shape)
+
+    noisy_sig = sig_float + noise
+
+    if np.issubdtype(sig.dtype, np.integer):
+        info = np.iinfo(sig.dtype)
+        noisy_sig = np.clip(noisy_sig, info.min, info.max)
+        noisy_sig = noisy_sig.astype(sig.dtype)
+
+    return noisy_sig
+
+def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, c=1500, overlap=0.5, quality_threshold=0.1):
     step = int(samples_per_window * (1 - overlap))
     n_of_windows = 1 + (len(sig_A) - samples_per_window) // step
     times = np.arange(n_of_windows) * step / fs
 
     # Physically possible range
-    tau_max_samples = int(np.ceil(d / c * fs)) + 5
+    tau_max_samples = int(np.ceil(MAX_HYDROPHONE_DISTANCE / c * fs)) 
     
-
     searches = []
     sample_delay = []
     for start in range(0, min(len(sig_A), len(sig_B)) - samples_per_window + 1, step):
@@ -54,33 +76,24 @@ def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, d, c=1500, 
     sample_delay = np.asarray(sample_delay)
     return searches_np, sample_delay, times
 
-def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
-    d = 0.3
-    precompute_bearing_angles_triangle(d)
+def compute_single_bearing_angle_triangle(track_folder, timestamp, F_index, seed = 0, SNR_desired = 999999):
+    precompute_bearing_angles_triangle(0.3)
 
-    fs, sig1_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
-    _, sig2_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
-    _, sig3_orig = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+    fs, sig1 = wav.read(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    _, sig2 = wav.read(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    _, sig3 = wav.read(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+
+    if SNR_desired < 100:
+        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
+        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
+        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
 
     durata_finestra = 0.05  # Seconds
     campioni_finestra = int(durata_finestra * fs)
-    quality_threshold = 0.0
-
-    if SNR_desired < 999:
-        sig1 = add_white_noise(sig1_orig,SNR_desired,seed=seed+1)
-        sig2 = add_white_noise(sig2_orig,SNR_desired,seed=seed+2)
-        sig3 = add_white_noise(sig3_orig,SNR_desired,seed=seed+3)
-    else:
-        sig1 = sig1_orig
-        sig2 = sig2_orig
-        sig3 = sig3_orig
-
-    #print(f"{check_snr(sig1_orig,sig1)} {check_snr(sig2_orig,sig2)} {check_snr(sig3_orig,sig3)}")
-
-    # Delays between hydrophones H1–H4 
-    test, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    quality_threshold = 0.01
+    test, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     #plt.figure()
     #plt.plot(sample_delay_21)
@@ -106,10 +119,7 @@ def compute_single_bearing_angle_triangle(wav_folder, timestamp, F_index, SNR_de
 
     return bearing, elevation
 
-def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
-    d = 0.228 / math.sqrt(2)
-    precompute_bearing_angles_complete(d)
-
+def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, seed = 0):
     fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
     _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
     _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
@@ -119,19 +129,13 @@ def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, SNR_desi
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.0
 
-    if SNR_desired < 999:
-        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
-        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
-        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
-        sig4 = add_white_noise(sig4,SNR_desired,seed=seed+4)
-
     # Delays between hydrophones H1–H4 
-    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
@@ -159,10 +163,7 @@ def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, SNR_desi
 
     return bearing, elevation
 
-def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index, SNR_desired=10000, seed = 0):
-    d = 0.228 / math.sqrt(2)
-    precompute_bearing_angles_complete(d)
-
+def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
     fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
     _, sig2 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H2.wav'))
     _, sig3 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H3.wav'))
@@ -173,26 +174,20 @@ def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index, SNR_de
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.0
 
-    if SNR_desired < 999:
-        sig1 = add_white_noise(sig1,SNR_desired,seed=seed+1)
-        sig2 = add_white_noise(sig2,SNR_desired,seed=seed+2)
-        sig3 = add_white_noise(sig3,SNR_desired,seed=seed+3)
-        sig4 = add_white_noise(sig4,SNR_desired,seed=seed+4)
-        sig5 = add_white_noise(sig5,SNR_desired,seed=seed+5)
     
     # Delays between hydrophones H1–H4 
-    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Delays with respect to H5 
-    _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, d*3, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
@@ -241,48 +236,7 @@ def circular_trim_mean(angles, proportiontocut=0.1):
     mean_angle = stats.trim_mean(unwrapped, proportiontocut) % 360
     return mean_angle 
 
-def check_snr(sig, noisy_sig):
-    """
-    Check the SNR between the original singal 'sig' and a noisy version of it 'noisy_sig'
-    """
-    sig_float = sig.astype(np.float64)
-    noisy_float = noisy_sig.astype(np.float64)
-
-    noise = noisy_float - sig_float
-
-    sig_power = np.mean(sig_float ** 2)
-    noise_power = np.mean(noise ** 2)
-
-    if noise_power == 0:
-        return np.inf
-
-    snr_db = 10 * np.log10(sig_power / noise_power)
-    return snr_db
-
-def add_white_noise(sig, snr_db, seed=None):
-    rng = np.random.default_rng(seed)
-
-    sig_float = sig.astype(np.float64)
-    sig_power = np.mean(sig_float ** 2)
-    snr_linear = 10 ** (snr_db / 10)
-    noise_power = sig_power / snr_linear
-
-
-    noise = rng.normal(0, np.sqrt(noise_power), size=sig_float.shape)
-
-    noisy_sig = sig_float + noise
-
-    if np.issubdtype(sig.dtype, np.integer):
-        info = np.iinfo(sig.dtype)
-        noisy_sig = np.clip(noisy_sig, info.min, info.max)
-        noisy_sig = noisy_sig.astype(sig.dtype)
-
-    return noisy_sig
-
-def clean_temporary_files():
-    if os.path.isdir("TMP"):
-        shutil.rmtree("TMP")
-
+def clean_temporary_files(sim_name):
     for j in range(5):
-        if os.path.isdir(f"HM_OUT_{j+1}"):
-                shutil.rmtree(f"HM_OUT_{j+1}")
+        if os.path.isdir(f"HM_OUT_{sim_name}_{j+1}"):
+                shutil.rmtree(f"HM_OUT_{sim_name}_{j+1}")

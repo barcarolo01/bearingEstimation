@@ -1,11 +1,9 @@
 AudioFiles
+Testing
+model_validation
 __pycache__
-TMP
-Synth
 .env
 .vscode
-FiguresAndPlots
-Testing
 .venv
 *.png
 *.egg-info

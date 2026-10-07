@@ -10,28 +10,23 @@ def measurement_covariance(floater_xy, target_xy, sigma_deg):
     J = np.zeros((2, 2))
 
     for h in floater_xy:
-        d = target_xy - h       # Cector from the floater to the target
+        d = target_xy - h       # Vector from the floater to the target
         r = np.linalg.norm(d)   # Floater-Target distance (estimated)
         u = d / r               # Unit vector along the bearing line
         Jn = (np.eye(2) - np.outer(u, u)) / (r * sigma) ** 2
         J += Jn
 
-    # The covariance is the inverse of the information
+    # The covariance matrix is the inverse of the information matrix
     return np.linalg.inv(J)
 
 def initial_state(z, R, init_speed_std):
     """
-    State and covariance used to start (or restart) the filter from a fix.
-
-    The position is taken from the fix z, with the same uncertainty R as the
-    fix itself. The velocity is unknown: it is set to zero with a large
-    standard deviation init_speed_std [m/s], so that the filter learns it from
-    the following measurements. Position and velocity errors are uncorrelated.
+    Initialize the data structure used by Kalman Filter
     """
     # State vector [x, vx, y, vy]
-    x = np.array([z[0], 0.0, z[1], 0.0])
+    x = np.array([z[0], 0.0, z[1], 0.0]) # Init state = first measurement, init velocity = 0
 
-    # Velocity variances on the diagonal (positions filled below)
+    # Diagonal matrix with velocity variances on the diagonal
     P = np.diag([0.0, init_speed_std ** 2, 0.0, init_speed_std ** 2])
 
     # Position block (rows/columns 0 and 2 of the state) = covariance of the fix
@@ -73,15 +68,7 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
     raw = find_points(floaters, bearings, elevation_array)
     STEPS = len(raw)
 
-    # The filter works in metres: local plane centred on the mean floater position
-    # TODO: Remove
-    center = np.nanmean(floaters[..., :2].reshape(-1, 2), axis=0)
     z_all = raw[:, :2]           # (STEPS, 2) [x, y]
-
-    # ------------------------------------------------------------------
-    # 2. Measurements for the filter: position z and its covariance R.
-    #    None means "no usable fix at this step" (the filter only predicts).
-    # ------------------------------------------------------------------
 
     # List of z (positions) and R (position covariance)
     zs, Rs = [], []
@@ -97,22 +84,16 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
         zs.append(z)
         Rs.append(R)
 
-
-    # First fix precise enough to start the track: a fix close to the baseline
-    # has a huge ellipse and must not be used as starting point
-
-    # Choose a sufficiently precise point to start the tracking, to avoid a wrong filter initialization
+    # Choose a sufficiently precise fix to start the tracking, to avoid a wrong filter initialization
     start = None
     for i in range(STEPS):
-        # Look 
         if zs[i] is not None and np.sqrt(np.trace(Rs[i])) <= max_init_std:
             start = i
             break
 
-    # TODO: In questo caso vorrei semplicemente fermare il filtro, non l'intero programma
     if start is None:
-        raise ValueError("No position fix precise enough to start the filter "
-                         "(increase max_init_std or check the bearings).")
+        print("[Kalman] No position fix precise enough to start the filter.")
+        return dict(raw=raw, filtered=None, smoothed=None, velocity=None)
 
     # State vector has 4 elements [x, vx, y, vy], measurement vector has 2 [x,y]
     kf = KalmanFilter(dim_x=4, dim_z=2)
@@ -125,11 +106,9 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
 
     # H: measurement model. The measurement is the position itself: H extracts [x,y] from state [x, vx, y, vy].
     kf.H = np.array([[1, 0, 0, 0],
-                     [0, 0, 1, 0]], dtype=float)
+                     [0, 0, 1, 0]])
 
     # Q: process noise covariance, the uncertainty added at every prediction
-    #    because the vessel may accelerate or turn. It models a random
-    #    acceleration of intensity a_max^2 * dt on each axis.
     kf.Q = Q_continuous_white_noise(dim=2, dt=dt, spectral_density=a_max ** 2 * dt,block_size=2)
 
     # Initial state from the first reliable fix
@@ -144,12 +123,9 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
         kf.predict()
 
         if z is not None:
-            # Gating: squared Mahalanobis distance of the fix from the prediction,
-            # i.e. the size of the innovation y measured in units of its expected
-            # uncertainty S (prediction uncertainty + measurement uncertainty)
-            y = z - kf.H @ kf.x                   # innovation
-            S = kf.H @ kf.P @ kf.H.T + R          # innovation covariance
-            d2 = y @ np.linalg.solve(S, y)        # y^T S^-1 y
+            xi = z - kf.H @ kf.x                  # Innovation
+            S = kf.H @ kf.P @ kf.H.T + R          # Innovation covariance
+            d2 = xi @ np.linalg.solve(S, xi)      # Squared of Mahalanobis distance (y^T S^-1 y)
 
             if d2 <= gate:
                 # Plausible fix: correct the prediction with the measurement
@@ -165,7 +141,7 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
                     kf.x, kf.P = initial_state(z, R, init_speed_std)
                     rejects = 0
 
-        # (if z is None there is no measurement: the prediction is kept)
+        # If z is None there is no measurement: the prediction is kept as a result
         x_f.append(kf.x.copy())
         P_f.append(kf.P.copy())
 
@@ -174,10 +150,9 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
     # RTS smoother
     x_s, _, _, _ = kf.rts_smoother(x_f, P_f)
 
-    # TODO: "steps before 'start' stay NaN". Should it be better to substitute them with raw data?
     filtered = np.full((STEPS, 3), np.nan)
     filtered[start:, :2] = x_f[:, [0, 2]]   # Filitered [x,y]
-    filtered[:, 2] = raw[:, 2] # Depth filling
+    filtered[start:, 2] = raw[:, 2] # Depth filling
 
     smoothed = np.full((STEPS, 3), np.nan)
     smoothed[start:, :2] = x_s[:, [0, 2]]   # Smoothed [x,y]

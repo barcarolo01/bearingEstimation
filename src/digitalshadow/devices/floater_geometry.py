@@ -71,8 +71,6 @@ def precompute_bearing_angles_complete(d):
             lut_tau53[az_idx, el_idx] = np.dot(H3 - H5, direction) / c
             lut_tau54[az_idx, el_idx] = np.dot(H4 - H5, direction) / c
 
-
-
 def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hydrohpones, PSI_RX=0):
     '''
     This method receives as an input the geographical coordinates of the center of a floater and returns 

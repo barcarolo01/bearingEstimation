@@ -2,8 +2,6 @@ import numpy as np
 
 P_REF = 1e-6  # Pa (1 µPa)
 
-# Indice dell'ampiezza nella tupla di ogni arrivo restituita da select_arrivals.
-# a[2] e' il ritardo (lo usi gia' per t0); se l'ampiezza non e' a[0], cambia qui.
 AMP_IDX = 0
 
 
@@ -42,7 +40,7 @@ def check_calibration(rx, src, used, fs, sl_db, label=""):
     diff = rl_meas - rl_exp
 
     sl_str = f"{sl_db:6.1f}" if sl_db is not None else "  None"
-    print(f"[{label:>4}] SL richiesto {sl_str} | SL misurato {sl_meas:6.1f} | "
-          f"TL_inc {tl_inc:6.1f} | RL atteso {rl_exp:6.1f} | "
-          f"RL misurato {rl_meas:6.1f} dB re 1 µPa | diff {diff:+5.1f} dB")
+    print(f"[{label:>4}] SL target {sl_str} | SL measured {sl_meas:6.1f} | "
+          f"TL {tl_inc:6.1f} | RL targer {rl_exp:6.1f} | "
+          f"RL measured {rl_meas:6.1f} dB re 1 µPa | diff {diff:+5.1f} dB")
     return diff

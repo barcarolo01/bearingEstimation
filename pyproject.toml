@@ -18,10 +18,11 @@ dependencies = [
     "python-dotenv",
     "scikit_learn",
     "scipy",
+    "filterpy",
     "soundfile",
     "xarray"
-
 ]
+
 requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]

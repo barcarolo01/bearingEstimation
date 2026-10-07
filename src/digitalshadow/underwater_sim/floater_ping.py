@@ -23,15 +23,15 @@ def ping_pair(Floater1_coordiantes,Floater2_coordiantes):
                     "CVWT", "A",
                     [-89,89],
                     10000,
-                    nrd=1)
+                    nrr = 1,
+                    nrd=1,)
 
     app.set_paths("C:/Users/Nicola/Desktop/TESI/HYDROMATE/hm_code_py/.env")
     app.run_sim()
 
-    rr_values, rd_values, arrivals = read_arr('ping_1/ping.arr')
-    h, used = build_ir(arrivals, rd_values, max(rr_values), FS_OUT, n_arrivals=0)
-    delay_first_arrival_samples = np.nonzero(h)[0][0]
-    delay_first_arrival_ms = 1000*(delay_first_arrival_samples / FS_OUT)
+    arrivals = read_arr('ping_1/ping.arr')
+    used = sorted(arrivals, key=lambda a: a[2])   # Sort by REAL delay
+    delay_first_arrival_ms = 1000*used[0][2]
     shutil.rmtree(f'ping_1')    
 
     return delay_first_arrival_ms # Delay, in seconds

@@ -5,7 +5,7 @@ from digitalshadow.devices.Transmitter import Transmitter
 # ==== E COMPASS ====
 COMPASS_SIGMA_NOISE   = np.deg2rad(2.0)
 COMPASS_BIAS    = np.deg2rad(0.3)
-COMPASS_ALPHA   = 0.5
+COMPASS_ALPHA   = 0.999
 
 CONSTANT_DEPTH = True
 MIN_DEPTH = 1
@@ -379,8 +379,8 @@ class Floater(Transmitter):
             self.steps_from_mds_start += 1
 
         # Run MDS if the matrix is completed or in case of timeout
-        MDS_timeout = self.ONGOING_MDS and self.steps_from_mds_start > (2*self.NF - 1) // self.TX_LIMIT
-        if not self.mds_done and (self._matrix_complete() ):#or MDS_timeout):
+        MDS_timeout = self.ONGOING_MDS and self.steps_from_mds_start > (2*self.NF) // self.TX_LIMIT
+        if not self.mds_done and (self._matrix_complete() or MDS_timeout):
             self.mds_done = True
             self.ONGOING_MDS = False
             D_ms, W = self._build_distance_matrix()
@@ -388,7 +388,7 @@ class Floater(Transmitter):
             if not self._matrix_complete():
                  print("INCOMPLETA")
                  
-            if W.sum() > 0 or True:
+            if W.sum() > 0:
                 D_m = np.nan_to_num(D_ms, nan=0.0) * 1500.0 / 1000.0
                 pos_all, err_all = self._assemble_priors()
                 new_pos, new_err = estimate(pos_all, err_all, D_m, W)                
@@ -428,8 +428,8 @@ class Floater(Transmitter):
         first = self.obs.setdefault((tx_idx, tx_idx), t_tx)
         return {
             "round_id": self.round_id,
-            "t_tx":     t_tx,      # istante di QUESTA trasmissione
-            "first_tx": first,     # istante della prima
+            "t_tx":     t_tx,      # Timestamp of this transmission
+            "first_tx": first,     # Timestamp of the first transmission of the same round
             "obs": dict(self.obs),
             "src_pos": np.asarray(self.est_pos_mds, dtype=float).copy(),
             "src_err": float(self.est_error_mds),

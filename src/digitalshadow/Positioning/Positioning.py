@@ -210,8 +210,7 @@ def mds_algo_3d(pos, dist, dist_w, pos_w):
     pos_MDS = weighted_smacof(dist, dist_w, init=pos, n_iter=500)
 
     R, t = roto_trans(pos, pos_MDS, pos_w)
-    estimated_pos = (R.dot(np.transpose(pos_MDS))
-                    + np.reshape(t, (-1, 1))).T
+    estimated_pos = (R.dot(np.transpose(pos_MDS))+ np.reshape(t, (-1, 1))).T
 
     isolated = (dist_w.sum(axis=1) == 0)
     if isolated.any():

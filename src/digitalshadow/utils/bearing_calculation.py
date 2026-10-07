@@ -7,6 +7,8 @@ by minimizing the least square error for all possible hydrophone configurations.
 """
 
 def find_bearing_triangle(measured_tau32, measured_tau21, measured_tau31):
+    if np.isnan(measured_tau32) or np.isnan(measured_tau21) or np.isnan(measured_tau31):
+        return np.nan
     E  = (measured_tau32 - lut_tau32[:,90])**2
     E += (measured_tau21 - lut_tau21[:,90])**2
     E += (measured_tau31 - lut_tau31[:,90])**2

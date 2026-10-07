@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 from digitalshadow.Positioning.coordinate_generator import *
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
 from digitalshadow.Positioning.point_estimation import *
-from digitalshadow.maps.build_local_map import build_local_cartesian_map
-from digitalshadow.maps.map_common import Track
+from digitalshadow.Positioning.local_map import Track, build_local_cartesian_map
 from digitalshadow.underwater_sim.floater_ping import *
 from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
@@ -46,13 +45,16 @@ class Simulation:
                 '''   
       
                 load_dotenv()
+                self.init_seed = seed
                 self.rnd_packetloss = np.random.default_rng(seed+1)
+                
 
                 self.sim_name = sim_name
                 if HYDROMATE_SIMULATION or True:
                         if os.path.isdir(self.sim_name):
                                 shutil.rmtree(self.sim_name)
                         os.makedirs(self.sim_name)
+                        os.makedirs(os.path.join(self.sim_name,'SynthTracks'))
 
                 '''
                 if os.path.isdir(self.sim_name):
@@ -69,8 +71,19 @@ class Simulation:
 
                 for f in Floaters:
                         f.TX_LIMIT = TX_LIMIT
+
                 self.NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
                 self.SAMPLING_FREQUENCY = int(os.getenv('SAMPLING_FREQUENCY'))
+
+                if self.NUMBER_OF_HYDROPHONES == 3:
+                        precompute_bearing_angles_triangle(0.3)
+                elif self.NUMBER_OF_HYDROPHONES == 4:
+                        precompute_bearing_angles_square(0.228 / math.sqrt(2))
+                elif self.NUMBER_OF_HYDROPHONES == 5:
+                        precompute_bearing_angles_complete(0.228 / math.sqrt(2))
+                else:
+                        raise ValueError(f"Unexpected number of hydrophones ({self.NUMBER_OF_HYDROPHONES}).")
+
 
 
                 if transmitter is None and transmitter_coordinates is None:
@@ -110,12 +123,7 @@ class Simulation:
                 }
                 GT = np.zeros((self.SIMULATION_STEPS, self.NUMBER_OF_FLOATERS, 3))
                 RX_positions = np.zeros((self.SIMULATION_STEPS,self.NUMBER_OF_FLOATERS,3))
-
-                if os.path.isdir("Synth"):
-                        shutil.rmtree("Synth")
-                os.makedirs("Synth")
                 
-
                 round_active  = False
                 round_order   = []     # Floater transmitting sequence (2N-1 long)
                 round_step    = 0
@@ -123,7 +131,7 @@ class Simulation:
 
                 mustTX = [False] * self.NUMBER_OF_FLOATERS
                 for i in range(self.SIMULATION_STEPS):
-                        #print(f"# Simulation step {i+1}/{self.SIMULATION_STEPS}")
+                        print(f"# Simulation step {i+1}/{self.SIMULATION_STEPS}")
                         if self.transmitter is None:
                                 TX_Coordinates = local_to_geo(self.Center,self.TX_positions[i,:])
                         else:
@@ -135,27 +143,34 @@ class Simulation:
 
                                 # Hydromate simulation
                                 if HYDROMATE_SIMULATION:
-                                        run_discrete_hydromate_single(  TX_Coordinates[0],
+                                        run_discrete_hydromate_single(  self.sim_name,
+                                                                        TX_Coordinates[0],
                                                                         TX_Coordinates[1],
                                                                         TX_Coordinates[2],
                                                                         RX_gt_Coordinates[0],
                                                                         RX_gt_Coordinates[1],
                                                                         RX_gt_Coordinates[2],
-                                                                        (n+1),
-                                                                        PSI_RX=self.Floaters[n].gt_psi )
-
-                                        # Save as wav segment
-                                        for j in range(self.NUMBER_OF_HYDROPHONES):
-                                                hydrophone_track = np.load(os.path.join('TMP',f'H{j+1}.npy'))
-                                                wav.write(f'Synth/T{i}_F{n+1}_H{j+1}.wav', self.SAMPLING_FREQUENCY, hydrophone_track)
-
+                                                                        
+                                                                        PSI_RX=self.Floaters[n].gt_psi,
+                                                                        seed = self.init_seed * 15 + 2)
+                                        
+                                        # By convolution, obtain a signal for each of the arrival files
+                                        from_arr_to_wav(TX_POS=np.asarray([TX_Coordinates[0],TX_Coordinates[1]]),
+                                                        number_mic=NUMBER_OF_HYDROPHONES,
+                                                        sim_name = self.sim_name,
+                                                        sim_timestamp = i,
+                                                        floater_number = (n + 1),
+                                                        n_arrivals=0,
+                                                        sl_db=150,
+                                                        add_noise=False,
+                                                        noise_seed=self.init_seed)
 
                                         if NUMBER_OF_HYDROPHONES == 3:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_triangle(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_triangle(track_folder=os.path.join(self.sim_name,'SynthTracks'), timestamp=i, F_index=(n + 1))
                                         if NUMBER_OF_HYDROPHONES == 4:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
                                         if NUMBER_OF_HYDROPHONES == 5:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder='Synth',F_index=(n + 1))
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
                                         
                         # Current clock shapshot
                         clocks    = np.array([f.clk    for f in self.Floaters])
@@ -267,18 +282,18 @@ class Simulation:
                         gt = res['gt']
                         GT[:, n, :] = gt
 
-                        #fig, ax = plt.subplots(figsize=(9, 5))
+                        fig, ax = plt.subplots(figsize=(9, 5))
 
                         for j,name in enumerate(names):
                                 pos = res[name]
                                 targets[name][:, n, :] = pos
-                                #ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
+                                ax.plot(np.linalg.norm(pos - gt, axis=1), color=colors[name], lw=1.8, label=name)
                                 if name == 'imu':
                                         errors_imu[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
                                 elif name == 'imu_mds':
                                         errors_imu_mds[n,:] = np.linalg.norm(pos - gt, axis=1).copy()
 
-                        '''
+                        
                         ax.set_title("Positioning error vs ground truth")
                         ax.set_xlabel("Simulation steps")
                         ax.set_ylabel("Meters")
@@ -292,7 +307,7 @@ class Simulation:
                         fig.tight_layout()
                         plt.savefig(os.path.join(self.sim_name,f"floater_{n}_errors.png"), dpi=300)
                         plt.close(fig)
-                        '''
+                        
                 
                 print(f"{'Version':22s} {'RMSE':>10s}")
                 for name in names:
@@ -304,45 +319,17 @@ class Simulation:
                         e = np.concatenate(e_all)
                         print(f"{name:22s} {np.sqrt((e**2).mean()):10.3f}")
 
-                clean_temporary_files()
+                clean_temporary_files(self.sim_name)
 
                 if ADD_PSI_ERROR and HYDROMATE_SIMULATION:
-                        print(f"psi_error_arrays: {self.psi_error_arrays}")
                         self.bearing_arrays = wrap_degrees(self.bearing_arrays + self.psi_error_arrays)
-                        print(f"FINAL BEARINGS: {self.bearing_arrays}")
 
-                # TODO modifica
-                #res = kalman_track(self.RX_positions, self.bearing_arrays, dt=4.5,elevation_array=self.elevation_arrays)
+
+                res = kalman_track(self.RX_positions, self.bearing_arrays, dt=4.5,elevation_array=self.elevation_arrays)
                 #tracking_report(res, self.TX_positions)
-                #plot_tracking(res, self.TX_positions, self.RX_positions,save_path="trackNEW.png")
-
-                # TODO: TMP
-                #estimated_points = find_points(self.RX_positions,self.bearing_arrays,self.elevation_arrays)
-
-                # Plotting points on the map 
-                '''
-                build_local_cartesian_map(
-                        floater_coordinates=self.RX_positions,
-                        TX_coordinates=self.TX_positions,
-                        #estimated_vessel_coordinates=res['raw'],
-                        tracks=[
-                                Track("RX IMU", RX_fw_IMU, "#0000FF"),
-                                Track("RX IMU+MDS", RX_fw_IMU_MDS, "#2AB040"),
-                                Track("Compensated", RX_IMU_compensated, "#FF8822"),
-                                ],
-                        output_file=os.path.join(self.sim_name,"local_map.png"),
-                        LEGEND=False
-                )
-
-                
-                build_local_cartesian_map(
-                                        floater_coordinates=self.RX_positions,
-                                        TX_coordinates=self.TX_positions,
-                                        estimated_vessel_coordinates=res['smoothed'],
-                                        output_file=os.path.join(self.sim_name,"local_map_smoothed.png"),
-                                        LEGEND=False
-                                )
-                '''
+                #plot_tracking_map(res, self.TX_positions, self.RX_positions,out_folder=self.sim_name)
+                #plot_tracking_error(res, self.TX_positions,out_folder=self.sim_name)
+                print(res['raw'])
 
                 return {
                         "RX_gt_pos": self.RX_positions,
@@ -351,6 +338,7 @@ class Simulation:
                         "RX_imu_mds": RX_fw_IMU_MDS,
                         "RX_imu_comp": RX_IMU_compensated,
                         'errors_imu' : errors_imu,
-                        'errors_imu_mds' : errors_imu_mds
+                        'errors_imu_mds' : errors_imu_mds,
+                        'bearing_arrays':self.bearing_arrays
                 }
         
