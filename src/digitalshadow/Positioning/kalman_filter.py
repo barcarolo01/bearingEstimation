@@ -150,9 +150,10 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
     # RTS smoother
     x_s, _, _, _ = kf.rts_smoother(x_f, P_f)
 
+    print(start)
     filtered = np.full((STEPS, 3), np.nan)
     filtered[start:, :2] = x_f[:, [0, 2]]   # Filitered [x,y]
-    filtered[start:, 2] = raw[:, 2] # Depth filling
+    filtered[:, 2] = raw[:, 2] # Depth filling
 
     smoothed = np.full((STEPS, 3), np.nan)
     smoothed[start:, :2] = x_s[:, [0, 2]]   # Smoothed [x,y]

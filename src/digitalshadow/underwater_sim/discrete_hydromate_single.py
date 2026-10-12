@@ -25,7 +25,7 @@ def run_discrete_hydromate_single(sim_name, Lat_TX, Lon_TX, depth_TX, Lat_RX, Lo
                     np.asarray(Floater_hydrophones),
                     "CVWT", "A",
                     [-89,89],
-                    10000,
+                    100,
                     nrr=1,
                     nrd=1)
 

@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
-DIST = 100
-SNRs = np.arange(-15, 3, 1)
+DIST = 30
+SNRs = np.arange(-18, 1, 1)
 N_TRIALS = 200
 
 SIM_NAME = "SNR_testing"
@@ -18,7 +18,7 @@ def wrap_deg(x):
 
 
 if __name__ == "__main__":
-    Center = [29.834027625426177, 49.69442749625741]
+    Center = [28.091633059908357,49.08909082064002]
     
     print(f"Depth = {get_depth_gebco(Center[0],Center[1])}")
 
@@ -63,10 +63,10 @@ if __name__ == "__main__":
     median = np.median(all_errors, axis=1)
     q25 = np.percentile(all_errors, 25, axis=1)
     q75 = np.percentile(all_errors, 75, axis=1)
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=(9, 5))
     
 
-    ax.plot(SNRs, median, 'o-', lw=2, label='Mediana')
+    ax.plot(SNRs, median, 'o-', lw=2, label='Median')
     ax.fill_between(SNRs, q25, q75, alpha=0.3, label='IQR')
     ax.legend()
     ax.set_xticks(SNRs)             
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     ax.tick_params(axis="both", which="major", labelsize=FONTSIZE)
     ax.legend(fontsize=FONTSIZE_LEGEND)
 
-    ax.set_title(f"Bearing error vs SNR  (distance = {DIST} m)")
+    #ax.set_title(f"Bearing error vs SNR  (distance = {DIST} m)")
     fig.tight_layout()
     fig.savefig("bearing_error_vs_SNR.png", dpi=900)
     plt.show()

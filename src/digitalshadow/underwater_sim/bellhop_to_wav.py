@@ -1,4 +1,5 @@
 import os
+from digitalshadow.underwater_sim.ambient_noise import add_ambient_noise, get_noise_config
 from digitalshadow.utils.checkcal import check_calibration
 from dotenv import load_dotenv
 import numpy as np
@@ -6,10 +7,10 @@ from scipy.fft import rfft, irfft, rfftfreq, next_fast_len
 from scipy.signal import resample_poly
 import scipy.io.wavfile as wav
 from math import gcd
-from digitalshadow.underwater_sim.ambient_noise import get_noise_config, add_ambient_noise
+#from digitalshadow.underwater_sim.ambient_noise import get_noise_config, add_ambient_noise
 from digitalshadow.utils.test_bathymetry import get_depth_gebco
 
-FS_OUT = 96000
+
 P_REF = 1e-6
 
 # FFT data of the source signal (constant during the entire simulation)
@@ -54,8 +55,11 @@ def read_arr(filename):
 
     return arrivals
 
-def synth_rx(src_path, sim_name, arrivals, fs, n_out, t0):
+def synth_rx(src_path, sim_name, arrivals, fs, n_out, t0, sl_db):
     global FFT_X, FFT_f, FFT_nfft
+
+    load_dotenv()
+    FS_OUT = int(os.getenv('SAMPLING_FREQUENCY'))
 
     arr = np.asarray(arrivals, dtype=np.float64).reshape(-1, 8)
 
@@ -70,7 +74,7 @@ def synth_rx(src_path, sim_name, arrivals, fs, n_out, t0):
     # ========= Source signal =========
     if FFT_X is None or FFT_f is None:
         # Load the audio file
-        src = load_audio_source(src_path,FS_OUT,sl_db=150)
+        src = load_audio_source(src_path,FS_OUT,sl_db=sl_db)
 
         # Compute the minimum length required to achieve the target output length
         x = np.zeros(n_out)
@@ -89,7 +93,7 @@ def synth_rx(src_path, sim_name, arrivals, fs, n_out, t0):
     # Multiplication in frequency domain and transformation in time domain
     return irfft(FFT_X * H, n=FFT_nfft)[:n_out]
 
-def load_audio_source(filepath, fs_target, sl_db=None, active_thresh_db=-40.0):
+def load_audio_source(filepath, fs_target, sl_db):
     """
     Loads the source track. If sl_db is given, the track is scaled to physical
     pressure [Pa] at 1 m, such that its active RMS equals SL (dB re 1 µPa @ 1 m).
@@ -107,15 +111,15 @@ def load_audio_source(filepath, fs_target, sl_db=None, active_thresh_db=-40.0):
     data /= np.max(np.abs(data))
 
     # Calibration
-    if False:
+    if True:
         p_rms_target = P_REF * 10 ** (sl_db / 20) 
         data *= p_rms_target / np.sqrt(np.mean(data**2))
         print(f"Source calibrated: SL = {sl_db:.1f} dB re 1 µPa @ 1 m")
 
     return data
 
-def from_arr_to_wav(TX_POS, number_mic: int,sim_name=str, n_arrivals=0, sl_db=150, sim_timestamp=0, floater_number=0,
-                    add_noise=False, noise_seed=1, save_clean=False):
+def from_arr_to_wav(TX_POS, number_mic: int,sim_name, sl_db, noise_seed, n_arrivals=0, sim_timestamp=0, floater_number=0,
+                    add_noise=False, save_clean=False):
     """
     Generates the received pressure [Pa] for N hydrophones from Bellhop .arr files.
 
@@ -130,6 +134,9 @@ def from_arr_to_wav(TX_POS, number_mic: int,sim_name=str, n_arrivals=0, sl_db=15
     noise_seed   : noise seed; None = use NOISE_SEED (if defined) or random
     save_clean   : if True, also save the noise-free traces (H{i}_clean.npy)
     """
+
+    load_dotenv()
+    FS_OUT = int(os.getenv('SAMPLING_FREQUENCY'))
 
     # Arrivals for each hydrophone (sorted by time of arrival)
     arrivals_per_mic = []
@@ -166,45 +173,49 @@ def from_arr_to_wav(TX_POS, number_mic: int,sim_name=str, n_arrivals=0, sl_db=15
         if used:
             load_dotenv()
             src_path = os.getenv('SRC_AUDIO_PATH')
-            rx = synth_rx(src_path, sim_name, used, FS_OUT, FS_OUT, t0)
+            rx = synth_rx(src_path, sim_name, used, FS_OUT, FS_OUT, t0, sl_db)
         else:
             rx = np.zeros(FS_OUT)
-
-        #src = load_audio_source(src_path, FS_OUT, sl_db=sl_db)
-        #check_calibration(rx, src, used, FS_OUT, sl_db, label=f"H{i}")
 
         clean.append(rx)
 
     # == Ambient noise (Wenz), optional
     cfg = get_noise_config()
 
-    if add_noise:
-        rng = np.random.default_rng(noise_seed)
+    #if add_noise or True:
+    if True:
+        rng = np.random.default_rng([noise_seed, sim_timestamp, floater_number])
         print(f"Ambient noise ON: shipping={cfg['shipping']}, wind={cfg['wind']} m/s, "
-              f"extra={cfg['extra_db']:+.1f} dB, band {cfg['f_low']:.0f}-{cfg['f_high']:.0f} Hz, "
+              f"extra={cfg['extra_db']:+.1f} dB, "
               f"seed={noise_seed}")
-        out, _ = add_ambient_noise(clean, FS_OUT,
-                                   shipping=cfg["shipping"], wind=cfg["wind"],
-                                   extra_db=cfg["extra_db"], rng=rng,
-                                   f_low=cfg["f_low"], f_high=cfg["f_high"])
+        out, _ = add_ambient_noise(clean, FS_OUT,shipping=cfg["shipping"],
+                                   wind=cfg["wind"],
+                                   extra_db=cfg['extra_db'],
+                                   rng=rng,coherent=True)
     else:
         #print("Ambient noise OFF")
         out = clean
+    
+    #out=clean
 
     # == Save
     for i, rx in enumerate(out, start=1):
-        L_MAX = 500
+        L_MAX = 800
         depth = get_depth_gebco(TX_POS[0],TX_POS[1])
-        
+
+        #print(f"RX TRUE: {20 * np.log10(np.sqrt(np.mean(rx**2)) / P_REF)}")
+        #print(f"RX UNO: {sl_db - 20*np.log10(L_MAX)}")
+        #print(f"RX DUE: {sl_db - (20*np.log10(depth) + 10*np.log10(L_MAX/depth))}")
+
         if(L_MAX <= depth):
             RX_EST_BEST = sl_db - 20*np.log10(L_MAX)
+            #print("USED UNO")
         else:
             RX_EST_BEST = sl_db - (20*np.log10(depth) + 10*np.log10(L_MAX/depth))
+            #print("USED DUE")
 
-        #print(f"RX BEST: {RX_EST_BEST}")
-        #print(f"RX TRUE: {20 * np.log10(np.sqrt(np.mean(rx**2)) / P_REF)}")
         
-        level_db = RX_EST_BEST - (-9)
+        level_db = RX_EST_BEST - (-8)
         rng = np.random.default_rng(i+(noise_seed**2))
         sigma = 1e-6 * 10 ** (level_db / 20)          # Pa RMS
         #rx =  rx + 0 + sigma * rng.standard_normal(len(rx))

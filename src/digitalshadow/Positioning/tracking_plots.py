@@ -59,7 +59,7 @@ def tracking_report(res, tx_gt):
     """Prints RMSE, median, 90th percentile and max error for each available method."""
     err = _errors(res, tx_gt)
     print("===== Kalman filter report =====")
-    print(f"{'method':14s} {'RMSE':>8s} {'median':>8s} {'p90':>8s} {'max':>8s} {'valid':>9s}")
+    print(f"{'method':14s} {'RMSE':>8s} {'median':>8s} {'max':>8s} {'valid':>9s}")
     out = {}
     for k, e in err.items():
         v = e[np.isfinite(e)]

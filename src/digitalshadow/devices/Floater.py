@@ -478,7 +478,6 @@ class Floater(Transmitter):
                                     for k, v in self.pos_history.items()}
         for idx, p in enumerate(self.Resurface_index):
             res_prec = self.Resurface_index[idx - 1] if idx > 0 else 0
-
             if p - res_prec < 2:          # intervallo troppo corto
                     continue
 
@@ -497,7 +496,7 @@ class Floater(Transmitter):
             'gt':              _dict_to_array(self.gt_history),
 
             'psi_gt':   _dict_to_array_scalar(self.psi_history),      
-            'psi_est':  _dict_to_array_scalar(self.psi_est_history),  # Euto-estimated
+            'psi_est':  _dict_to_array_scalar(self.psi_est_history),  # Auto-estimated
             'psi_err':  _dict_to_array_scalar(self.psi_err_history),  # Estimated - groundtruth, in [-180, 180)
         }
 

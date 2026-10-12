@@ -31,7 +31,7 @@ pip install -e path/to/digitalshadow/folder
 5. Create a `.env` file with the following environment variables
 
 ```env
-SAMPLING_FREQUENCY = "96000"
+SAMPLING_FREQUENCY = "48000"
 NUMBER_OF_HYDROPHONES = "5"
 HYDROMATE_PY_PATH = "Path/to/your/hydromate/python/hm_code/folder"
 ```
