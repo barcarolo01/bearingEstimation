@@ -15,10 +15,9 @@ from plot_simulation import plot_sim_interactive
 FONTSIZE = 18
 
 ADD_PSI_ERROR = False
-SIM = False
 
 class Simulation:
-        def __init__(self, Floaters, Center, transmitter=None,  Steps=1, transmitter_coordinates=None, sim_name="simulation0", TX_LIMIT=1, seed=256123):
+        def __init__(self, Floaters, Center, transmitter=None,  Steps=1, transmitter_coordinates=None, sim_name="simulation0", TX_LIMIT=1, seed=256123, HYDROMATE_SIMULATION=True):
                 '''
                 Initialization method. Input:
                  * Floaters: list of 'Floater' objects
@@ -37,7 +36,7 @@ class Simulation:
                 load_dotenv()
                 self.init_seed = seed
                 self.rnd_packetloss = np.random.default_rng(seed+1)
-                
+                self.HYDROMATE_SIMULATION = HYDROMATE_SIMULATION
 
                 self.sim_name = sim_name
                 if os.path.isdir(self.sim_name):
@@ -114,7 +113,7 @@ class Simulation:
                 
                                 RX_gt_Coordinates = local_to_geo(self.Center,self.RX_positions[i,n,:])
 
-                                if SIM:
+                                if self.HYDROMATE_SIMULATION:
                                         run_discrete_hydromate_single(  self.sim_name,
                                                                         TX_Coordinates[0],
                                                                         TX_Coordinates[1],

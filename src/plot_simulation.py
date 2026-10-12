@@ -184,6 +184,7 @@ def plot_sim_interactive(simulation_folder, kres=None):
             ax_err.legend(loc="upper left", fontsize=8)
 
         fig.canvas.draw_idle()
+        fig.savefig(os.path.join(simulation_folder,"sim_results.png"))
 
     def on_coord(label):
         state["geo"] = label.startswith("Geo")
@@ -254,4 +255,4 @@ def plot_sim_result(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_sim_result("simulation1")
+        plot_sim_result("simulation1000")
