@@ -35,7 +35,7 @@ def initial_state(z, R, init_speed_std):
 
 def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
                  a_max=0.5, init_speed_std=15.0, max_init_std=50.0,
-                 gate=9.21, max_consecutive_rejects=3):
+                 gate=9.21, max_consecutive_rejects=30):
     """
     Parameters
     ----------

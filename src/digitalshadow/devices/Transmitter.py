@@ -10,7 +10,7 @@ Class Floater, defined in its own file, derives from Transmitter.
 '''
 
 class Transmitter:
-    def __init__(self, ID, gt_x, gt_y, gt_z, dt=1.0):
+    def __init__(self, ID, gt_x, gt_y, gt_z, dt=1.0, seed = 0):
         self.dt = dt
         self.ID = ID
         self.steps_counter = 0
@@ -20,6 +20,7 @@ class Transmitter:
         # === Motion model parameters ===
         self.Rho = 0.0
         self.sigma = np.zeros(3)
+        self.mov_rnd = np.random.default_rng(seed)
 
     def set_rho(self, rho):
         """Set the autocorrelation parameter of the motion model"""
@@ -54,7 +55,7 @@ class Transmitter:
         self.steps_counter += 1
 
         # Motion model: AR(1) process for velocity
-        e = np.random.normal(0, self.sigma)
+        e = self.mov_rnd.normal(0, self.sigma)
         self.gt_v = self.gt_v * self.Rho + e * np.sqrt(1 - self.Rho**2)
         
         # Update true position

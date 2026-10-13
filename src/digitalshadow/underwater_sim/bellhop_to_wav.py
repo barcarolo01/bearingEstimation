@@ -75,10 +75,10 @@ def synth_rx(src_path, sim_name, arrivals, fs, n_out, t0, sl_db):
     if FFT_X is None or FFT_f is None:
         # Load the audio file
         src = load_audio_source(src_path,FS_OUT,sl_db=sl_db)
-
+        
         # Compute the minimum length required to achieve the target output length
         x = np.zeros(n_out)
-        x[:min(n_out, len(src))] = src[:n_out]
+        x[:min(n_out, len(src))] = src[len(src)//2-n_out//2:len(src)//2+n_out//2]
         nfft = next_fast_len(2 * n_out) 
 
         # Compute the FFT
@@ -183,7 +183,7 @@ def from_arr_to_wav(TX_POS, number_mic: int,sim_name, sl_db, noise_seed, n_arriv
     cfg = get_noise_config()
 
     #if add_noise or True:
-    if True:
+    if False:
         rng = np.random.default_rng([noise_seed, sim_timestamp, floater_number])
         print(f"Ambient noise ON: shipping={cfg['shipping']}, wind={cfg['wind']} m/s, "
               f"extra={cfg['extra_db']:+.1f} dB, "

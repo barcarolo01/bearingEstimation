@@ -255,4 +255,4 @@ def plot_sim_result(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_sim_result("simulation1000")
+        plot_sim_result("simulation12")

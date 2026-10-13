@@ -238,5 +238,5 @@ def circular_trim_mean(angles, proportiontocut=0.1):
 
 def clean_temporary_files(sim_name):
     for j in range(5):
-        if os.path.isdir(f"HM_OUT_{sim_name}_{j+1}"):
-                shutil.rmtree(f"HM_OUT_{sim_name}_{j+1}")
+        if os.path.isdir(f"HM_out_{sim_name}_{j+1}"):
+                shutil.rmtree(f"HM_out_{sim_name}_{j+1}")

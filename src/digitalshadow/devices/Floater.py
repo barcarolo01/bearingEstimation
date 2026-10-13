@@ -27,8 +27,8 @@ class Floater(Transmitter):
     This class emulates a floater, its motion model and its self-positioning algorithm based on 
     a simulated Inertial Movement Unit (IMU).
     """
-    def __init__(self, ID, gt_x, gt_y, gt_z, NF, dt=1.0,imu_seed=1):
-        super().__init__(ID=ID, gt_x=gt_x, gt_y=gt_y, gt_z=gt_z, dt=dt)
+    def __init__(self, ID, gt_x, gt_y, gt_z, NF, dt=1.0,seed=1):
+        super().__init__(ID=ID, gt_x=gt_x, gt_y=gt_y, gt_z=gt_z, dt=dt, seed = seed)
 
         self.gt_v = np.zeros(3)     # Initial ground truth velocity
         self.gt_psi   = 0           # Initial ground truth heading 
@@ -36,11 +36,11 @@ class Floater(Transmitter):
         self.gt_omega = 0           # Initial ground truth angular velocity
 
         # === RANDOM NUMBER GENERATORS ===
-        self.rnd_gt = np.random.default_rng([imu_seed, ID, 0])      # Random generator for gt value
-        self.rnd_gyro = np.random.default_rng([imu_seed, ID, 1])    # Gyroscope
-        self.rnd_accel = np.random.default_rng([imu_seed, ID, 2])   # Accelerometer
-        self.rnd_compass = np.random.default_rng([imu_seed, ID, 3]) # E-compass
-        self.rnd_clk = np.random.default_rng([imu_seed, ID, 4])     # Random clock generator
+        self.rnd_gt = np.random.default_rng(seed+1)      # Random generator for gt value
+        self.rnd_gyro = np.random.default_rng(seed+2)    # Gyroscope
+        self.rnd_accel = np.random.default_rng(seed+3)   # Accelerometer
+        self.rnd_compass = np.random.default_rng(seed+4) # E-compass
+        self.rnd_clk = np.random.default_rng(seed+5)     # Random clock generator
 
 
         self.NF = NF # Number of floaters

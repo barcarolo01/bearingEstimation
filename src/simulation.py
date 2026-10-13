@@ -36,6 +36,7 @@ class Simulation:
                 load_dotenv()
                 self.init_seed = seed
                 self.rnd_packetloss = np.random.default_rng(seed+1)
+                self.rnd_transmitter = np.random.default_rng(seed+2)
                 self.HYDROMATE_SIMULATION = HYDROMATE_SIMULATION
 
                 self.sim_name = sim_name
@@ -121,7 +122,7 @@ class Simulation:
                                                                         RX_gt_Coordinates[0],
                                                                         RX_gt_Coordinates[1],
                                                                         RX_gt_Coordinates[2],
-                                                                        
+        
                                                                         PSI_RX=self.Floaters[n].gt_psi,
                                                                         seed = self.init_seed * 15 + 2)
                                         

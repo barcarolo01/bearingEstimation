@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import scipy.io.wavfile as wav
 from scipy.signal import butter, find_peaks, get_window, lfilter, decimate, hilbert, welch
 from math import floor
+from scipy.ndimage import median_filter
 from scipy.signal import detrend, butter, sosfiltfilt
 
 
@@ -23,7 +24,6 @@ def decimate_cascade(x, factor, ftype='fir', max_step=10):
         x = decimate(x, step, ftype=ftype)
         remaining //= step
     return x
-
 
 def square_law(x, cutoff=1000.0, high=30000, low=20000, fs=200000):
     """
@@ -62,7 +62,6 @@ def square_law(x, cutoff=1000.0, high=30000, low=20000, fs=200000):
 
     new_fs = fs / n
     return x, new_fs
-
 
 def hilbert_detector(x, target_fs=None, cutoff=1000.0, high=30000, low=20000, fs=200000):
     ...
@@ -140,7 +139,6 @@ def find_demon_peaks(freqs, psd, freq_min=0.5, freq_max=None,
     order_f = np.argsort(peak_freqs)
     return peak_freqs[order_f], peak_psd[order_f]
 
-
 def compute_demon_spectrum(envelope, env_fs):
     """
     Calcola lo spettro DEMON dell'inviluppo con Welch.
@@ -155,25 +153,22 @@ def compute_demon_spectrum(envelope, env_fs):
                         window='hann', scaling='density')
     return freqs, psd
 
+def demon_normalized(envelope, env_fs, seg_s=0.5, bg_win_hz=30.0):
+    nperseg = int(seg_s * env_fs)
+    freqs, psd = welch(envelope, fs=env_fs, nperseg=nperseg,
+                       noverlap=nperseg // 2, nfft=2 * nperseg,
+                       window='hann', scaling='density')
+    df = freqs[1] - freqs[0]
+    k = max(3, int(bg_win_hz / df) | 1)          # finestra dispari, in bin
+    bg = median_filter(psd, size=k, mode='nearest')
+    return freqs, psd / (bg + 1e-30)
 
-
-if __name__ == "__main__":
-
-    # --------- Parametri da adattare ---------
-    WAV_PATH = "AudioFiles/Motorboat_26.08.23_115945_20secCPA.wav"
-    #WAV_PATH = "simulation0/SynthTracks/T0_F1_H1.wav"
-    #WAV_PATH = "Synth/F1_H2.wav"
-    #WAV_PATH = "AudioFiles/0937_crop.wav"
-    LOW_HZ = 2.0         # limite inferiore banda passante (Hz)
+def detect_env(sig0,fs):
+    LOW_HZ = 5.0         # limite inferiore banda passante (Hz)
     HIGH_HZ = 15000.0       # limite superiore banda passante (Hz)
     CUTOFF_HZ = 500.0       # frequenza massima di interesse nello spettro DEMON (Hz)
     FREQ_PLOT_MAX = 300.0    # range in Hz mostrato nel plot dello spettro
-    # ------------------------------------------
-
-    fs, sig0 = wav.read(WAV_PATH)
     
-    sig0 = sig0.astype(np.float64)
-
     # Verifica coerenza banda passante / Nyquist
     nyq = fs / 2
     if HIGH_HZ >= nyq:
@@ -188,23 +183,29 @@ if __name__ == "__main__":
     envelope_hp = sosfiltfilt(sos_hp, envelope)
 
     freqs, psd = compute_demon_spectrum(envelope_hp, env_fs)
-    mask = freqs <= FREQ_PLOT_MAX
+
+    psd = psd * 1 / np.sqrt(np.mean(psd)**2)
+    mask = (freqs >= 10) & (freqs <= FREQ_PLOT_MAX)
 
      # --------- Rilevamento picchi ---------
-    PEAK_FREQ_MIN = 0.5       # esclude drift residuo vicino a 0
-    PEAK_PROMINENCE_DB = 3  # abbassa se mancano picchi veri, alza se ne prende troppi/rumore
+    PEAK_FREQ_MIN = 0.5     # esclude drift residuo vicino a 0
+    PEAK_PROMINENCE_DB = 2  # abbassa se mancano picchi veri, alza se ne prende troppi/rumore
     PEAK_MAX_COUNT = 3
-    FREQ_PLOT_MAX = 300.0     # alzato per mostrare bene la serie 70-140-210-280
+    FREQ_PLOT_MAX = 300.0   # alzato per mostrare bene la serie 70-140-210-280
+
+
+    #print(psd)
 
     peak_freqs, peak_psd = find_demon_peaks(
-    freqs, psd,
-    freq_min=PEAK_FREQ_MIN,
-    freq_max=FREQ_PLOT_MAX,
-    prominence_db=PEAK_PROMINENCE_DB,  # es. 3-6 dB, filtra "quanto emerge"
-    min_psd=0.08,                        # filtra "quanto vale in assoluto"
-    max_peaks=PEAK_MAX_COUNT,
-)
+        freqs, psd,
+        freq_min=PEAK_FREQ_MIN,
+        freq_max=FREQ_PLOT_MAX,
+        prominence_db=6,  # es. 3-6 dB, filtra "quanto emerge"
+        min_psd=0.08,                        # filtra "quanto vale in assoluto"
+        max_peaks=PEAK_MAX_COUNT,
+    )
  
+
     if len(peak_freqs) > 0:
         print("Picchi rilevati (Hz):")
         for pf, pp in zip(peak_freqs, peak_psd):
@@ -213,6 +214,7 @@ if __name__ == "__main__":
         print("Nessun picco significativo rilevato con i parametri correnti.")
 
     # ================== PLOTTING ==================
+
     FONTSIE = 15
     plt.rcParams.update({
         "font.size": FONTSIE,
@@ -227,7 +229,6 @@ if __name__ == "__main__":
     ax.set_title(f"Decimated envelope")
 
 
-
     ax = axes[1]
     ax.plot(freqs[mask], psd[mask], color='green', linewidth=0.8,zorder = 1)
     ax.grid(True, linestyle='--', alpha=0.5)
@@ -235,8 +236,8 @@ if __name__ == "__main__":
     ax.set_ylabel("PSD")
     ax.set_title("DEMON Spectrum")
 
-    peak_freqs = peak_freqs[1:]
-    peak_psd = peak_psd[1:]
+    peak_freqs = peak_freqs[0:]
+    peak_psd = peak_psd[0:]
 
     for f, p in zip(peak_freqs,peak_psd):
         ax.scatter(f, p,marker='o',color='red')
@@ -244,5 +245,18 @@ if __name__ == "__main__":
 
 
     plt.tight_layout()
-    #plt.savefig("DEMON_Garda.png")
+    plt.savefig("DEMON.png")
+    return np.max(psd) > 6
     plt.show()
+
+if __name__ == "__main__":
+    # --------- Parametri da adattare ---------
+    WAV_PATH = "simulation1000/SynthTracks/T0_F2_H2.wav"
+    #WAV_PATH = "AudioFiles/barca.wav"
+    #WAV_PATH = "Synth/F1_H2.wav"
+    #WAV_PATH = "AudioFiles/0937_crop.wav"
+
+    # ------------------------------------------
+
+    fs, sig0 = wav.read(WAV_PATH)
+    detect_env(sig0,fs)

@@ -7,7 +7,7 @@ from matplotlib.ticker import FuncFormatter
 from scipy.io import wavfile
 import numpy as np
 font_size = 13
-filename = 'AudioFiles/motorboat.wav'
+filename = 'AudioFiles/barca.wav'
 
 samplingFrequency, signalData = wavfile.read(filename)
 signalData = signalData / np.iinfo(signalData.dtype).max
@@ -26,5 +26,5 @@ ax.tick_params(axis='both', which='major', labelsize=font_size)
 ax.set_xlabel('Time (s)',fontsize=font_size)
 ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x/1000)}'))
 ax.set_ylabel('Frequency (kHz)',labelpad=15,fontsize=font_size)
-#plt.savefig(f'FiguresAndPlots/spectrogram.png', bbox_inches='tight')
+plt.savefig(f'spectrogram.png', bbox_inches='tight')
 plt.show()

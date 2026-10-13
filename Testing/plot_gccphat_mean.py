@@ -14,9 +14,9 @@ _, sig2 = wav.read('Synth/F1_H2.wav')
 _, sig3 = wav.read('Synth/F1_H3.wav')
 '''
 
-fs, sig1 = wav.read('Synth/T0_F2_H1.wav')
-_, sig2 = wav.read('Synth/T0_F2_H2.wav')
-_, sig3 = wav.read('Synth/T0_F2_H3.wav')
+fs, sig1 = wav.read('simulation1002/SynthTracks/T500_F2_H1.wav')
+_, sig2 = wav.read('simulation1002/SynthTracks/T500_F2_H2.wav')
+_, sig3 = wav.read('simulation1002/SynthTracks/T500_F2_H3.wav')
 
 '''
 fs, data = wav.read('AudioFiles/0958_crop.wav')
@@ -64,4 +64,5 @@ for i, (ax, values, lbl) in enumerate(zip(axes, data, datasets_label)):
     
     
 plt.show()
-fig.savefig('FiguresAndPlots/gcc_phat_synth.eps', format='eps')
+#fig.savefig('gcc_phat_synth.eps', format='eps')
+fig.savefig('gcc_phat_synth.png', format='png')
