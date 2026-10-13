@@ -26,6 +26,13 @@ TARGET_STYLE = {
     "Kalman":        dict(color="#FFCC00FF", lw=3),
     "Kalman RTS": dict(color="#2AB040", lw=3),
 }
+# Style overrides used ONLY in the target-error plot (top right).
+# Keys given here replace the corresponding ones in TARGET_STYLE; everything else is inherited.
+TARGET_ERR_STYLE = {
+    "Triangulation": dict(ls="-", lw=1, marker="none", color="#002AFF", alpha=0.5),
+    "Kalman":        dict(ls="-", lw=1,color="#FFCC00FF",  alpha=0.5),
+    "Kalman RTS": dict(ls="-", lw=1,color="#2AB040",  alpha=0.5),
+}
 
 
 def local_to_geo(east, north, lat0, lon0):
@@ -84,7 +91,13 @@ def plot_sim_interactive(simulation_folder, kres=None):
 
     fig = plt.figure(figsize=(15, 7.5))
     ax_map = fig.add_axes([0.25, 0.09, 0.42, 0.83])
-    ax_err = fig.add_axes([0.73, 0.09, 0.25, 0.83])
+    ax_terr = fig.add_axes([0.73, 0.56, 0.25, 0.36])                  # top: target error
+    ax_ferr = fig.add_axes([0.73, 0.09, 0.25, 0.36])  # bottom: floater error
+
+    # Target horizontal error vs ground truth for each estimate: shape (N_STEPS,), NaN where missing
+    tx_gt = targets["Target GT"]
+    target_errors = {name: np.linalg.norm(arr[:, :2] - tx_gt[:, :2], axis=-1)
+                     for name, arr in targets.items() if name != "Target GT" and arr is not None}
 
     # --- Widgets -----------------------------------------------------------
     ax_coord = fig.add_axes([0.02, 0.83, 0.17, 0.10])
@@ -121,7 +134,8 @@ def plot_sim_interactive(simulation_folder, kres=None):
         visible.update(zip(target_traces, check_t.get_status()))
         floaters = range(n_floaters) if state["floater"] is None else [state["floater"]]
         ax_map.clear()
-        ax_err.clear()
+        ax_terr.clear()
+        ax_ferr.clear()
 
         # --- Map: floaters ---------------------------------------------------
         floater_arrays = {"Floater GT": gt, **estimates}
@@ -168,20 +182,48 @@ def plot_sim_interactive(simulation_folder, kres=None):
         if ax_map.get_legend_handles_labels()[0]:
             ax_map.legend(loc="best", fontsize=9)
 
-        # --- Floater positioning error ----------------------------------------
+        # --- Target positioning error (top) -----------------------------------
+        for name, e in target_errors.items():
+            if not visible[name]:
+                continue
+            rmse = np.sqrt(np.nanmean(e ** 2))   # NaN steps (no fix / filter not started) are ignored
+            style = {**TARGET_STYLE[name], **TARGET_ERR_STYLE.get(name, {})}
+            steps = np.arange(e.shape[0])
+            ax_terr.plot(steps, e, **style, label=f"{name} (RMSE {rmse:.2f} m)")
+        
+        ax_terr.set_title("Target error vs ground truth")
+        ax_terr.set_xlabel("Simulation steps")
+        ax_terr.set_ylabel("Meters")
+        ax_terr.grid(True, ls="--", alpha=.5)
+        ax_terr.tick_params()
+        if ax_terr.get_legend_handles_labels()[0]:
+            ax_terr.legend(loc="upper left", fontsize=8)
+
+        # --- Floater positioning error (bottom) -------------------------------
         for name in estimates:
             if not visible[name]:
                 continue
             e = errors[name][list(floaters)]            # (n_selected, steps)
             rmse = np.sqrt((e ** 2).mean())
-            curve = e[0] if len(e) == 1 else e.mean(axis=0)
-            ax_err.plot(curve, **FLOATER_STYLE[name], label=f"{name} (RMSE {rmse:.2f} m)")
-        ax_err.set_title("Floater error vs ground truth" + ("" if state["floater"] is not None else " (mean)"))
-        ax_err.set_xlabel("Simulation steps")
-        ax_err.set_ylabel("Meters")
-        ax_err.grid(True, ls="--", alpha=.5)
-        if ax_err.get_legend_handles_labels()[0]:
-            ax_err.legend(loc="upper left", fontsize=8)
+            if len(e) == 1:
+                ax_ferr.plot(e[0], **FLOATER_STYLE[name], label=f"{name} (RMSE {rmse:.2f} m)")
+            else:
+                # Mean across floaters + interquartile range (25th-75th percentile) as a band
+                steps = np.arange(e.shape[1])
+                q1, q3 = np.percentile(e, [25, 75], axis=0)
+                ax_ferr.fill_between(steps, q1, q3, color=FLOATER_STYLE[name]["color"],
+                                     alpha=0.2, lw=0)
+                ax_ferr.plot(steps, e.mean(axis=0), **FLOATER_STYLE[name],
+                             label=f"{name} (RMSE {rmse:.2f} m)")
+        if len(floaters) > 1 and any(visible[name] for name in estimates):
+            ax_ferr.fill_between([], [], [], color="grey", alpha=0.2, lw=0, label="IQR (25–75%)")
+        ax_ferr.set_title("Floater error vs ground truth"
+                          + (" (mean, IQR band)" if len(floaters) > 1 else f" – Floater {state['floater'] + 1}"))
+        ax_ferr.set_xlabel("Simulation steps")
+        ax_ferr.set_ylabel("Meters")
+        ax_ferr.grid(True, ls="--", alpha=.5)
+        if ax_ferr.get_legend_handles_labels()[0]:
+            ax_ferr.legend(loc="upper left", fontsize=8)
 
         fig.canvas.draw_idle()
         fig.savefig(os.path.join(simulation_folder,"sim_results.png"))
@@ -198,9 +240,9 @@ def plot_sim_interactive(simulation_folder, kres=None):
         tag = "all" if state["floater"] is None else f"floater_{state['floater'] + 1}"
         tag += "_geo" if state["geo"] else "_local"
         path = os.path.join(simulation_folder, f"interactive_{tag}.png")
-        try:   # save only the two plots, without the widgets
+        try:   # save only the plots, without the widgets
             r = fig.canvas.get_renderer()
-            bbox = Bbox.union([ax_map.get_tightbbox(r), ax_err.get_tightbbox(r)])
+            bbox = Bbox.union([ax.get_tightbbox(r) for ax in (ax_map, ax_terr, ax_ferr)])
             fig.savefig(path, dpi=300, bbox_inches=bbox.transformed(fig.dpi_scale_trans.inverted()))
         except Exception:
             fig.savefig(path, dpi=300)
@@ -255,4 +297,4 @@ def plot_sim_result(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_sim_result("simulation12")
+        plot_sim_result("simulation13")
