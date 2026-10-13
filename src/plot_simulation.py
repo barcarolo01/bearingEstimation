@@ -216,9 +216,8 @@ def plot_sim_interactive(simulation_folder, kres=None):
                 ax_ferr.plot(steps, e.mean(axis=0), **FLOATER_STYLE[name],
                              label=f"{name} (RMSE {rmse:.2f} m)")
         if len(floaters) > 1 and any(visible[name] for name in estimates):
-            ax_ferr.fill_between([], [], [], color="grey", alpha=0.2, lw=0, label="IQR (25–75%)")
-        ax_ferr.set_title("Floater error vs ground truth"
-                          + (" (mean, IQR band)" if len(floaters) > 1 else f" – Floater {state['floater'] + 1}"))
+            ax_ferr.fill_between([], [], [], color="grey", alpha=0.2, lw=0)
+        ax_ferr.set_title("Floater error vs ground truth")
         ax_ferr.set_xlabel("Simulation steps")
         ax_ferr.set_ylabel("Meters")
         ax_ferr.grid(True, ls="--", alpha=.5)
