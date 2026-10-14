@@ -4,7 +4,7 @@ def load_imu_model(floater,model_name,param_seed=1,dt=1.0):
     rnd_param = np.random.default_rng(param_seed)
     if model_name == 'ADIS16470':
         # Accelerometer
-        floater.sigma_accel_bias = np.ones(3) * (4e-3)
+        floater.sigma_accel_bias = np.ones(3) * (4e-4)
         floater.sigma_accel_white_noise = np.ones(3) * (0.037 / np.sqrt(3600 * dt))
         floater.sigma_accel_bias_driving = np.ones(3) * (13e-6 * 9.81 * np.sqrt(dt / 200.0))
 

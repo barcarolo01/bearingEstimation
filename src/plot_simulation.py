@@ -296,4 +296,4 @@ def plot_sim_result(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_sim_result("simulation13")
+        plot_sim_result("simulation202_MDS100_PLR0.0")

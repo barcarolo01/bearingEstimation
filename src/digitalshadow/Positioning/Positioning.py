@@ -118,7 +118,7 @@ def mds_algo(pos, dist, dist_w, pos_w):
     dist_h = np.sqrt(np.maximum(dist**2 - dz**2, 0.0))
 
     # SMACOF in due dimensioni, seminato dalle posizioni correnti
-    xy_MDS = weighted_smacof(dist_h, dist_w, init=pos[:, :2])
+    xy_MDS = weighted_smacof(dist_h, dist_w, init=pos[:, :2], n_iter = 500)
 
     # Allineamento rigido sul piano
     R, t = roto_trans(pos[:, :2], xy_MDS, pos_w)
