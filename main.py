@@ -10,12 +10,12 @@ HYDROMATE_SIMULATION = True
 
 if __name__ == '__main__':
         SEEDS = np.arange(1,12,1)
-        SEEDS = [12]
+        SEEDS = [1002]
         for SEED in SEEDS:
-                SIMULATION_NAME=f'simulation{SEED}'
+                SIMULATION_NAME=f'simulation{SEED}_600'
                 random_sim = np.random.default_rng(SEED)
                 NUMBER_OF_FLOATERS = 4
-                STEPS = 600
+                STEPS = 1800
                 Center = [20.832813, 88.698390] # India, low depth
                 #Center = [32.839, -34.635] # Atlantic
                 
@@ -48,6 +48,7 @@ if __name__ == '__main__':
                         f.compass_bias = 0
                         f.compass_bias_sigma = 0
                         f.TX_LIMIT=3
+                        f.MDS_freq = 1800
                         
                         floaters.append(f)
 
