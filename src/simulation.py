@@ -107,7 +107,7 @@ class Simulation:
                         if self.transmitter is not None:
                                 self.TX_positions[i,:] = self.transmitter.gt_pos
 
-                        TX_Coordinates = local_to_geo(self.Center,self.transmitter.gt_pos)
+                        TX_Coordinates = local_to_geo(self.Center,self.TX_positions[i,:])
 
                         for n in range(self.NUMBER_OF_FLOATERS):
                                 self.RX_positions[i,n,:] = self.Floaters[n].gt_pos.copy()
@@ -133,7 +133,7 @@ class Simulation:
                                                         sim_timestamp = i,
                                                         floater_number = (n + 1),
                                                         n_arrivals=0,
-                                                        sl_db=160,
+                                                        sl_db=155,
                                                         add_noise=False,
                                                         noise_seed=self.init_seed)
 

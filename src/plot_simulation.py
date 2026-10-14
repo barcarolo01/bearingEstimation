@@ -285,7 +285,10 @@ def plot_sim_result(simulation_folder):
         print(f"{name:22s} {np.sqrt((errors[name] ** 2).mean()):10.3f}")
 
     # Triangulation + Kalman filter
-    kres = kalman_track(gt, res["bearings_no_psi_error"], dt=4.5, elevation_array=res["elevations"])
+    #QUA
+
+
+    kres = kalman_track(res["RX_IMU"], res["bearings_no_psi_error"], dt=4.5, elevation_array=res["elevations"])
     tracking_report(kres, res["TX"])
     #plot_tracking_map(kres, res["TX"], gt, out_folder=simulation_folder)
     #plot_tracking_error(kres, res["TX"], out_folder=simulation_folder)
@@ -296,4 +299,4 @@ def plot_sim_result(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_sim_result("simulation202_MDS100_PLR0.0")
+        plot_sim_result("simulation202_MDS300_PLR0.0")
