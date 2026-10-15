@@ -26,13 +26,14 @@ TARGET_STYLE = {
     "Kalman":        dict(color="#FFCC00FF", lw=3),
     "Kalman RTS": dict(color="#2AB040", lw=3),
 }
-# Style overrides used ONLY in the target-error plot (top right).
-# Keys given here replace the corresponding ones in TARGET_STYLE; everything else is inherited.
-TARGET_ERR_STYLE = {
-    "Triangulation": dict(ls="-", lw=1, marker="none", color="#002AFF", alpha=0.5),
-    "Kalman":        dict(ls="-", lw=1,color="#FFCC00FF",  alpha=0.5),
-    "Kalman RTS": dict(ls="-", lw=1,color="#2AB040",  alpha=0.5),
+# Floater positions fed to triangulation + Kalman: label -> key in results.npz
+KALMAN_SOURCES = {
+    "Floater GT":      "RX",
+    "IMU":             "RX_IMU",
+    "IMU+MDS":         "RX_IMU_MDS",
+    "IMU compensated": "RX_IMU_comp",
 }
+KALMAN_DT = 4.5              # time between two consecutive steps [s]
 
 
 def local_to_geo(east, north, lat0, lon0):
@@ -74,32 +75,76 @@ def extract_kalman_tracks(kres):
             "Kalman RTS": kres.get("smoothed")}
 
 
+def target_rmse(arr, tx_gt):
+    """Horizontal RMSE of a target track vs ground truth, ignoring NaN steps (None -> NaN)."""
+    if arr is None:
+        return np.nan
+    e = np.linalg.norm(arr[:, :2] - tx_gt[:, :2], axis=-1)
+    return np.sqrt(np.nanmean(e ** 2)) if np.isfinite(e).any() else np.nan
+
+
+def run_all_kalman(res):
+    """Run triangulation + Kalman once per floater-position source in KALMAN_SOURCES.
+    Prints a tracking report for each case and a final comparison table.
+    Returns {source label: kalman_track output}."""
+    tx_gt = np.asarray(res["TX"])
+    kres_all = {}
+    for label, key in KALMAN_SOURCES.items():
+        print("\n" + "=" * 60)
+        print(f"Triangulation + Kalman using floater positions: {label}  ({key})")
+        print("=" * 60)
+        kres = kalman_track(res[key], res["bearings_no_psi_error"], dt=KALMAN_DT,
+                            elevation_array=res["elevations"])
+        try:
+            tracking_report(kres, res["TX"])
+        except Exception as exc:   # e.g. the filter could not start (filtered/smoothed = None)
+            print(f"tracking_report failed: {exc}")
+        kres_all[label] = kres
+
+    # Summary: target RMSE for every source / estimator
+    names = ["Triangulation", "Kalman", "Kalman RTS"]
+    print("\n" + "=" * 60)
+    print("Target RMSE [m] by floater-position source")
+    print(f"{'Floater positions':22s}" + "".join(f"{n:>15s}" for n in names))
+    for label, kres in kres_all.items():
+        tracks = extract_kalman_tracks(kres)
+        print(f"{label:22s}" + "".join(f"{target_rmse(tracks[n], tx_gt):15.3f}" for n in names))
+    print("=" * 60 + "\n")
+    return kres_all
+
+
 # ---------------------------------------------------------------------------
 # Interactive window
 # ---------------------------------------------------------------------------
-def plot_sim_interactive(simulation_folder, kres=None):
+def plot_sim_interactive(simulation_folder, kres_all=None):
+    """kres_all: {source label: kalman_track output}, as returned by run_all_kalman()."""
     res, lat0, lon0, gt, estimates, errors = load_results(simulation_folder)
     n_floaters = int(res["NUMBER_OF_FLOATERS"])
+    tx_gt = np.asarray(res["TX"])            # single transmitter, shape (N_STEPS, 3)
+    kres_all = kres_all or {}
 
-    # Target tracks: ground truth (single transmitter, shape (N_STEPS, 3)) + Kalman estimates
-    targets = {"Target GT": np.asarray(res["TX"])}
-    targets.update(extract_kalman_tracks(kres) if kres is not None
-                   else {"Triangulation": None, "Kalman": None, "Kalman RTS": None})
-    for name, arr in targets.items():
-        if arr is None:
-            print(f"Warning: '{name}' track not available, it will not be drawn.")
+    # Target estimates for each floater-position source
+    tracks_by_source = {label: extract_kalman_tracks(k) for label, k in kres_all.items()}
+    for label, tracks in tracks_by_source.items():
+        for name, arr in tracks.items():
+            if arr is None:
+                print(f"Warning: '{name}' track not available with {label} positions, it will not be drawn.")
 
     fig = plt.figure(figsize=(15, 7.5))
     ax_map = fig.add_axes([0.25, 0.09, 0.42, 0.83])
-    ax_terr = fig.add_axes([0.73, 0.56, 0.25, 0.36])                  # top: target error
-    ax_ferr = fig.add_axes([0.73, 0.09, 0.25, 0.36])  # bottom: floater error
-
-    # Target horizontal error vs ground truth for each estimate: shape (N_STEPS,), NaN where missing
-    tx_gt = targets["Target GT"]
-    target_errors = {name: np.linalg.norm(arr[:, :2] - tx_gt[:, :2], axis=-1)
-                     for name, arr in targets.items() if name != "Target GT" and arr is not None}
+    ax_ferr = fig.add_axes([0.73, 0.09, 0.25, 0.50])   # bottom right: floater error
 
     # --- Widgets -----------------------------------------------------------
+    # Top right: which floater positions were used for triangulation + Kalman.
+    # Each label also shows the Kalman RTS target RMSE obtained with that source.
+    source_labels = {}
+    for label in tracks_by_source:
+        rmse = target_rmse(tracks_by_source[label]["Kalman RTS"], tx_gt)
+        info = f"RTS RMSE {rmse:.2f} m" if np.isfinite(rmse) else "Kalman not started"
+        source_labels[f"{label}"] = label
+    ax_source = fig.add_axes([0.73, 0.70, 0.25, 0.22])
+    ax_source.set_title("Floater positions for triangulation + Kalman", fontsize=10, loc="left")
+    radio_source = RadioButtons(ax_source, list(source_labels) or ["(not available)"])
     ax_coord = fig.add_axes([0.02, 0.83, 0.17, 0.10])
     ax_coord.set_title("Coordinates", fontsize=10, loc="left")
     radio_coord = RadioButtons(ax_coord, ["Local (m)", "Geographic (°)"])
@@ -123,7 +168,8 @@ def plot_sim_interactive(simulation_folder, kres=None):
     ax_save = fig.add_axes([0.02, 0.03, 0.17, 0.05])
     btn_save = Button(ax_save, "Save PNG")
 
-    state = {"geo": False, "floater": None}     # floater: 0-based index or None (= all)
+    state = {"geo": False, "floater": None,     # floater: 0-based index or None (= all)
+             "source": next(iter(tracks_by_source), None)}
 
     def xy(arr):
         e, n = arr[..., EAST_IDX], arr[..., NORTH_IDX]
@@ -134,8 +180,12 @@ def plot_sim_interactive(simulation_folder, kres=None):
         visible.update(zip(target_traces, check_t.get_status()))
         floaters = range(n_floaters) if state["floater"] is None else [state["floater"]]
         ax_map.clear()
-        ax_terr.clear()
         ax_ferr.clear()
+
+        # Target tracks: ground truth + estimates obtained with the selected source
+        targets = {"Target GT": tx_gt}
+        targets.update(tracks_by_source.get(state["source"],
+                                            {"Triangulation": None, "Kalman": None, "Kalman RTS": None}))
 
         # --- Map: floaters ---------------------------------------------------
         floater_arrays = {"Floater GT": gt, **estimates}
@@ -177,29 +227,15 @@ def plot_sim_interactive(simulation_folder, kres=None):
             ax_map.set_xlabel("East [m]")
             ax_map.set_ylabel("North [m]")
             ax_map.set_aspect("equal", adjustable="datalim")
-        ax_map.set_title("Trajectories" + ("" if state["floater"] is None else f" – Floater {state['floater'] + 1}"))
+        title = "Trajectories" + ("" if state["floater"] is None else f" – Floater {state['floater'] + 1}")
+        if state["source"] is not None:
+            title += f"\nTarget estimated with {state['source']} floater positions"
+        ax_map.set_title(title)
         ax_map.grid(True, ls="--", alpha=.5)
         if ax_map.get_legend_handles_labels()[0]:
             ax_map.legend(loc="best", fontsize=9)
 
-        # --- Target positioning error (top) -----------------------------------
-        for name, e in target_errors.items():
-            if not visible[name]:
-                continue
-            rmse = np.sqrt(np.nanmean(e ** 2))   # NaN steps (no fix / filter not started) are ignored
-            style = {**TARGET_STYLE[name], **TARGET_ERR_STYLE.get(name, {})}
-            steps = np.arange(e.shape[0])
-            ax_terr.plot(steps, e, **style, label=f"{name} (RMSE {rmse:.2f} m)")
-        
-        ax_terr.set_title("Target error vs ground truth")
-        ax_terr.set_xlabel("Simulation steps")
-        ax_terr.set_ylabel("Meters")
-        ax_terr.grid(True, ls="--", alpha=.5)
-        ax_terr.tick_params()
-        if ax_terr.get_legend_handles_labels()[0]:
-            ax_terr.legend(loc="upper left", fontsize=8)
-
-        # --- Floater positioning error (bottom) -------------------------------
+        # --- Floater positioning error (bottom right) -------------------------
         for name in estimates:
             if not visible[name]:
                 continue
@@ -231,6 +267,11 @@ def plot_sim_interactive(simulation_folder, kres=None):
         state["geo"] = label.startswith("Geo")
         redraw()
 
+    def on_source(label):
+        if label in source_labels:
+            state["source"] = source_labels[label]
+            redraw()
+
     def on_select(label):
         state["floater"] = None if label == "All" else int(label.split()[-1]) - 1
         redraw()
@@ -238,15 +279,18 @@ def plot_sim_interactive(simulation_folder, kres=None):
     def on_save(_):
         tag = "all" if state["floater"] is None else f"floater_{state['floater'] + 1}"
         tag += "_geo" if state["geo"] else "_local"
+        if state["source"] is not None:
+            tag += "_kf-" + state["source"].replace(" ", "_").replace("+", "_")
         path = os.path.join(simulation_folder, f"interactive_{tag}.png")
         try:   # save only the plots, without the widgets
             r = fig.canvas.get_renderer()
-            bbox = Bbox.union([ax.get_tightbbox(r) for ax in (ax_map, ax_terr, ax_ferr)])
+            bbox = Bbox.union([ax.get_tightbbox(r) for ax in (ax_map, ax_ferr)])
             fig.savefig(path, dpi=300, bbox_inches=bbox.transformed(fig.dpi_scale_trans.inverted()))
         except Exception:
             fig.savefig(path, dpi=300)
         print(f"Saved: {path}")
 
+    radio_source.on_clicked(on_source)
     radio_coord.on_clicked(on_coord)
     check_f.on_clicked(redraw)
     check_t.on_clicked(redraw)
@@ -254,7 +298,7 @@ def plot_sim_interactive(simulation_folder, kres=None):
     btn_save.on_clicked(on_save)
 
     # Keep references to the widgets (otherwise garbage collection disables them)
-    fig._widgets = (radio_coord, check_f, check_t, radio_select, btn_save)
+    fig._widgets = (radio_coord, check_f, check_t, radio_select, btn_save, radio_source)
     redraw()
     return fig
 
@@ -284,17 +328,11 @@ def plot_sim_result(simulation_folder):
     for name in estimates:
         print(f"{name:22s} {np.sqrt((errors[name] ** 2).mean()):10.3f}")
 
-    # Triangulation + Kalman filter
-    #QUA
-
-
-    kres = kalman_track(res["RX_IMU"], res["bearings_no_psi_error"], dt=4.5, elevation_array=res["elevations"])
-    tracking_report(kres, res["TX"])
-    #plot_tracking_map(kres, res["TX"], gt, out_folder=simulation_folder)
-    #plot_tracking_error(kres, res["TX"], out_folder=simulation_folder)
+    # Triangulation + Kalman filter, once per floater-position source (with reports)
+    kres_all = run_all_kalman(res)
 
     # Interactive window
-    plot_sim_interactive(simulation_folder, kres)
+    plot_sim_interactive(simulation_folder, kres_all)
     plt.show()
 
 
