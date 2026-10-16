@@ -10,7 +10,6 @@ from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
 from digitalshadow.Positioning.kalman_filter import *
 from digitalshadow.Positioning.tracking_plots import *
-from plot_simulation import plot_sim_interactive
 
 FONTSIZE = 18
 
@@ -84,6 +83,7 @@ class Simulation:
                 # Floater data for vessel DoA estimation
                 self.bearing_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
                 self.elevation_arrays = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
+                self.bearing_weight = np.full((self.NUMBER_OF_FLOATERS,self.SIMULATION_STEPS), np.nan)
 
         
         def run_simulation(self):
@@ -122,7 +122,6 @@ class Simulation:
                                                                         RX_gt_Coordinates[0],
                                                                         RX_gt_Coordinates[1],
                                                                         RX_gt_Coordinates[2],
-        
                                                                         PSI_RX=self.Floaters[n].gt_psi,
                                                                         seed = self.init_seed * 15 + 2)
                                         
@@ -133,19 +132,20 @@ class Simulation:
                                                         sim_timestamp = i,
                                                         floater_number = (n + 1),
                                                         n_arrivals=0,
-                                                        sl_db=155,
+                                                        sl_db=150,
                                                         add_noise=False,
                                                         noise_seed=self.init_seed)
 
                                         if NUMBER_OF_HYDROPHONES == 3:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_triangle(track_folder=os.path.join(self.sim_name,'SynthTracks'), timestamp=i, F_index=(n + 1))
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i]  = compute_single_bearing_angle_triangle(track_folder=os.path.join(self.sim_name,'SynthTracks'), timestamp=i, F_index=(n + 1))
                                         if NUMBER_OF_HYDROPHONES == 4:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
                                         if NUMBER_OF_HYDROPHONES == 5:
-                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i]  = compute_single_bearing_angle_complete(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
-
+                                                self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i] = compute_single_bearing_angle_complete(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
 
                                         
+
+
                         # Current clock shapshot
                         clocks    = np.array([f.clk    for f in self.Floaters])
 
@@ -208,7 +208,7 @@ class Simulation:
 
                                                 if self.rnd_packetloss.uniform(0,1) >= self.PACKET_LOSS:
                                                         #delay_ms = ping_pair(local_to_geo(self.Center,self.Floaters[tx].gt_pos),local_to_geo(self.Center,self.Floaters[m].gt_pos))
-                                                        delay_ms = 1000* np.linalg.norm(self.Floaters[tx].gt_pos[:2]-self.Floaters[m].gt_pos[:2]) / 1500
+                                                        delay_ms = 1000* np.linalg.norm(self.Floaters[tx].gt_pos[:2]-self.Floaters[m].gt_pos[:2]) / 1540
                                                         t_rx = clocks[m] + delay_ms + math.ceil(1000/self.TX_LIMIT)
                                                         self.Floaters[m].on_receive(t_rx, tx, m, payload, self.Floaters[tx].ID)
                                                 else:
@@ -257,12 +257,11 @@ class Simulation:
                         TX = self.TX_positions,
                         bearings_no_psi_error = self.bearing_arrays,
                         bearings_with_psi_error = bearings_with_psi_error,
+                        bearing_weights = self.bearing_weight,
                         elevations = self.elevation_arrays)
 
                 clean_temporary_files(self.sim_name)
                 print("End of simulation.")
-
-                #plot_sim_interactive(self.sim_name)
 
                 return {
                         "Center_coordinates":self.Center,

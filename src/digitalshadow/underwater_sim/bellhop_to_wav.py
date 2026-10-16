@@ -8,7 +8,7 @@ from scipy.signal import resample_poly
 import scipy.io.wavfile as wav
 from math import gcd
 #from digitalshadow.underwater_sim.ambient_noise import get_noise_config, add_ambient_noise
-from digitalshadow.utils.test_bathymetry import get_depth_gebco
+from digitalshadow.utils.bathymetry import get_depth_gebco
 
 
 P_REF = 1e-6
@@ -183,7 +183,7 @@ def from_arr_to_wav(TX_POS, number_mic: int,sim_name, sl_db, noise_seed, n_arriv
     cfg = get_noise_config()
 
     #if add_noise or True:
-    if False:
+    if True:
         rng = np.random.default_rng([noise_seed, sim_timestamp, floater_number])
         print(f"Ambient noise ON: shipping={cfg['shipping']}, wind={cfg['wind']} m/s, "
               f"extra={cfg['extra_db']:+.1f} dB, "

@@ -32,29 +32,40 @@ def add_white_noise(sig, snr_db, seed=None):
 
     return noisy_sig
 
-def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, c=1500, overlap=0.5, quality_threshold=0.1):
-    step = int(samples_per_window * (1 - overlap))
-    n_of_windows = 1 + (len(sig_A) - samples_per_window) // step
-    times = np.arange(n_of_windows) * step / fs
+def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, c=1500, overlap=0.5,
+                               quality_threshold=0.1):
+    """
+    Stima il ritardo (in campioni) tra sig_A e sig_B finestra per finestra con GCC-PHAT.
+
+    Restituisce:
+        searches     : GCC-PHAT nell'intervallo fisicamente possibile, per ogni finestra
+        sample_delay : ritardo stimato in campioni (NaN se la finestra non supera la soglia)
+        times        : istante di inizio di ogni finestra [s]
+        peaks        : valore del picco GCC-PHAT per ogni finestra
+    """
+    step = max(1, int(samples_per_window * (1 - overlap)))
+    n_samples = min(len(sig_A), len(sig_B))
+    starts = np.arange(0, n_samples - samples_per_window + 1, step)
+    times = starts / fs
 
     # Physically possible range
-    tau_max_samples = int(np.ceil(MAX_HYDROPHONE_DISTANCE / c * fs)) 
-    
-    searches = []
-    sample_delay = []
-    for start in range(0, min(len(sig_A), len(sig_B)) - samples_per_window + 1, step):
-        win1 = sig_A[start:start+samples_per_window]
-        win2 = sig_B[start:start+samples_per_window]
+    tau_max_samples = int(np.ceil(MAX_HYDROPHONE_DISTANCE / c * fs))
 
-        cc     = gcc_phat(win1, win2)
-        #cc     = gcc_phat_lowpass(win1, win2, fc=25000)
+    searches, sample_delay, peaks = [], [], []
+
+    for start in starts:
+        win1 = sig_A[start:start + samples_per_window]
+        win2 = sig_B[start:start + samples_per_window]
+
+        cc = gcc_phat(win1, win2)
+        #cc = gcc_phat_lowpass(win1, win2, fc=25000)
 
         center = len(cc) // 2
 
         # Search only in the physically possible range (+-tau_max_samples)
         search = cc[center - tau_max_samples : center + tau_max_samples + 1]
-        k    = np.argmax(search)
-        peak = search[k]
+        k = int(np.argmax(search))
+        peak = float(search[k])
 
         if peak >= quality_threshold:   # Quality check
             delta = 0.0
@@ -65,16 +76,13 @@ def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, c=1500, ove
                     delta = 0.5 * (y0 - y2) / den
             lag = (k - tau_max_samples) + delta
         else:
-            lag = np.nan    # Low quality: the delay values is discarded
+            lag = np.nan    # Low quality: the delay value is discarded
 
-
-
-        sample_delay.append(lag)
         searches.append(search)
+        sample_delay.append(lag)
+        peaks.append(peak)
 
-    searches_np = np.array(searches) 
-    sample_delay = np.asarray(sample_delay)
-    return searches_np, sample_delay, times
+    return np.array(searches), np.asarray(sample_delay), times, np.asarray(peaks)
 
 def compute_single_bearing_angle_triangle(track_folder, timestamp, F_index, seed = 0, SNR_desired = 999999):
     precompute_bearing_angles_triangle(0.3)
@@ -91,9 +99,9 @@ def compute_single_bearing_angle_triangle(track_folder, timestamp, F_index, seed
     durata_finestra = 0.05  # Seconds
     campioni_finestra = int(durata_finestra * fs)
     quality_threshold = 0.01
-    test, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times, peak_21 = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _, peak_32        = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _, peak_31        = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     #plt.figure()
     #plt.plot(sample_delay_21)
@@ -113,11 +121,14 @@ def compute_single_bearing_angle_triangle(track_folder, timestamp, F_index, seed
         estimated_azimuth[i]   = az
         estimated_elevation[i] = 0
 
-    # Obtaining a single value for bearing and elevation angle    
+    # Obtaining a single value for bearing and elevation angle
     bearing = circular_trim_mean(estimated_azimuth,0.2)
     elevation = 0
 
-    return bearing, elevation
+    # GCC-PHAT peak: mean over the three hydrophone pairs and over all windows
+    gcc_peak = np.mean([np.mean(peak_21), np.mean(peak_32), np.mean(peak_31)])
+
+    return bearing, elevation, gcc_peak
 
 def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, seed = 0):
     fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
@@ -130,12 +141,12 @@ def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, seed = 0
     quality_threshold = 0.0
 
     # Delays between hydrophones H1–H4 
-    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times, peak_21 = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _, peak_32     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _, peak_31     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _, peak_41     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _, peak_42     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _, peak_43     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
@@ -161,7 +172,10 @@ def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, seed = 0
     bearing = circular_trim_mean(estimated_azimuth,0.2)
     elevation = 0
 
-    return bearing, elevation
+    gcc_peak = np.mean([np.mean(peak_21), np.mean(peak_32), np.mean(peak_31),
+                        np.mean(peak_41), np.mean(peak_42), np.mean(peak_43)])
+
+    return bearing, elevation, gcc_peak
 
 def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
     fs, sig1 = wav.read(os.path.join(wav_folder,f'T{timestamp}_F{F_index}_H1.wav'))
@@ -176,18 +190,18 @@ def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
 
     
     # Delays between hydrophones H1–H4 
-    _, sample_delay_21, times = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_32, _     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_31, _     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_41, _     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_42, _     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_43, _     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_21, times, peak_21 = compute_sample_delay_array(sig2, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_32, _, peak_32     = compute_sample_delay_array(sig3, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_31, _, peak_31     = compute_sample_delay_array(sig3, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_41, _, peak_41     = compute_sample_delay_array(sig4, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_42, _, peak_42     = compute_sample_delay_array(sig4, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_43, _, peak_43     = compute_sample_delay_array(sig4, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Delays with respect to H5 
-    _, sample_delay_51, _ = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_52, _ = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_53, _ = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
-    _, sample_delay_54, _ = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_51, _, peak_51 = compute_sample_delay_array(sig5, sig1, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_52, _, peak_52 = compute_sample_delay_array(sig5, sig2, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_53, _, peak_53 = compute_sample_delay_array(sig5, sig3, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
+    _, sample_delay_54, _, peak_54 = compute_sample_delay_array(sig5, sig4, fs, campioni_finestra, quality_threshold=quality_threshold, overlap=0)
 
     # Samples to seconds
     time_delay_21 = sample_delay_21 / fs
@@ -217,24 +231,33 @@ def compute_single_bearing_angle_complete(wav_folder, timestamp, F_index):
     # Obtaining a single value for bearing and elevation angle    
     bearing = circular_trim_mean(estimated_azimuth,0.2)
     elevation = circular_trim_mean(estimated_elevation,0.2)
+    elevation = (elevation + 180) % 360 - 180
 
-    return bearing, elevation
+    gcc_peak = np.mean([np.mean(peak_21), np.mean(peak_32), np.mean(peak_31),
+                        np.mean(peak_41), np.mean(peak_42), np.mean(peak_43),
+                        np.mean(peak_51), np.mean(peak_52), np.mean(peak_53), np.mean(peak_54)])
 
-def circular_trim_mean(angles, proportiontocut=0.1):
-    """
-    This function takes as input an array of angles (in degrees),
-    sorts them maintaining the wrap-around between 0° and 360°,
-    removes the percentage (proportiontocut) of values at the extremes,
-    and finally return the mean value of the remaining ones
-    """
-    angles = np.sort(np.asarray(angles, dtype=float) % 360)
-    # Gap between consecutive angles
-    gaps = np.diff(np.append(angles, angles[0] + 360))
-    i = np.argmax(gaps)
-    start = (i + 1) % len(angles)
-    unwrapped = np.concatenate([angles[start:], angles[:start] + 360])
-    mean_angle = stats.trim_mean(unwrapped, proportiontocut) % 360
-    return mean_angle 
+    return bearing, elevation, gcc_peak
+
+def circular_trim_mean(angles_deg, trim=0.0, weights=None):
+    a = np.asarray(angles_deg, float)
+    if weights is None:
+        w = np.ones_like(a)
+    else:
+        w = np.asarray(weights, float)
+
+    m = np.isfinite(a) & np.isfinite(w) & (w > 0)
+    a, w = np.deg2rad(a[m]), w[m]
+    if len(a) == 0:
+        return np.nan
+
+    if trim > 0:
+        mu = np.angle(np.sum(w * np.exp(1j * a)))
+        dist = np.abs(np.angle(np.exp(1j * (a - mu))))
+        keep = dist <= np.quantile(dist, 1 - trim)
+        a, w = a[keep], w[keep]
+
+    return np.rad2deg(np.angle(np.sum(w * np.exp(1j * a)))) % 360
 
 def clean_temporary_files(sim_name):
     for j in range(5):

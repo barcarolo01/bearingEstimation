@@ -33,9 +33,9 @@ def initial_state(z, R, init_speed_std):
     P[np.ix_([0, 2], [0, 2])] = R
     return x, P
 
-def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
-                 a_max=0.5, init_speed_std=15.0, max_init_std=50.0,
-                 gate=9.21, max_consecutive_rejects=30):
+def estimate_TX_position(floaters, bearings, weights, dt, elevation_array=None, sigma_deg=1.0,
+                 a_max=3, init_speed_std=15.0, max_init_std=50.0,
+                 gate=9.21, max_consecutive_rejects=50):
     """
     Parameters
     ----------
@@ -64,10 +64,11 @@ def kalman_track(floaters, bearings, dt, elevation_array=None, sigma_deg=1.0,
     """
     floaters = np.asarray(floaters, dtype=float)
 
-    # Compute target trajectory with minimum-RMSE triangulation
-    raw = find_points(floaters, bearings, elevation_array)
-    STEPS = len(raw)
+    #weights = None
 
+    # Compute target trajectory with minimum-RMSE triangulation
+    raw = find_points(floaters, bearings, elevation_array, weights)
+    STEPS = len(raw)
     z_all = raw[:, :2]           # (STEPS, 2) [x, y]
 
     # List of z (positions) and R (position covariance)

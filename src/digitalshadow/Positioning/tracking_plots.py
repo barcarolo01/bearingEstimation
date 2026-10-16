@@ -145,10 +145,10 @@ def plot_tracking_error(res, tx_gt, out_folder=''):
         has_data |= bool(np.any(np.isfinite(e) & (e > 0)))
     if has_data:
         ax.set_yscale('log')
-    ax.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
-    ax.tick_params(axis="both", which="major", labelsize=FONTSIZE)
     ax.set_xlabel('Simulation step', fontsize=FONTSIZE)
     ax.set_ylabel('Localization error [m]', fontsize=FONTSIZE)
+    ax.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
+    ax.tick_params(axis="both", which="major", labelsize=FONTSIZE)
     ax.grid(alpha=0.3, which='both')
     if err:
         ax.legend(fontsize=FONTSIZE_LEGEND)

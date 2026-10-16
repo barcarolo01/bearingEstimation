@@ -42,7 +42,7 @@ def get_noise_config():
         enabled=_env_bool("ADD_AMBIENT_NOISE", False),
         shipping=_env_float("NOISE_SHIPPING", 0.5),
         wind=_env_float("NOISE_WIND", 5.0),
-        extra_db=_env_float("NOISE_EXTRA_DB", 3.0),
+        extra_db=_env_float("NOISE_EXTRA_DB", 4.0),
         spacing=_env_float("NOISE_SPACING", 0.3),
         seed=int(seed) if seed not in (None, "") else None,
     )

@@ -2,7 +2,7 @@ from digitalshadow.devices.Floater import *
 from digitalshadow.devices.IMU_models import load_imu_model, calibrate_floater
 from digitalshadow.devices.Transmitter import *
 from digitalshadow.utils.Envelope import detect_env
-from plot_simulation import plot_sim_result
+from plot_simulation import *
 from simulation import *
 
 

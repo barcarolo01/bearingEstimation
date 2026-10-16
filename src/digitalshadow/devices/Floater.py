@@ -469,8 +469,8 @@ class Floater(Transmitter):
                         pos_all[j] = self.peer_pos[j]
                         err_all[j] = self.peer_err[j]
                 else:
-                        pos_all[j] = self.est_pos_mds       # nessuna info
-                        err_all[j] = 1e6                    # errore enorme
+                        pos_all[j] = self.est_pos_mds       # No info
+                        err_all[j] = 1e6                    # placeholder for huge error
         return pos_all, err_all
     
     def return_results(self, fuse=True):
@@ -478,10 +478,10 @@ class Floater(Transmitter):
                                     for k, v in self.pos_history.items()}
         for idx, p in enumerate(self.Resurface_index):
             res_prec = self.Resurface_index[idx - 1] if idx > 0 else 0
-            if p - res_prec < 2:          # intervallo troppo corto
+            if p - res_prec < 2:          # Time interval too short
                     continue
 
-            # Drift osservato: l'ultimo step prima che resurface() sovrascriva
+            # Drift observed at the resurface
             DELTA = self.pos_history[p-1] - self.gt_history[p-1]
             
             span = (p - 1) - res_prec
@@ -494,7 +494,6 @@ class Floater(Transmitter):
             'imu_mds':         _dict_to_array(self.pos_history_mds),
             'imu_compensated': _dict_to_array(self.pos_history_compensated),
             'gt':              _dict_to_array(self.gt_history),
-
             'psi_gt':   _dict_to_array_scalar(self.psi_history),      
             'psi_est':  _dict_to_array_scalar(self.psi_est_history),  # Auto-estimated
             'psi_err':  _dict_to_array_scalar(self.psi_err_history),  # Estimated - groundtruth, in [-180, 180)

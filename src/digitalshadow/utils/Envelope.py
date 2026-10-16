@@ -4,17 +4,16 @@ import scipy.io.wavfile as wav
 from scipy.ndimage import median_filter
 from scipy.signal import butter, decimate, find_peaks, hilbert, lfilter, sosfilt, sosfiltfilt, welch
 
+# DETECTOR PARAMETERS
+LOW_HZ = 1000       # lower passband filter frequency (Hz)
+HIGH_HZ = 15000.0   # upper passband filter frequency (Hz)
+CUTOFF_HZ = 500.0   # CUTOFF frequency of DEMON Spectrum (Hz)
 
-# ======================= PARAMETRI DEL DETECTOR =======================
-LOW_HZ = 5.0            # limite inferiore banda passante (Hz)
-HIGH_HZ = 15000.0       # limite superiore banda passante (Hz)
-CUTOFF_HZ = 500.0       # frequenza massima dello spettro DEMON (Hz)
-
-F_MIN_HZ = 30.0         # finestra di ricerca del blade rate: [F_MIN_HZ, F_MAX_HZ] (Hz)
-F_MAX_HZ = 150.0
+F_MIN_HZ = 20.0         # finestra di ricerca del blade rate: [F_MIN_HZ, F_MAX_HZ] (Hz)
+F_MAX_HZ = 300.0
 HARMONICS = (1,)        # armoniche usate: (1,) solo la finestra base; (1, 2, 3) anche
                         # [2*F_MIN_HZ, 2*F_MAX_HZ] e [3*F_MIN_HZ, 3*F_MAX_HZ]
-THRESHOLD = 10.0        # soglia sullo spettro normalizzato. Abbassarla aumenta la
+THRESHOLD = 9        # soglia sullo spettro normalizzato. Abbassarla aumenta la
                         # probabilita' di rivelazione e anche i falsi allarmi
 
 SEG_S = None            # None = periodogramma su tutto il frame (come prima);
@@ -249,7 +248,8 @@ def _plot(envelope, env_fs, freqs, r, stat, threshold, detected):
 
 if __name__ == "__main__":
     # --------- Parametri da adattare ---------
-    WAV_PATH = "simulationDEMON/SynthTracks/T0_F1_H1.wav"
+    #WAV_PATH = "simulationDEMON/SynthTracks/T0_F1_H1.wav"
+    WAV_PATH = "AudioFiles/Motorboat_03.08.23_161603_20secCPA.wav"
 
     # ------------------------------------------
 
