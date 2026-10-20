@@ -10,7 +10,7 @@ from digitalshadow.utils.utils import *
 from digitalshadow.devices.floater_geometry import *
 from digitalshadow.utils.bearing_calculation import *
 
-MAX_HYDROPHONE_DISTANCE = 1 # Meters
+MAX_HYDROPHONE_DISTANCE = 0.5 # Meters
 
 def add_white_noise(sig, snr_db, seed=None):
     rng = np.random.default_rng(seed)
@@ -58,7 +58,7 @@ def compute_sample_delay_array(sig_A, sig_B, fs, samples_per_window, c=1500, ove
         win2 = sig_B[start:start + samples_per_window]
 
         cc = gcc_phat(win1, win2)
-        #cc = gcc_phat_lowpass(win1, win2, fc=25000)
+        #cc = gcc_phat_bandpass(win1, win2,fs,100,20000)
 
         center = len(cc) // 2
 

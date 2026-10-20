@@ -18,5 +18,5 @@ def get_depth_gebco(lat_query,lon_query):
 
 
 if __name__ == '__main__':
-    Center = [28.091633059908357,49.08909082064002]    
+    Center = [29.809284451457938,49.27237481798266]    
     print(get_depth_gebco(Center[0],Center[1]))

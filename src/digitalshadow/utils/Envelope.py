@@ -5,8 +5,8 @@ from scipy.ndimage import median_filter
 from scipy.signal import butter, decimate, find_peaks, hilbert, lfilter, sosfilt, sosfiltfilt, welch
 
 # DETECTOR PARAMETERS
-LOW_HZ = 1000       # lower passband filter frequency (Hz)
-HIGH_HZ = 15000.0   # upper passband filter frequency (Hz)
+LOW_HZ = 100       # lower passband filter frequency (Hz)
+HIGH_HZ = 20000.0   # upper passband filter frequency (Hz)
 CUTOFF_HZ = 500.0   # CUTOFF frequency of DEMON Spectrum (Hz)
 
 F_MIN_HZ = 20.0         # finestra di ricerca del blade rate: [F_MIN_HZ, F_MAX_HZ] (Hz)
@@ -249,7 +249,8 @@ def _plot(envelope, env_fs, freqs, r, stat, threshold, detected):
 if __name__ == "__main__":
     # --------- Parametri da adattare ---------
     #WAV_PATH = "simulationDEMON/SynthTracks/T0_F1_H1.wav"
-    WAV_PATH = "AudioFiles/Motorboat_03.08.23_161603_20secCPA.wav"
+    #WAV_PATH = "AudioFiles/Motorboat_03.08.23_161603_20secCPA.wav"
+    WAV_PATH = "AudioFIles/barca.wav"
 
     # ------------------------------------------
 

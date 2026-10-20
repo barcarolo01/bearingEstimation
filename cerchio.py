@@ -16,38 +16,29 @@ if __name__ == '__main__':
         NUMBER_OF_FLOATERS = 2
         STEPS = 1
         #Center = [20.832813, 88.698390] # India, low depth
-        Center = [32.839, -34.635] # Atlantic
+        #Center = [32.839, -34.635] # Atlantic
+        Center =[43.4144393753542,50.10894650149935]
         
         #TX = Transmitter(-1,0,0,10,1.0,seed=SEED)
         #TX.Rho = 0.995
         #TX.set_initial_velocity(-3,6,0)
         #TX.set_sigma(0.2,0.2,0)
         
-        TX = compute_TX_circle_trajectory(20,0,350,35,200)
+        TX = compute_TX_circle_trajectory(10,0,355,71,200)
 
         floaters = []
         for i in range(NUMBER_OF_FLOATERS):
                 f = Floater(ID = i,
-                                gt_x=100,
-                                gt_y=0,
-                                #gt_x=(-100 if i==1 else 100),
+                                #gt_x=100,
                                 #gt_y=0,
+                                gt_x=(-100 if i==1 else 100),
+                                gt_y=0,
                                 gt_z=10,
                                 NF=NUMBER_OF_FLOATERS,
                                 dt=1.0,
                                 seed = i+1)
 
-                f = load_imu_model(f,'ADIS16470',dt=1.0)
-                f = calibrate_floater(f)
-                f.set_initial_velocity(random_sim.uniform(-3,3), random_sim.uniform(-3,3), 0.0)
-                f.set_sigma(random_sim.uniform(0.05), random_sim.uniform(0.05), 0.0)
-                f.Rho = 0.999
-                f.use_compass = True
-                f.use_compass = False
-                f.compass_bias = 0
-                f.compass_bias_sigma = 0
-                f.TX_LIMIT=3
-                f.MDS_freq = 1800
+    
                 
                 floaters.append(f)
 
