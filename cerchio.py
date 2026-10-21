@@ -39,7 +39,7 @@ if __name__ == '__main__':
                         x = R * np.cos(np.deg2rad(210))
                         y = R * np.sin(np.deg2rad(210))
 
-                f = Floater(ID = i,
+                f = Floater(ID = i+1,
                                 #gt_x=100,
                                 #gt_y=0,
                                 gt_x=x,
