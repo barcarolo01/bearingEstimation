@@ -183,7 +183,7 @@ def from_arr_to_wav(TX_POS, number_mic: int,sim_name, sl_db, noise_seed, n_arriv
     cfg = get_noise_config()
 
     #if add_noise or True:
-    if False:
+    if True:
         rng = np.random.default_rng([noise_seed, sim_timestamp, floater_number])
         print(f"Ambient noise ON: shipping={cfg['shipping']}, wind={cfg['wind']} m/s, "
               f"extra={cfg['extra_db']:+.1f} dB, "

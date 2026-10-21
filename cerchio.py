@@ -11,9 +11,9 @@ HYDROMATE_SIMULATION = True
 
 if __name__ == '__main__':
         SEED = 2
-        SIMULATION_NAME=f'simulationCIRCLE'
+        SIMULATION_NAME=f'simulationCIRCLE2'
         random_sim = np.random.default_rng(SEED)
-        NUMBER_OF_FLOATERS = 2
+        NUMBER_OF_FLOATERS = 3
         STEPS = 1
         #Center = [20.832813, 88.698390] # India, low depth
         #Center = [32.839, -34.635] # Atlantic
@@ -27,12 +27,23 @@ if __name__ == '__main__':
         TX = compute_TX_circle_trajectory(10,0,359,359,200)
 
         floaters = []
+        R = 57.7
         for i in range(NUMBER_OF_FLOATERS):
+                if i == 0:
+                        x = R * np.cos(np.deg2rad(-30))
+                        y = R * np.sin(np.deg2rad(-30))
+                if i == 1:
+                        x = R * np.cos(np.deg2rad(90))
+                        y = R * np.sin(np.deg2rad(90))
+                if i == 2:
+                        x = R * np.cos(np.deg2rad(210))
+                        y = R * np.sin(np.deg2rad(210))
+
                 f = Floater(ID = i,
                                 #gt_x=100,
                                 #gt_y=0,
-                                gt_x=(-100 if i==1 else 100),
-                                gt_y=0,
+                                gt_x=x,
+                                gt_y=y,
                                 gt_z=10,
                                 NF=NUMBER_OF_FLOATERS,
                                 dt=1.0,

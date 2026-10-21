@@ -11,8 +11,8 @@ EARTH_RADIUS = 6378137.0
 KALMAN_DT = 1.0              # time between two consecutive steps [s]
 
 # --- Font sizes ---------------------------------------------------------------
-FONTSIZE = 16                # everything shown on screen (titles, axes, ticks, widgets, annotations)
-FONTSIZE_LEGEND = 14         # legends only
+FONTSIZE = 13                # everything shown on screen (titles, axes, ticks, widgets, annotations)
+FONTSIZE_LEGEND = 12         # legends only
 SAVE_DPI = 900               # resolution of the PNGs saved by the "Save figures" button
 EXPORT_MAP_SIZE = (8, 8)     # size [inches] of the exported map figure
 EXPORT_FERR_SIZE = (8, 5)    # size [inches] of the exported floater-error figure
@@ -37,7 +37,7 @@ FLOATER_STYLE = {
 
 TARGET_STYLE = {
     "Target GT":     dict(color="#000000", lw=3, ls="--"),
-    "Triangulation": dict(color="#002AFF", zorder=99, ls="none", marker="x", ms=3, alpha=0.75),
+    "Triangulation": dict(color="#000DFF", zorder=99, ls="none", marker="o", ms=3, alpha=0.5),
     "Kalman":        dict(color="#FFCC00FF", lw=3),
     "Kalman RTS": dict(color="#2AB040", lw=3),
 }
@@ -235,9 +235,8 @@ def plot_simulation_results(simulation_folder):
             ax.plot(x, y, **TARGET_STYLE[name], label=name)
             if name == "Target GT":
                 c = TARGET_STYLE[name]["color"]
-                ax.plot(x[0], y[0], "o", color=c, ms=8, mfc="white", mew=2,
-                        label="Target start", zorder=5)
-                ax.plot(x[-1], y[-1], "o", color=c, ms=8, label="Target end", zorder=5)
+                ax.plot(x[0], y[0], "o", color=c, ms=8, mfc="white", mew=2,zorder=5)#,label="Target start")
+                ax.plot(x[-1], y[-1], "o", color=c, ms=8, zorder=5)#,label="Target end")
 
         if state["geo"]:
             ax.set_xlabel("Longitude [°]")
@@ -343,4 +342,4 @@ def plot_simulation_results(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulationCIRCLE")
+        plot_simulation_results("simulationCIRCLE2")

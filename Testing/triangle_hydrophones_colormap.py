@@ -26,6 +26,7 @@ def filtro_passabanda(segnale, fs, f_bassa, f_alta, ordine=4):
 if __name__ == "__main__":
     precompute_bearing_angles_triangle(d)
 
+    '''
     # Reading 3-tracks file
     fs, data = wav.read('AudioFiles/0958_crop.wav')
 
@@ -36,6 +37,12 @@ if __name__ == "__main__":
     sig1 = data[start*fs:end*fs, 0]
     sig2 = data[start*fs:end*fs, 1]
     sig3 = data[start*fs:end*fs, 2]
+    '''
+
+    fs, sig1 = wav.read('simulationGarda/SynthTracks/F1_H1.wav')
+    _, sig2 = wav.read('simulationGarda/SynthTracks/F1_H2.wav')
+    _, sig3 = wav.read('simulationGarda/SynthTracks/F1_H3.wav')
+
 
     # Signal pre-filtering: if used, spurious peaks are introduced in tau = 0
     if BUTTERWORTH_FILTER:
@@ -124,6 +131,8 @@ if __name__ == "__main__":
 
 
     # ==================== Plot Bearing angle ====================
+    #estimated_bearing = (360-estimated_bearing) % 360
+    print(estimated_bearing[0])
     ax = axes[3]
     ax.scatter(estimated_bearing,times,color='red', s = 1) 
     ax.set_xlim(0, 360)

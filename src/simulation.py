@@ -1,6 +1,5 @@
 import os
 import shutil
-import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from digitalshadow.Positioning.coordinate_generator import *
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
@@ -232,7 +231,20 @@ class Simulation:
                         if self.transmitter is not None: 
                                 self.transmitter.move() # Vessel motion
 
-                
+
+                # Save the complete .wav tracks for each hydrophone
+                if self.HYDROMATE_SIMULATION:
+                        for n in range(self.NUMBER_OF_FLOATERS):
+                                for j in range(self.NUMBER_OF_HYDROPHONES):
+                                        segments = []
+                                        for i in range (self.SIMULATION_STEPS):
+                                                segment_path = os.path.join(self.sim_name,"SynthTracks",f"T{i}_F{self.Floaters[n].ID}_H{j+1}.wav")
+                                                fs, seg = wav.read(segment_path)
+                                                segments.append(seg)
+                                        
+                                        track = np.concatenate(segments)
+                                        wav.write(os.path.join(self.sim_name,"SynthTracks",f"F{self.Floaters[n].ID}_H{j+1}.wav"),fs,np.asarray(track))
+                        
                 psi_error_arrays = np.zeros((self.SIMULATION_STEPS,self.NUMBER_OF_FLOATERS))
                 for n in range(self.NUMBER_OF_FLOATERS):
                         floater_results = self.Floaters[n].return_results(fuse=False)

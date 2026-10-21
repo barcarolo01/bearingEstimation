@@ -16,32 +16,24 @@ if __name__ == '__main__':
         MDS = 300
         PLR = 0.0
         for SEED in SEEDS:      
-                SIMULATION_NAME=f'simulationpeak'
+                SIMULATION_NAME=f'simulationGarda'
                 random_sim = np.random.default_rng(SEED)
                 
                 Center = [29.809284451457938,49.27237481798266]
                 #Center = [20.832813, 88.698390] # India, low depth
 
-                
-                TX = Transmitter(ID=-1,
-                                 gt_x=0,
-                                 gt_y=0,
-                                 gt_z=10,
-                                 dt=1)
-                TX.set_initial_velocity(0,0,0)
-                TX.Rho = 1
-                
+                TX = compute_TX_circle_trajectory(10,90,270,37,200)
 
                 floaters = []
                 for i in range(NUMBER_OF_FLOATERS):
                         if i == 0:
-                                x = 1000
+                                x = 0
                                 y = 0
                         if i == 1:
                                 x = 0
                                 y = 1000
                 
-                        f = Floater(ID = i,
+                        f = Floater(ID = i+1,
                                         gt_x=x,
                                         gt_y=y,
                                         gt_z=10,
@@ -52,11 +44,11 @@ if __name__ == '__main__':
                         floaters.append(f)
 
                 sim = Simulation(
-                                #transmitter_coordinates=TX,
+                                transmitter_coordinates=TX,
                                 Floaters=floaters,
-                                Steps=STEPS,
+                                #Steps=STEPS,
                                 Center=Center,
-                                transmitter=TX,
+                                #transmitter=TX,
                                 seed=100,
                                 sim_name=SIMULATION_NAME,
                                 HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)

@@ -20,18 +20,14 @@ def wrap_deg(x):
 if __name__ == "__main__":
     Center = [28.091633059908357,49.08909082064002]
     
-    print(f"Depth = {get_depth_gebco(Center[0],Center[1])}")
-
     TX = Transmitter(ID=-1,gt_x=0,gt_y=0,gt_z=3,dt=1.0)
     floaters = []
     RX = Floater(ID=1,gt_x=100,gt_y=0,gt_z=3,NF=1,dt=1)
     floaters.append(RX)
 
-
     #TX_Coordinates = np.asarray([38.81282072005432,134.05669525507423, 30])
     NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
     SAMPLING_FREQUENCY = 96000
-
 
     TRUE_BEARING = 180.0
 

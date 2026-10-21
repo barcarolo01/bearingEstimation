@@ -64,7 +64,6 @@ if __name__ == "__main__":
     axes[0, 0].legend(fontsize=FONTSIZE)
 
     fig.text(0.97, 0.735,rf"$\rho$ = {RHO_REF}",fontsize=FONTSIZE, ha='right', va='center')
-
     fig.text(0.99, 0.265,rf"$\sigma$ = {SIG_REF} m/s",fontsize=FONTSIZE, ha='right', va='center')
 
     plt.tight_layout(rect=[0, 0, 0.92, 1])
