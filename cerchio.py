@@ -24,7 +24,7 @@ if __name__ == '__main__':
         #TX.set_initial_velocity(-3,6,0)
         #TX.set_sigma(0.2,0.2,0)
         
-        TX = compute_TX_circle_trajectory(10,0,355,71,200)
+        TX = compute_TX_circle_trajectory(10,0,359,359,200)
 
         floaters = []
         for i in range(NUMBER_OF_FLOATERS):

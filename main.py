@@ -12,7 +12,7 @@ if __name__ == '__main__':
         SEEDS = np.arange(1,12,1)
         SEEDS = [501]
         STEPS = 5
-        NUMBER_OF_FLOATERS = 5
+        NUMBER_OF_FLOATERS = 4
         MDS = 300
         PLR = 0.0
         for SEED in SEEDS:      
@@ -31,13 +31,13 @@ if __name__ == '__main__':
                 TX.set_initial_velocity(10,0,0)
                 TX.Rho = 1
                 '''
-                line1 = np.arange(-400,100,10)
+                line1 = np.arange(-2000,100,10)
                 TX_1 = np.asarray([line1,-100*np.ones(line1.shape[0]),10*np.ones(line1.shape[0])]).T
 
                 curve = compute_TX_circle_trajectory(10,180,90,10,100,False)
                 curve[:,0] +=  100
 
-                line2 = np.arange(0,400,10)
+                line2 = np.arange(0,500,10)
                 TX_2 = np.asarray([200*np.ones(line2.shape[0]),line2,10*np.ones(line2.shape[0])]).T
 
                 TX = np.concat([TX_1,curve,TX_2])
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                         f.set_initial_velocity(random_sim.uniform(0,0), random_sim.uniform(0,0), 0.0)
                         f.set_sigma(random_sim.uniform(0.01), random_sim.uniform(0.01), 0.0)
                         f.Rho = 1 
-                        f.use_compass = True
+                        f.use_compass = False
                         f.TX_LIMIT=3
                         #f.PLR = PLR
                         #f.MDS_freq = MDS

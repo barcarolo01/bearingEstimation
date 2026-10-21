@@ -34,7 +34,7 @@ def initial_state(z, R, init_speed_std):
     return x, P
 
 def estimate_TX_position(floaters, bearings, weights, dt, elevation_array=None, sigma_deg=1.0,
-                 a_max=3, init_speed_std=15.0, max_init_std=50.0,
+                 a_max=2, init_speed_std=15.0, max_init_std=50.0,
                  gate=9.21, max_consecutive_rejects=50):
     """
     Parameters
