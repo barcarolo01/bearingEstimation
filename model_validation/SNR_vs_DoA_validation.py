@@ -44,11 +44,12 @@ if __name__ == "__main__":
     for i, SNR in enumerate(SNRs):
         print(f"SNR = {SNR} dB")
         for k in range(N_TRIALS):
-            bearing, _ = compute_single_bearing_angle_triangle(
+            bearing, _,_ = compute_single_bearing_angle_triangle(
                 timestamp=0, track_folder=os.path.join(SIM_NAME,'SynthTracks'),
                 F_index=1,
                 SNR_desired=SNR,
                 seed=i * N_TRIALS + k +1)  
+            
             err = np.mean(bearing) - TRUE_BEARING
             all_errors[i, k] = np.abs(err)      # valore assoluto PER PROVA
 

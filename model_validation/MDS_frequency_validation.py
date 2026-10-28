@@ -2,26 +2,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from digitalshadow.devices.Floater import Floater
-from digitalshadow.devices.IMU_models import load_imu_model
+from digitalshadow.devices.IMU_models import calibrate_floater, load_imu_model
 from digitalshadow.devices.Transmitter import Transmitter
 from simulation import Simulation
 
-SIMULATE = True
+SIMULATE = False
 
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
 
-NUMBER_OF_FLOATERS = 10
+NUMBER_OF_FLOATERS = 6
 N_SIMULATIONS = 50
 STEPS = 3600
 PERIODS = [60, 120, 180, 300, 600, 900, 1800]
 
 # One entry per IMU case: results file and plot color
 CASES = {
-    "calibrated":   dict(file="MDS_calibrated.npz",   color='#2AB040', edge='#1d7a2c',
-                         label="Calibrated IMU (no bias)"),
+    #"calibrated":   dict(file="MDS_calibrated.npz",   color='#2AB040', edge='#1d7a2c',label="Calibrated IMU (no bias)"),
     "uncalibrated": dict(file="MDS_uncalibrated.npz", color='#E07B28', edge='#a3531a',
-                         label="Uncalibrated IMU"),
+                         label="IQR"),
 }
 
 
@@ -56,15 +55,12 @@ def run_all(calibrated, results_file):
 
                 # Ideal calibration: remove accelerometer and gyroscope biases
                 if calibrated:
-                    f.accel_bias = np.zeros(3)
-                    f.sigma_accel_bias = np.zeros(3)
-                    f.gyro_bias = 0
-                    f.sigma_gyro_bias = 0
-
+                    f = calibrate_floater(f)
+         
                 f.set_initial_velocity(rnd_sim.uniform(-1, 1), rnd_sim.uniform(-1, 1), 0.0)
                 f.set_sigma(rnd_sim.uniform(0, 0.1), rnd_sim.uniform(0, 0.1), 0.0)
-                f.use_compass = True
-                f.alpha_compass = 0.999
+                f.use_compass = False
+                f.alpha_compass = 0.99
                 f.Rho = 0.999
                 f.Rho_yaw = 0.999
                 f.MDS_freq = period
@@ -79,10 +75,18 @@ def run_all(calibrated, results_file):
                              sim_name="sim_MDSFreq")
             sim.TX_LIMIT = 10
             sim.PACKET_LOSS = 0
+            sim.HYDROMATE_SIMULATION = False
             res = sim.run_simulation()
 
-            err_imu[p, seed] = np.mean(res['errors_imu'])
-            err_mds[p, seed] = np.mean(res['errors_imu_mds'])
+            diff_imu = res['RX_gt_pos'][:,:,:2]-res['RX_imu'][:,:,:2]
+            diff_imu_mds = res['RX_gt_pos'][:,:,:2]-res['RX_imu_mds'][:,:,:2]
+            err_imu_1 = np.linalg.norm(diff_imu, axis=-1)
+            err_imu_mds_1 = np.linalg.norm(diff_imu_mds, axis=-1)
+
+            errors_imu = err_imu_1.mean()
+            errors_imu_mds = err_imu_mds_1.mean()
+            err_imu[p, seed] = np.mean(errors_imu)
+            err_mds[p, seed] = np.mean(errors_imu_mds)
 
     np.savez(results_file, periods=np.asarray(PERIODS), err_imu=err_imu, err_mds=err_mds)
     print(f"END OF SIMULATION -> {results_file}")
@@ -134,7 +138,7 @@ def plot_results(periods, results, outfile="MDS_calibration_comparison.png"):
 
         # IMU-only baseline (identical for every period): shown as a reference
         b_lo, b_med, b_hi = np.percentile(err_imu[0], [lo, 50, hi])
-        title_parts.append(f"{name}: median {b_med:.0f} m (IQR {b_lo:.0f}–{b_hi:.0f} m)")
+        title_parts.append(f"median {b_med:.0f} m (IQR {b_lo:.0f}–{b_hi:.0f} m)")
 
     ax.set_ylabel("Error reduction with MDS [%]", fontsize=FONTSIZE)
     ax.set_xlabel("MDS period [seconds]", fontsize=FONTSIZE)

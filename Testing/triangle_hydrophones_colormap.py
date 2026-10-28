@@ -42,7 +42,7 @@ if __name__ == "__main__":
     fs, sig1 = wav.read('simulationGarda/SynthTracks/F1_H1.wav')
     _, sig2 = wav.read('simulationGarda/SynthTracks/F1_H2.wav')
     _, sig3 = wav.read('simulationGarda/SynthTracks/F1_H3.wav')
-
+    
 
     # Signal pre-filtering: if used, spurious peaks are introduced in tau = 0
     if BUTTERWORTH_FILTER:
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             pos.height
         ])
         cbar = fig.colorbar(first_im, cax=cbar_ax)
-        cbar.set_label('GCC-PATH peak value', fontsize=FONTSIZE)
+        cbar.set_label('GCC-PHAT peak value', fontsize=FONTSIZE)
         cbar_ax.tick_params(labelsize=FONTSIZE)
         cbar.ax.tick_params(labelsize=FONTSIZE)
         cbar_ax.yaxis.set_ticks_position('left')

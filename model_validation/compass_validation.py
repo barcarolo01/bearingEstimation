@@ -18,7 +18,7 @@ USE_CALIBRATED_GYROSCOPE = False
 def build_floater(seed, alpha=None):
     """Still floater; alpha = None means gyroscope only (no compass)."""
     np.random.seed(seed)
-    f = Floater(0, 0, 0, 0, 1, 1.0, imu_seed=seed)
+    f = Floater(0, 0, 0, 0, 1, 1.0, seed=seed)
     f = load_imu_model(f,'ADIS16470',dt=1.0)
     
     f.set_initial_velocity(0.0, 0.0, 0.0)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
             fontsize=9, va="center")
 
     plt.xlabel("Time [seconds]", fontsize=FONTSIZE)
-    plt.ylabel("Heading error [degrees, unwrapped]",fontsize=FONTSIZE)
+    plt.ylabel("Heading error [degrees]",fontsize=FONTSIZE)
     plt.tick_params(axis="both", which="major", labelsize=FONTSIZE)
     plt.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
     #plt.title("Heading error")

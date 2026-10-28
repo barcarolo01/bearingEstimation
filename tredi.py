@@ -26,7 +26,7 @@ def build_local_cartesian_map_3d(
     max_depth_m=100.0,         # limite inferiore dell'asse Z
     margin_m=50.0,             # margine attorno ai dati per la finestra automatica
     label_floaters=True,       # numero del floater sulla prima posizione
-    crop_px=(800, 500, 200),   # (sopra, sotto, destra) pixel da tagliare; None = nessun ritaglio
+    crop_px=None,   # (sopra, sotto, destra) pixel da tagliare; None = nessun ritaglio
     out_path="local_map_3D.png",
     show=True,
 ):
@@ -177,8 +177,7 @@ def build_local_cartesian_map_3d(
     ax.set_ylabel("Latitude [°]", fontsize=FONTSIZE, fontweight="bold", labelpad=18)
     ax.set_zlabel("Depth [m]", fontsize=FONTSIZE, fontweight="bold", labelpad=10)
  
-    ax.legend(loc="upper right", frameon=True, facecolor="white",
-              edgecolor="grey", fontsize=FONTSIZE - 3)
+    #ax.legend(loc="lower right", frameon=True, facecolor="white",edgecolor="grey", fontsize=FONTSIZE - 3)
  
     ax.view_init(elev=15, azim=230, roll=0)
  
@@ -205,18 +204,19 @@ def filtro_mediano(x, W):
     return y
 
 if __name__ == "__main__":
-    res,lat0, lon0, gt, floater_positions, errors = load_results("simulationCIRCLE_3depth_3")
+    res,lat0, lon0, gt, floater_positions, errors = load_results("simulationCIRCLE_3depth_4")
     kres = estimate_TX_position(res["RX"], res["bearings_no_psi_error"], res["bearing_weights"]**2, dt=1.0,elevation_array=res["elevations"])
 
 
     estimated = kres["smoothed"]
     estimated_depth = estimated[:,2]
-    estimated_depth = filtro_mediano(estimated_depth,5)
+    estimated_depth = filtro_mediano(estimated_depth,9)
+    mask = ~(np.isnan(res["TX"][:,0]))
 
-    mask = (res["TX"][:,2] != np.nan)
     e = (res["TX"][:,2][mask]-estimated_depth[mask])
-    print(f"MEDIAN = {np.median(e)}")
-    print(f"RMSE DEPTH = {np.sqrt(np.mean(e**2))}")
+    print()
+    print(f"MEDIAN = {np.nanmedian(e)}")
+    print(f"RMSE DEPTH = {np.sqrt(np.nanmean(e**2))}")
 
     estimated[:,2] = estimated_depth
     build_local_cartesian_map_3d(

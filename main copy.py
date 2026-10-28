@@ -22,7 +22,7 @@ if __name__ == '__main__':
                 Center = [29.809284451457938,49.27237481798266]
                 #Center = [20.832813, 88.698390] # India, low depth
 
-                TX = compute_TX_circle_trajectory(10,90,270,37,200)
+                TX = compute_TX_circle_trajectory(10,90,270,37,200,False)
 
                 floaters = []
                 for i in range(NUMBER_OF_FLOATERS):

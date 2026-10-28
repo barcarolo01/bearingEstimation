@@ -5,7 +5,7 @@ from digitalshadow.devices.IMU_models import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 20
+NUMBER_OF_RUNS = 40
 STEPS = 3600
 
 FONTSIZE = 14
@@ -29,7 +29,7 @@ EXPECTED_SLOPE = {
 def build_floater(seed, cfg):
     """Create a static floater with only the selected error sources enabled."""
     np.random.seed(seed)
-    f = Floater(0, 0, 0, 0, 1, 1.0, imu_seed=seed)
+    f = Floater(0, 0, 0, 0, 1, 1.0, seed=seed)
 
     # Static: no motion at all, so L = 0 and the heading term drops out
     f.set_initial_velocity(0.0, 0.0, 0.0)

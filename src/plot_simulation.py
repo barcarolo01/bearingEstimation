@@ -169,23 +169,23 @@ def plot_simulation_results(simulation_folder):
     ax_check_t.set_title("Target", fontsize=FONTSIZE, loc="left")
     check_t = CheckButtons(ax_check_t, target_traces, [True] * len(target_traces))
 
-    select_labels = ["All"] + [f"Floater {i + 1}" for i in range(n_floaters)]
+    select_labels = [f"Floater {i + 1}" for i in range(n_floaters)]
     h = min(0.27, 0.035 * len(select_labels))
     ax_select = fig.add_axes([0.02, 0.38 - h, 0.17, h])
     ax_select.set_title("Show floater", fontsize=FONTSIZE, loc="left")
-    radio_select = RadioButtons(ax_select, select_labels)
+    check_select = CheckButtons(ax_select, select_labels, [True] * n_floaters)
 
     # Bottom left: regenerate the two plots as separate figures and save them
     ax_save_figs = fig.add_axes([0.02, 0.03, 0.17, 0.05])
     btn_save_figs = Button(ax_save_figs, "Save figures")
 
     # Make sure every widget label uses FONTSIZE
-    for w in (radio_source, radio_coord, check_f, check_t, radio_select):
+    for w in (radio_source, radio_coord, check_f, check_t, check_select):
         for t in w.labels:
             t.set_fontsize(FONTSIZE)
     btn_save_figs.label.set_fontsize(FONTSIZE)
 
-    state = {"geo": False, "floater": None,     # floater: 0-based index or None (= all)
+    state = {"geo": False,
                 "source": next(iter(tracks_by_source), None)}
 
     def get_map_coordinates(arr):
@@ -199,7 +199,7 @@ def plot_simulation_results(simulation_folder):
     def current_view():
         visible = dict(zip(floater_traces, check_f.get_status()))
         visible.update(zip(target_traces, check_t.get_status()))
-        floaters = range(n_floaters) if state["floater"] is None else [state["floater"]]
+        floaters = [i for i, s in enumerate(check_select.get_status()) if s]
         return visible, floaters
 
     def draw_map(ax, visible, floaters, with_title=True):
@@ -248,7 +248,9 @@ def plot_simulation_results(simulation_folder):
             ax.set_ylabel("North [m]")
             ax.set_aspect("equal", adjustable="datalim")
         if with_title:
-            title = "Trajectories" + ("" if state["floater"] is None else f" – Floater {state['floater'] + 1}")
+            title = "Trajectories"
+            if len(floaters) != n_floaters:
+                title += " – Floater " + ", ".join(str(n + 1) for n in floaters)
             if state["source"] is not None:
                 title += f"\nTarget estimated with {state['source']} floater positions"
             ax.set_title(title)
@@ -258,7 +260,7 @@ def plot_simulation_results(simulation_folder):
 
     def draw_ferr(ax, visible, floaters, with_title=True):
         for name in floater_positions:
-            if not visible[name]:
+            if not visible[name] or not floaters:
                 continue
             e = errors[name][list(floaters)]            # (n_selected, steps)
             rmse = np.sqrt((e ** 2).mean())
@@ -291,8 +293,8 @@ def plot_simulation_results(simulation_folder):
         fig.canvas.draw_idle()
         fig.savefig(os.path.join(simulation_folder,"sim_results.png"))
 
-    def current_tag():
-        tag = "all" if state["floater"] is None else f"floater_{state['floater'] + 1}"
+    def current_tag(floaters):
+        tag = "all" if len(floaters) == n_floaters else "floater_" + "_".join(str(n + 1) for n in floaters)
         tag += "_geo" if state["geo"] else "_local"
         if state["source"] is not None:
             tag += "_kf-" + state["source"].replace(" ", "_").replace("+", "_")
@@ -307,16 +309,12 @@ def plot_simulation_results(simulation_folder):
             state["source"] = source_labels[label]
             redraw()
 
-    def on_select(label):
-        state["floater"] = None if label == "All" else int(label.split()[-1]) - 1
-        redraw()
-
     def on_save_figs(_):
         """Regenerate from scratch the map and the floater-error plot as two separate
         figures (same content as displayed, without titles), save them as PNG (SAVE_DPI)
         and discard them without showing."""
         visible, floaters = current_view()
-        tag = current_tag()
+        tag = current_tag(floaters)
         plots = {"map": (draw_map, EXPORT_MAP_SIZE),
                  "floater_error": (draw_ferr, EXPORT_FERR_SIZE)}
         for name, (draw, size) in plots.items():
@@ -332,14 +330,14 @@ def plot_simulation_results(simulation_folder):
     radio_coord.on_clicked(on_coord)
     check_f.on_clicked(redraw)
     check_t.on_clicked(redraw)
-    radio_select.on_clicked(on_select)
+    check_select.on_clicked(redraw)
     btn_save_figs.on_clicked(on_save_figs)
 
     # Keep references to the widgets (otherwise garbage collection disables them)
-    fig._widgets = (radio_coord, check_f, check_t, radio_select, btn_save_figs, radio_source)
+    fig._widgets = (radio_coord, check_f, check_t, check_select, btn_save_figs, radio_source)
     redraw()
     plt.show()
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulationCIRCLE2")
+        plot_simulation_results("simulationCIRCLE")

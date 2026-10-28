@@ -251,6 +251,7 @@ if __name__ == "__main__":
     #WAV_PATH = "simulationDEMON/SynthTracks/T0_F1_H1.wav"
     #WAV_PATH = "AudioFiles/Motorboat_03.08.23_161603_20secCPA.wav"
     WAV_PATH = "AudioFIles/barca.wav"
+    #WAV_PATH = "AudioFiles/0958_crop.wav"
 
     # ------------------------------------------
 
