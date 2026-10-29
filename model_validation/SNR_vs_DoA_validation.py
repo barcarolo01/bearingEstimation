@@ -26,8 +26,6 @@ if __name__ == "__main__":
     floaters.append(RX)
 
     #TX_Coordinates = np.asarray([38.81282072005432,134.05669525507423, 30])
-    NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
-    SAMPLING_FREQUENCY = 96000
 
     TRUE_BEARING = 180.0
 

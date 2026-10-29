@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, RadioButtons, Button
 from matplotlib.figure import Figure
-from digitalshadow.Positioning.kalman_filter import *
-from digitalshadow.Positioning.coordinate_generator import *
-from digitalshadow.Positioning.tracking_plots import *
+from digitalshadow.positioning.kalman_filter import *
+from digitalshadow.positioning.coordinate_generator import *
+from digitalshadow.positioning.tracking_plots import *
 
 EARTH_RADIUS = 6378137.0
 KALMAN_DT = 1.0              # time between two consecutive steps [s]
@@ -71,7 +71,7 @@ def load_results(simulation_folder):
 
 def extract_kalman_tracks(kres):
     """Return the target floater_positions from the output of estimate_TX_position():
-      "Triangulation": raw find_points fixes (no filtering)
+      "Triangulation": raw 'triangulate' fixes (no filtering)
       "Kalman":        causal Kalman filter
       "Kalman RTS":    Kalman + RTS smoother
     Each array has shape (N_STEPS, 3) [x, y, depth] in local metres (same frame as RX/TX);
@@ -100,8 +100,16 @@ def run_all_kalman(res):
         print("\n" + "=" * 60)
         print(f"Triangulation + Kalman using floater positions: {label}  ({key})")
         print("=" * 60)
-        kres = estimate_TX_position(res[key], res["bearings_no_psi_error"], res["bearing_weights"]**2, dt=KALMAN_DT,
-                            elevation_array=res["elevations"])
+        kres = estimate_TX_position(floaters=res[key],
+                                    bearings=res["bearings_no_psi_error"],
+                                    weights=res["bearing_weights"]**2,
+                                    dt=KALMAN_DT,
+                                    elevations=res["elevations"],
+                                    sigma_deg=1.0,
+                                    a_max=config.KF_MAX_ACCEL,
+                                    init_speed_std=config.KF_INIT_VELOCITY_STD,
+                                    max_init_std=config.KF_MAX_INIT_DEVSTD,
+                                    max_consecutive_rejects=config.KF_MAX_REJECTION)
         try:
             tracking_report(kres, res["TX"])
         except Exception as exc:   # e.g. the filter could not start (filtered/smoothed = None)
@@ -340,4 +348,4 @@ def plot_simulation_results(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulationCIRCLE")
+        plot_simulation_results("simulationCIRCLE_3depth_4")

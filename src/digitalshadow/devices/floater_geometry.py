@@ -73,7 +73,7 @@ def precompute_bearing_angles_complete(d):
 
 def get_hydrophones_coordinates(lat_center,lon_center,depth_center,number_of_hydrohpones, PSI_RX=0):
     '''
-    This method receives as an input the geographical coordinates of the center of a floater and returns 
+    Receives as an input the geographical coordinates of the center of a floater and returns 
     the coordinates of each hydrophone
     '''
     # From meters to degrees

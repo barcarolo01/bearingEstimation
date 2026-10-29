@@ -1,12 +1,10 @@
 
 import shutil
-
 import numpy as np
 from digitalshadow.devices.Floater import *
 from digitalshadow.underwater_sim.bellhop_to_wav import *
 from hydromate.app_bellhop import AppBellhop
 
-FS_OUT = 96000
 C_SOUND = 1540
     
 def ping_pair(Floater1_coordiantes,Floater2_coordiantes):

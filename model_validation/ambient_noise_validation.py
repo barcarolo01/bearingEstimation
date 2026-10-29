@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import welch
-from digitalshadow.underwater_sim.ambient_noise import add_ambient_noise, wenz_psd_db, P_REF
+from digitalshadow.underwater_sim.ambient_noise import add_ambient_noise, generate_ambient_noise, P_REF
 
 FONTSIZE = 15
 
@@ -48,12 +48,12 @@ def main():
         keep[-1] = False
         ax.semilogx(f[keep], 10 * np.log10(pxx[keep] / P_REF ** 2),
                     color=colour, lw=2.0, zorder=3, solid_capstyle="round")
-        ax.semilogx(f_model, wenz_psd_db(f_model, SHIPPING, wind),
+        ax.semilogx(f_model, generate_ambient_noise(f_model, SHIPPING, wind),
                     color="#52514e", lw=1.0, ls=(0, (4, 3)), zorder=4, alpha=0.75)
         rows.append((label, band_level_db(f, pxx, F_LOW, F_HIGH)))
 
         ax.annotate(label,
-                    xy=(FS / 2 * 0.95, wenz_psd_db(FS / 2 * 0.95, SHIPPING, wind)),
+                    xy=(FS / 2 * 0.95, generate_ambient_noise(FS / 2 * 0.95, SHIPPING, wind)),
                     xytext=(8, 0), textcoords="offset points", va="center",
                     fontsize=FONTSIZE, color=colour)
 

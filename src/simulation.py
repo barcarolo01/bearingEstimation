@@ -1,14 +1,15 @@
 import os
 import shutil
+from digitalshadow import config
 from dotenv import load_dotenv
-from digitalshadow.Positioning.coordinate_generator import *
+from digitalshadow.positioning.coordinate_generator import *
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
-from digitalshadow.Positioning.point_estimation import *
+from digitalshadow.positioning.point_estimation import *
 from digitalshadow.underwater_sim.floater_ping import *
 from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
-from digitalshadow.Positioning.kalman_filter import *
-from digitalshadow.Positioning.tracking_plots import *
+from digitalshadow.positioning.kalman_filter import *
+from digitalshadow.positioning.tracking_plots import *
 
 FONTSIZE = 18
 
@@ -52,16 +53,14 @@ class Simulation:
                 for f in Floaters:
                         f.TX_LIMIT = TX_LIMIT
 
-                self.NUMBER_OF_HYDROPHONES = int(os.getenv('NUMBER_OF_HYDROPHONES'))
-
-                if self.NUMBER_OF_HYDROPHONES == 3:
+                if config.NUMBER_OF_HYDROPHONES == 3:
                         precompute_bearing_angles_triangle(0.3)
-                elif self.NUMBER_OF_HYDROPHONES == 4:
+                elif config.NUMBER_OF_HYDROPHONES == 4:
                         precompute_bearing_angles_square(0.228 / math.sqrt(2))
-                elif self.NUMBER_OF_HYDROPHONES == 5:
+                elif config.NUMBER_OF_HYDROPHONES == 5:
                         precompute_bearing_angles_complete(0.228 / math.sqrt(2))
                 else:
-                        raise ValueError(f"Unexpected number of hydrophones ({self.NUMBER_OF_HYDROPHONES}).")
+                        raise ValueError(f"Unexpected number of hydrophones ({config.NUMBER_OF_HYDROPHONES}).")
 
 
                 if transmitter is None and transmitter_coordinates is None:
@@ -126,20 +125,20 @@ class Simulation:
                                         
                                         # By convolution, obtain a signal for each of the arrival files
                                         from_arr_to_wav(TX_POS=np.asarray([TX_Coordinates[0],TX_Coordinates[1]]),
-                                                        number_mic=NUMBER_OF_HYDROPHONES,
+                                                        nr_of_hydrophones=config.NUMBER_OF_HYDROPHONES,
                                                         sim_name = self.sim_name,
                                                         sim_timestamp = i,
                                                         floater_number = (n + 1),
                                                         n_arrivals=0,
-                                                        sl_db=150,
+                                                        sl_db=config.SL_DB,
                                                         add_noise=False,
                                                         noise_seed=self.init_seed)
 
-                                        if NUMBER_OF_HYDROPHONES == 3:
+                                        if config.NUMBER_OF_HYDROPHONES == 3:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i]  = compute_single_bearing_angle_triangle(track_folder=os.path.join(self.sim_name,'SynthTracks'), timestamp=i, F_index=(n + 1))
-                                        if NUMBER_OF_HYDROPHONES == 4:
+                                        if config.NUMBER_OF_HYDROPHONES == 4:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i]  = compute_single_bearing_angle_square(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
-                                        if NUMBER_OF_HYDROPHONES == 5:
+                                        if config.NUMBER_OF_HYDROPHONES == 5:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i] = compute_single_bearing_angle_complete(timestamp=i, wav_folder=os.path.join(self.sim_name,'SynthTracks'),F_index=(n + 1))
 
                                         
@@ -235,7 +234,7 @@ class Simulation:
                 # Save the complete .wav tracks for each hydrophone
                 if self.HYDROMATE_SIMULATION:
                         for n in range(self.NUMBER_OF_FLOATERS):
-                                for j in range(self.NUMBER_OF_HYDROPHONES):
+                                for j in range(config.NUMBER_OF_HYDROPHONES):
                                         segments = []
                                         for i in range (self.SIMULATION_STEPS):
                                                 segment_path = os.path.join(self.sim_name,"SynthTracks",f"T{i}_F{self.Floaters[n].ID}_H{j+1}.wav")
@@ -256,7 +255,7 @@ class Simulation:
 
                 bearings_with_psi_error = np.full(self.bearing_arrays.shape,np.nan)
                 if ADD_PSI_ERROR:
-                        bearings_with_psi_error = wrap_degrees(self.bearing_arrays + psi_error_arrays)
+                        bearings_with_psi_error = (self.bearing_arrays + psi_error_arrays) & 360
                 
                 np.savez(os.path.join(self.sim_name,"results.npz"),
                         Center_coordinates = self.Center,

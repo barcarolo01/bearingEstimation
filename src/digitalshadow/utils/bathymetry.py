@@ -3,6 +3,10 @@ from dotenv import load_dotenv
 import xarray as xr
 
 def get_depth_gebco(lat_query,lon_query):
+    '''
+    Queries the GEBCO database used by HYDROMATE and returns the depth/altitude of the queried point.
+    '''
+    
     load_dotenv()
     HYDROMATE_PY_PATH = os.getenv('HYDROMATE_PY_PATH')
     PATH = os.path.join(HYDROMATE_PY_PATH,"gebco_2024_sub_ice_topo/GEBCO_2024_sub_ice_topo.nc")

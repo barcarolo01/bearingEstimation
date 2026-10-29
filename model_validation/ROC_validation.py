@@ -23,13 +23,13 @@ Output:
 """
 
 import glob
-
+from digitalshadow import config
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io.wavfile as wav
 from scipy.signal import butter, sosfiltfilt
 from digitalshadow.underwater_sim.ambient_noise import *
-import digitalshadow.underwater_sim.ambient_noise as AN   # per _active_power (non esportata da *)
+import digitalshadow.underwater_sim.ambient_noise as AN
 import digitalshadow.utils.Envelope as D
 
 FONTSIZE = 16
@@ -47,12 +47,9 @@ SEED = 0
 # Rumore di Wenz: generate_noise_array di digitalshadow.underwater_sim.ambient_noise
 # (lo stesso generatore usato da add_ambient_noise). Di default i parametri vengono
 # dalle stesse variabili d'ambiente del simulatore (NOISE_SHIPPING, NOISE_WIND, ...).
-_cfg = get_noise_config()
-SHIPPING = _cfg["shipping"]   # definiscono la FORMA dello spettro di Wenz;
-WIND = _cfg["wind"]           # il livello viene poi riscalato per ottenere ogni SNR
-EXTRA_DB = _cfg["extra_db"]
+
+
 N_CH = 1                # canali generati: per il detector su un solo idrofono basta 1
-SPACING = _cfg["spacing"]     # distanza tra idrofoni (m), usata solo se N_CH > 1
 C_SOUND = 1500.0
 COHERENT = False        # come add_ambient_noise quando coherent=None
 
@@ -81,8 +78,8 @@ def noise_frame(n_samples, fs, rng):
     if USE_TEST_NOISE:
         return _test_colored_noise(n_samples, fs, rng)
     ch = CHANNEL if N_CH > 1 else 0
-    noises = generate_noise_array(n_samples, fs, N_CH, SPACING, None, C_SOUND,
-                                  SHIPPING, WIND, rng, EXTRA_DB, COHERENT)
+    noises = generate_noise_array(n_samples, fs, N_CH, config.NOISE_SPACING, None, C_SOUND,
+                                  config.NOISE_SHIPPING, config.NOISE_WIND, rng, config.NOISE_EXTRA_DB, COHERENT)
     return np.asarray(noises[ch], dtype=np.float64)
 
 
@@ -183,8 +180,8 @@ def main():
     if USE_TEST_NOISE:
         print("ATTENZIONE: rumore di prova, non il tuo rumore di Wenz. Solo per verificare lo script.")
     else:
-        print(f"Rumore: generate_noise_array (shipping={SHIPPING}, wind={WIND}, "
-              f"extra_db={EXTRA_DB}); SNR {SNR_DEF}")
+        print(f"Rumore: generate_noise_array (shipping={config.NOISE_SHIPPING}, wind={config.NOISE_WIND}, "
+              f"extra_db={config.NOISE_EXTRA_DB}); SNR {SNR_DEF}")
     print(f"{len(files)} tracce, fs = {fs} Hz, frame da {n} campioni")
     print(f"Detector: banda {D.LOW_HZ}-{D.HIGH_HZ} Hz, finestra {D.F_MIN_HZ}-{D.F_MAX_HZ} Hz, "
           f"armoniche {D.HARMONICS}, SEG_S={D.SEG_S}, NORM={D.NORM}, soglia={thr}")

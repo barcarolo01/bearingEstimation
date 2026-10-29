@@ -1,7 +1,7 @@
 import numpy as np
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_continuous_white_noise
-from digitalshadow.Positioning.point_estimation import find_points
+from digitalshadow.positioning.point_estimation import triangulate
 
 def measurement_covariance(floater_xy, target_xy, sigma_deg):
     sigma = np.deg2rad(sigma_deg)
@@ -29,45 +29,41 @@ def initial_state(z, R, init_speed_std):
     # Diagonal matrix with velocity variances on the diagonal
     P = np.diag([0.0, init_speed_std ** 2, 0.0, init_speed_std ** 2])
 
-    # Position block (rows/columns 0 and 2 of the state) = covariance of the fix
-    P[np.ix_([0, 2], [0, 2])] = R
+    # Position block
+    P[0, 0] = R[0, 0]
+    P[0, 2] = R[0, 1]
+    P[2, 0] = R[1, 0]
+    P[2, 2] = R[1, 1]
     return x, P
 
-def estimate_TX_position(floaters, bearings, weights, dt, elevation_array=None, sigma_deg=1.0,
-                 a_max=20, init_speed_std=15.0, max_init_std=50.0,
-                 gate=9.21, max_consecutive_rejects=50):
+def estimate_TX_position(floaters, bearings, weights, dt, elevations=None,
+                         sigma_deg=1.0, a_max=10, init_speed_std=10,
+                         max_init_std=50.0, max_consecutive_rejects=10):
     """
-    Parameters
-    ----------
-    floaters, bearings, elevation_array : same as find_points.
-    dt       : time between two consecutive trajectory points [s].
-    sigma_deg: standard deviation of a single bearing [deg].
-    a_max    : largest acceleration expected for the vessel [m/s^2].
-    init_speed_std : initial velocity uncertainty [m/s] (velocity starts at 0).
-    max_init_std   : the filter starts at the first fix whose position
-                     standard deviation is below this value [m].
-    gate     : a fix is rejected as an outlier if its squared Mahalanobis
-               distance from the prediction exceeds this value
-               (9.21 = 99% quantile of a chi-square with 2 dof).
-    max_consecutive_rejects : after this many consecutive rejected fixes the
-               target is considered lost and the filter restarts from the
-               current fix (if precise enough).
+    Input  
+        floaters: floater positions, shape or (I,N,3)
+        bearings: bearing arrays, shape (I,N)
+        elevations: bearing arrays, shape (I,N)
+        dt: time between two consecutive trajectory points, in seconds.
+        sigma_deg: standard deviation of a single bearing, in degrees.
+        a_max: largest acceleration expected for the vessel, in m/s^2.
+        init_speed_std: initial velocity uncertainty, in m/s.
+        max_init_std: max std deviation allowed to initialize KF, in.
+        max_consecutive_rejects : maximum consecutive rejections before a KF reinitialization.
 
-    Returns
-    -------
-    dict of (STEPS, 3) arrays [lat, lon, depth]:
-        'raw'      : find_points output
-        'filtered' : Kalman filter (causal, usable in real time)
-        'smoothed' : Kalman + RTS smoother (offline)
-    plus 'velocity' (STEPS, 2) [vx, vy] in m/s from the smoother.
-    Depth is taken from find_points. Steps before the first reliable fix are NaN.
+    Output
+        dicts, containing a np array of shape (STEPS, 3) [lat, lon, depth] for each key:
+            'raw'      : raw triangulation result
+            'filtered' : Kalman filter (causal)
+            'smoothed' : Kalman + RTS smoother (offline)
+            'velocity' (STEPS, 2) [vx, vy] in m/s, from the smoother.
     """
     floaters = np.asarray(floaters, dtype=float)
 
     #weights = None
 
     # Compute target trajectory with minimum-RMSE triangulation
-    raw = find_points(floaters, bearings, elevation_array, weights)
+    raw = triangulate(floaters, bearings, elevations, weights)
     STEPS = len(raw)
     z_all = raw[:, :2]           # (STEPS, 2) [x, y]
 
@@ -75,7 +71,7 @@ def estimate_TX_position(floaters, bearings, weights, dt, elevation_array=None, 
     zs, Rs = [], []
     for i in range(STEPS):
         z, R = None, None
-        if np.all(np.isfinite(z_all[i])):   # find_points succeeded
+        if np.all(np.isfinite(z_all[i])):   # 'triangulate' method succeeded
             floater_xy = floaters[i, :, :2]
             try:
                 R = measurement_covariance(floater_xy, z_all[i], sigma_deg)
@@ -128,7 +124,8 @@ def estimate_TX_position(floaters, bearings, weights, dt, elevation_array=None, 
             S = kf.H @ kf.P @ kf.H.T + R          # Innovation covariance
             d2 = xi @ np.linalg.solve(S, xi)      # Squared of Mahalanobis distance (y^T S^-1 y)
 
-            if d2 <= gate:
+            # Gate (Mahalanobis distance)
+            if d2 <= 9.21: 
                 # Plausible fix: correct the prediction with the measurement
                 kf.update(z, R=R)
                 rejects = 0

@@ -3,85 +3,67 @@ import math
 
 def math_to_bearing(math_angle_deg):
     """
-    This function convert an angle expressed in the mathematical convention
+    Converts an angle expressed in the mathematical convention
     (0° = EAST, angles increasing in anti-clockwise sense) into an angle measured
     in geographical convention (0° = NORTH, angles increasing in clockwise sense)
     """
     return (90.0 - math_angle_deg) % 360.0
 
-def wrap_degrees(angle_deg):
+def two_line_intersection(x1, y1, brg1, x2, y2, brg2):
     """
-    This function takes as an input a value of an angle (in degrees) and wrap it 
-    in order to keep it inside the range [0;360)
-    """
-    return angle_deg % 360
+    Computes the intersection between two lines in the local plane.
 
-def _flat_earth_intersection(
-    x1: float, z1: float, brg1: float,
-    x2: float, z2: float, brg2: float,
-) -> tuple[float, float]:
-    """
-    This function compute the intersection between two lines in the local plane.
+    Input 
+        x1, y1 : coordinates of the starting point of the first line
+        brg1   : first line direction (Geographical convention)
+        x2, y2 : coordinates of the starting point of the second line
+        brg2   : second line direction (Geographical convention)
 
-    Parameters
-    ---------
-    x1, z1 : coordinates of the starting point of the first line
-    brg1   : first line direction
-    x2, z2 : coordinates of the starting point of the second line
-    brg2   : second line direction
-
-    Returns
-    -------
-    Coordintes (x, z) of the intersection point, or (nan, nan) if no intersection point is found.
+    Output 
+        Triangulated point (x,y), or (nan, nan) if no intersection point is found.
     """
+
     # Compute the direction vector in the plane (x=East, z=North)
     r = math.radians(brg1)
-    dx1, dz1 = math.sin(r), math.cos(r)
+    dx1, dy1 = math.sin(r), math.cos(r)
     r = math.radians(brg2)
-    dx2, dz2 = math.sin(r), math.cos(r)
+    dx2, dy2 = math.sin(r), math.cos(r)
 
-    # Intersection of two parametric lines:
-    #   P1 + t * d1 = P2 + s * d2
-    # Solved for t using Cramer's rule
-    denom = dx1 * dz2 - dz1 * dx2 # Determinant
+    # Intersection of two parametric lines (Cramer)
+    denom = dx1 * dy2 - dy1 * dx2 
 
-    if abs(denom) < 1e-12:      # Lines are parallel or coincident lines
+    # Lines are parallel or coincident: no intersection can be estimated
+    if abs(denom) < 1e-12:      
         return math.nan, math.nan
 
-    t = ((x2 - x1) * dz2 - (z2 - z1) * dx2) / denom
+    # Parametric form of the linear system
+    t = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / denom
+    s = ((x2 - x1) * dy1 - (y2 - y1) * dx1) / denom
 
-    if t < 0:                   # Line intersection is behind half-line 1
+    # Line intersection is behind one of the two half-lines
+    if t < 0 or s < 0:
         return math.nan, math.nan
-
-    s = ((x2 - x1) * dz1 - (z2 - z1) * dx1) / denom
-    if s < 0:                   # Line intersection is behind half-line 2
-        return math.nan, math.nan
-
+    
     # Local coordinates of the intersection point
     x_out = x1 + t * dx1
-    z_out = z1 + t * dz1
+    y_out = y1 + t * dy1
 
-    return x_out, z_out
-def _least_squares_point_n(
-    xs: np.ndarray,
-    zs: np.ndarray,
-    brgs: np.ndarray,
-    weights: np.ndarray = None,
-) -> tuple[float, float] | None:
+    return x_out, y_out
+
+def _least_squares_point_n(xs, ys, brgs, weights):
     """
-    Finds the point that minimizes the weighted sum of squared distances
-    from the N half-lines in the local plane.
+    Finds the point that minimizes the weighted sum of
+    squared distances from the N half-lines in the local plane.
 
-    Parameters
-    ---------
-    xs, zs  : array (N,) of floater coordinates in metres.
-    brgs    : array (N,) of geographic bearings in degrees (clockwise from North).
-    weights : array (N,) of floater weights. If None, uniform weights are used.
+    Input:
+        xs, ys: floater positions, shape (N,)
+        brgs: bearing of each floater (Geographical convention), shape (N,)
+        weights: weight of each floater, shape (N,). If None, uniform weights are used.
 
-    Returns
-    -------
-    (x, z) of the optimal point, or None if the system is singular.
+    Output
+        (x_opt, y_opt): local coordinates of the optimal point, or None if the system is singular.
     """
+
     if weights is None:
         weights = np.ones(len(xs))
 
@@ -95,52 +77,43 @@ def _least_squares_point_n(
     for i in range(len(xs)):
         d = np.array([dx[i], dz[i]])
         P_orth = np.eye(2) - np.outer(d, d)
-        h = np.array([xs[i], zs[i]])
+        h = np.array([xs[i], ys[i]])
         A += weights[i] * P_orth
         b += weights[i] * (P_orth @ h)
 
     try:
         p = np.linalg.solve(A, b)
+
     except np.linalg.LinAlgError:
         return None
 
     if not np.all(np.isfinite(p)):
         return None
 
-    return float(p[0]), float(p[1])
+    x_opt = p[0]
+    y_opt = p[1]
+    return x_opt, y_opt
 
-def compute_flat_distance(x1: float, z1: float, x2: float, z2: float) -> float:
+def compute_flat_distance(x1: float, y1: float, x2: float, y2: float) -> float:
     """Distance in meters between two points in the local plane"""
     dx = x2 - x1
-    dz = z2 - z1
+    dz = y2 - y1
     return np.sqrt(dx**2 + dz**2)
 
-def find_points(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.ndarray = None, weights: np.ndarray = None):
+def triangulate(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.ndarray = None, weights: np.ndarray = None):
     """
     For each of the N simulation steps, this method compute the point that minimzes the weighted RMSE
     distance with respect to the M direction of arrival lines estimated by each of the M floaters
 
-    Parameters
-    ---------
-    floaters : np.ndarray of shape (N, M, 2) or (N, M, 3)
-        N simulation steps, each with M floaters. Coordinates must be in form [x, z] or [x, z, depth_m],
-        expressed in metres in the local plane.
-    bearings : np.ndarray of shape (M, N)
-        Horizontal angles (degrees) for each of the M floaters and for each of the N simulation steps.
-    elevation_array : np.ndarray of shape (M, N)
-        Vertical angles (degrees) for each of the M floaters and for each of the N simulation steps.
-    weights : np.ndarray of shape (M, N)
-        Reliability of each floater for each of the N simulation steps (e.g. GCC-PHAT peak).
-        Normalized so that they sum to 1 at each simulation step. If None, uniform weights are used.
+    Input (I = simulation steps, N = floaters.):
+        floaters: floater positions, shape (I, N, 2) or (I, N, 3). Coordinates must be in form [x, z] or [x, z, depth_m]
+        bearings: DoA estimations, shape (N, I)
+        elevation_array: elevation estimations, shape (N, I)
+        weights: reliability of each DoA estimated, shape (N, I). These weights are normalized to sum up to 1
 
-    Returns
-    -------
-    positions : np.ndarray of shape (N, 3)
-        A triple [x, z, depth_m] in the local plane for each of the N simulation steps
+    Output
+        positions: target triangulated positions, shape (I, 3)
     """
-
-    floaters = np.asarray(floaters, dtype=float)
-    bearings = np.asarray(bearings, dtype=float)
 
     # Check "floaters" and "bearings" arrays
     if floaters.ndim != 3 or floaters.shape[2] not in (2, 3):
@@ -151,15 +124,13 @@ def find_points(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.
     n_simulations = floaters.shape[0]
     n_floaters = floaters.shape[1]
 
-
     if bearings.shape[0] != n_floaters or bearings.shape[1] != n_simulations:
         raise ValueError(f"Bearings must have shape ({n_floaters}, {n_simulations}), while it has {bearings.shape}.")
     if n_floaters < 2:
         raise ValueError("At least 2 floaters are needed")
 
-
     has_depth = floaters.shape[2] == 3 # Boolean flag
-    use_elevation = has_depth and elevation_array is not None
+    use_elevation = has_depth and (elevation_array is not None)
 
     if use_elevation:
         elevation_array = np.asarray(elevation_array, dtype=float)
@@ -178,74 +149,68 @@ def find_points(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.
     weight_sums = weights.sum(axis=0, keepdims=True)
     weights = np.where(weight_sums > 0, weights / np.where(weight_sums > 0, weight_sums, 1.0), 1.0 / n_floaters)
 
-    
     positions = np.full((n_simulations, 3), np.nan)
     brgs = math_to_bearing(bearings)
 
     # Iteration over the N simulation steps
-    for n in range(n_simulations):
-
+    for i in range(n_simulations):
         # Fetching data of the n-th simulation
-        floaters_n = floaters[n]
-        brg_n = brgs[:, n] # Shape (M,) (i.e.: one angle for each floater)
-        w_n = weights[:, n] # Shape (M,) (i.e.: one weight for each floater)
-        
-        xs = floaters_n[:, 0]
-        zs = floaters_n[:, 1]
-        floater_depths = floaters_n[:, 2] if has_depth else None
+        floaters_i = floaters[i]
+        brg_n = brgs[:, i] # Shape (N,) (i.e.: one angle for each floater)
+        w_n = weights[:, i] # Shape (N,) (i.e.: one weight for each floater)
+        xs = floaters_i[:, 0]
+        ys = floaters_i[:, 1]
+        floater_depths = floaters_i[:, 2] if has_depth else None
 
         # If only two floaters are present, the point of minimum distance is the intersection of the bearing lines
         if n_floaters == 2:
-            x_i, z_i = _flat_earth_intersection(
-                xs[0], zs[0], brg_n[0],
-                xs[1], zs[1], brg_n[1],
-            )
-            if not np.isnan(x_i):
-                positions[n, 0] = x_i
-                positions[n, 1] = z_i
+            x_i, y_i = two_line_intersection(xs[0], ys[0], brg_n[0],xs[1], ys[1], brg_n[1],)
+            if (not np.isnan(x_i) and not np.isnan(y_i)):
+                positions[i, 0] = x_i
+                positions[i, 1] = y_i
 
         # If more than two floaters are used, estimate the point minimizing the weighted distance between all bearing lines
         else:
             candidates = []
             candidate_weights = []
-            for i in range(n_floaters):
-                for j in range(i + 1, n_floaters):
-                    x_i, z_i = _flat_earth_intersection(
-                        xs[i], zs[i], brg_n[i],
-                        xs[j], zs[j], brg_n[j],
-                    )
-                    if not np.isnan(x_i):
-                        candidates.append((x_i, z_i))
+
+            # Compute the two-line intersection between each pair of floaters and keep each solution as a candidate
+            for n in range(n_floaters):
+                for j in range(n + 1, n_floaters):
+                    x_i, y_i = two_line_intersection(xs[n], ys[n], brg_n[n],xs[j], ys[j], brg_n[j])
+                    if (not np.isnan(x_i) and not np.isnan(y_i)):
+                        candidates.append((x_i, y_i))
                         candidate_weights.append(w_n[i] * w_n[j])
 
-            opt = _least_squares_point_n(xs, zs, brg_n, w_n)
+             
+            opt = _least_squares_point_n(xs, ys, brg_n, w_n)
 
             if opt is None:
                 if len(candidates) >= 2:
                     cw = np.asarray(candidate_weights)
                     if cw.sum() <= 0:
                         cw = np.ones_like(cw)
-                    positions[n, 0] = float(np.average([p[0] for p in candidates], weights=cw))
-                    positions[n, 1] = float(np.average([p[1] for p in candidates], weights=cw))
+                    positions[i, 0] = float(np.average([p[0] for p in candidates], weights=cw))
+                    positions[i, 1] = float(np.average([p[1] for p in candidates], weights=cw))
                 elif len(candidates) == 1:
-                    positions[n, 0] = candidates[0][0]
-                    positions[n, 1] = candidates[0][1]
+                    positions[i, 0] = candidates[0][0]
+                    positions[i, 1] = candidates[0][1]
                 else:
                     continue
             else:
-                positions[n, 0] = opt[0]
-                positions[n, 1] = opt[1]
+                positions[i, 0] = opt[0]
+                positions[i, 1] = opt[1]
 
         # Depth estimation
-        if use_elevation and not np.isnan(positions[n, 0]):
+        if use_elevation and not np.isnan(positions[i, 0]):
             depth_estimates = []
             depth_weights = []
             
-            for i in range(n_floaters):
-                el_deg = elevation_array[i, n] #i-th floater, n-th simulation step
+            for n in range(n_floaters):
+                el_deg = elevation_array[n, i] #i-th floater, n-th simulation step
                 
                 el_rad = np.deg2rad(el_deg)
-                dist_h = compute_flat_distance(xs[i], zs[i], positions[n, 0], positions[n, 1])
+                dist_h = compute_flat_distance(xs[n], ys[n], positions[i, 0], positions[i, 1])
                 
                 delta_z = dist_h * np.tan(el_rad)
                 estimated_z = floater_depths[i] - delta_z
@@ -254,8 +219,8 @@ def find_points(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.
                 depth_weights.append(w_n[i] * np.cos(el_rad) ** 2)
 
             if depth_estimates and np.sum(depth_weights) > 0:
-                positions[n, 2] = float(np.average(depth_estimates, weights=depth_weights))
+                positions[i, 2] = float(np.average(depth_estimates, weights=depth_weights))
             else:
-                positions[n, 2] = float(np.mean(floater_depths))
+                positions[i, 2] = float(np.mean(floater_depths))
 
     return positions

@@ -5,7 +5,6 @@ from digitalshadow.utils.Envelope import detect_env
 from plot_simulation import *
 from simulation import *
 
-
 TX_LIMIT = 3
 HYDROMATE_SIMULATION = True
 
@@ -14,7 +13,7 @@ if __name__ == '__main__':
         SIMULATION_NAME=f'simulationCIRCLE_3depth_4'
         random_sim = np.random.default_rng(SEED)
         NUMBER_OF_FLOATERS = 3
-        STEPS = 1
+        STEPS = 2
         #Center = [20.832813, 88.698390] # India, low depth
         #Center = [32.839, -34.635] # Atlantic
         Center =[43.4144393753542,50.10894650149935]
@@ -24,7 +23,7 @@ if __name__ == '__main__':
         #TX.set_initial_velocity(-3,6,0)
         #TX.set_sigma(0.2,0.2,0)
         
-        TX = compute_TX_circle_trajectory(10,0,350,35,200)
+        TX = compute_TX_circle_trajectory(10,0,350,2,200)
 
         floaters = []
         R = 58

@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def gcc_phat(sig_A, sig_B):
     beta = 0
     N = len(sig_A) + len(sig_B) - 1
@@ -16,7 +15,6 @@ def gcc_phat(sig_A, sig_B):
     cc = np.fft.irfft(R, n=N)
     cc = np.fft.fftshift(cc)
     return cc
-
 
 def gcc_phat_bandpass(sig_A, sig_B, f_sampling, f_low, f_high):
     beta = 0

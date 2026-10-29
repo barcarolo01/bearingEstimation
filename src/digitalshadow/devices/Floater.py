@@ -1,5 +1,5 @@
 import numpy as np
-from digitalshadow.Positioning.Positioning import *
+from digitalshadow.positioning.Positioning import *
 from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====
@@ -391,7 +391,7 @@ class Floater(Transmitter):
             if W.sum() > 0:
                 D_m = np.nan_to_num(D_ms, nan=0.0) * 1500.0 / 1000.0
                 pos_all, err_all = self._assemble_priors()
-                new_pos, new_err = estimate(pos_all, err_all, D_m, W)                
+                new_pos, new_err = MDS_estimate(pos_all, err_all, D_m, W)                
                 self.est_pos_mds   = new_pos[self.ID].copy()
                 self.est_error_mds = float(new_err[self.ID])
                 self.steps_since_fix = 0
