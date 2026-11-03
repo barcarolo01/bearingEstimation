@@ -11,9 +11,9 @@ BELLHOP_frequency = 1000    # Hz
 
 # ===== AMBIENT NOISE =====
 AMBIENT_NOISE = True        # Turn ON/OFF ambient noise generation
-NOISE_SHIPPING = 0.5        # Shipping activity factor (real number between 0 and 1)
-NOISE_WIND = 5.0            # Wind velocity (meter/second)
-NOISE_EXTRA_DB =  4.0       # Extra noise to be added on tracks (dB)
+NOISE_SHIPPING = 0.6        # Shipping activity factor (real number between 0 and 1)
+NOISE_WIND = 6.0            # Wind velocity (meter/second)
+NOISE_EXTRA_DB =  5.0       # Extra noise to be added on tracks (dB)
 NOISE_SPACING = 0.3         # TODO: check
 
 # ===== KALMAN FILTER ======

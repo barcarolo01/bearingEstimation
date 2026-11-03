@@ -6,6 +6,7 @@ from matplotlib.figure import Figure
 from digitalshadow.positioning.kalman_filter import *
 from digitalshadow.positioning.coordinate_generator import *
 from digitalshadow.positioning.tracking_plots import *
+from digitalshadow import config
 
 EARTH_RADIUS = 6378137.0
 KALMAN_DT = 1.0              # time between two consecutive steps [s]
@@ -344,7 +345,7 @@ def plot_simulation_results(simulation_folder):
     # Keep references to the widgets (otherwise garbage collection disables them)
     fig._widgets = (radio_coord, check_f, check_t, check_select, btn_save_figs, radio_source)
     redraw()
-    plt.show()
+    #plt.show()
 
 
 if __name__ == "__main__":
