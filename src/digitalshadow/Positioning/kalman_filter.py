@@ -1,7 +1,7 @@
 import numpy as np
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_continuous_white_noise
-from digitalshadow.positioning.point_estimation import triangulate
+from digitalshadow.Positioning.point_estimation import triangulate
 
 def measurement_covariance(floater_xy, target_xy, sigma_deg):
     sigma = np.deg2rad(sigma_deg)

@@ -213,10 +213,10 @@ def triangulate(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.
                 dist_h = compute_flat_distance(xs[n], ys[n], positions[i, 0], positions[i, 1])
                 
                 delta_z = dist_h * np.tan(el_rad)
-                estimated_z = floater_depths[i] - delta_z
+                estimated_z = floater_depths[n] - delta_z
                 
                 depth_estimates.append(estimated_z)
-                depth_weights.append(w_n[i] * np.cos(el_rad) ** 2)
+                depth_weights.append(w_n[n] * np.cos(el_rad) ** 2)
 
             if depth_estimates and np.sum(depth_weights) > 0:
                 positions[i, 2] = float(np.average(depth_estimates, weights=depth_weights))

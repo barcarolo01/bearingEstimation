@@ -2,14 +2,14 @@ import os
 import shutil
 from digitalshadow import config
 from dotenv import load_dotenv
-from digitalshadow.positioning.coordinate_generator import *
+from digitalshadow.Positioning.coordinate_generator import *
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
-from digitalshadow.positioning.point_estimation import *
+from digitalshadow.Positioning.point_estimation import *
 from digitalshadow.underwater_sim.floater_ping import *
 from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
-from digitalshadow.positioning.kalman_filter import *
-from digitalshadow.positioning.tracking_plots import *
+from digitalshadow.Positioning.kalman_filter import *
+from digitalshadow.Positioning.tracking_plots import *
 
 FONTSIZE = 18
 
@@ -237,12 +237,12 @@ class Simulation:
                                 for j in range(config.NUMBER_OF_HYDROPHONES):
                                         segments = []
                                         for i in range (self.SIMULATION_STEPS):
-                                                segment_path = os.path.join(self.sim_name,"SynthTracks",f"T{i}_F{self.Floaters[n].ID}_H{j+1}.wav")
+                                                segment_path = os.path.join(self.sim_name,"SynthTracks",f"T{i}_F{n+1}_H{j+1}.wav")
                                                 fs, seg = wav.read(segment_path)
                                                 segments.append(seg)
                                         
                                         track = np.concatenate(segments)
-                                        wav.write(os.path.join(self.sim_name,"SynthTracks",f"F{self.Floaters[n].ID}_H{j+1}.wav"),fs,np.asarray(track))
+                                        wav.write(os.path.join(self.sim_name,"SynthTracks",f"F{n+1}_H{j+1}.wav"),fs,np.asarray(track))
                         
                 psi_error_arrays = np.zeros((self.SIMULATION_STEPS,self.NUMBER_OF_FLOATERS))
                 for n in range(self.NUMBER_OF_FLOATERS):

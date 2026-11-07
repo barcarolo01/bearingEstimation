@@ -1,7 +1,7 @@
 # ===== GENERAL PARAMETERS =====
 DT = 1.0                    # Time interval between consevutive timestamps (seconds)
 SYNTH_FS = 96000            # Target sampling frequency of synthetic tracks (Hz)
-NUMBER_OF_HYDROPHONES = 5   # Number of hydrophones per floater (Values allowed: 3, 4, 5)
+NUMBER_OF_HYDROPHONES = 3   # Number of hydrophones per floater (Values allowed: 3, 4, 5)
 SL_DB = 150                 # Source level SL (dB)
 
 # ====== BELLHOP  ======

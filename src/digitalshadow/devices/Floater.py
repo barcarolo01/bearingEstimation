@@ -1,5 +1,5 @@
 import numpy as np
-from digitalshadow.positioning.Positioning import *
+from digitalshadow.Positioning import *
 from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====

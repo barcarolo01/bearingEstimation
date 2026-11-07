@@ -58,7 +58,7 @@ def read_arr(filename):
 def synth_rx(src_path, sim_name, arrivals, fs, dt, t0, sl_db):
     global FFT_X, FFT_f, FFT_nfft
 
-    n_out = dt * config.SYNTH_FS
+    n_out = int(dt * config.SYNTH_FS)
     arr = np.asarray(arrivals, dtype=np.float64).reshape(-1, 8)
 
     # Amplitude, phase and time of travel

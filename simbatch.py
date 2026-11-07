@@ -5,10 +5,10 @@ from plot_simulation import *
 from simulation import *
 
 TX_LIMIT = 3
-HYDROMATE_SIMULATION = False
+HYDROMATE_SIMULATION = True
 
 if __name__ == '__main__':
-        SEEDS = np.arange(1,3)
+        SEEDS = np.arange(1,100)
         STEPS = 3600
         NUMBER_OF_FLOATERS = 5
         ferr = open("seeds_err.txt","w")
@@ -97,5 +97,5 @@ if __name__ == '__main__':
                         sim.run_simulation()
                         plot_simulation_results(SIMULATION_NAME)
                 except Exception as e:
-                        ferr.write(f"{SEED}")
+                        ferr.write(f"{SEED}\n")
                         continue

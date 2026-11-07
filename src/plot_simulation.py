@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, RadioButtons, Button
 from matplotlib.figure import Figure
-from digitalshadow.positioning.kalman_filter import *
-from digitalshadow.positioning.coordinate_generator import *
-from digitalshadow.positioning.tracking_plots import *
+from digitalshadow.Positioning.kalman_filter import *
+from digitalshadow.Positioning.coordinate_generator import *
+from digitalshadow.Positioning.tracking_plots import *
 from digitalshadow import config
 
 EARTH_RADIUS = 6378137.0
@@ -349,4 +349,4 @@ def plot_simulation_results(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulationCIRCLE_3depth_4")
+        plot_simulation_results("simulation1")
