@@ -85,5 +85,5 @@ if __name__ == "__main__":
     ax[2].grid(axis='both',linestyle='--',alpha=0.5)
     ax[2].set_title("Compass heading estimation",fontsize=FONTSIZE)
     plt.tight_layout()
-    plt.savefig("gyro_vs_compass.png",dpi=900)
+    plt.savefig("gyro_vs_compass.pdf")
     plt.show()

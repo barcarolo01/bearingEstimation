@@ -27,8 +27,10 @@ def load_imu_model(floater,model_name,param_seed=1,dt=1.0):
     else:
         raise ValueError(f"Unknown model name '{model_name}'.")
 
-    floater.accel_bias = rnd_param.normal(0,floater.sigma_accel_bias)
-    floater.gyro_bias = rnd_param.normal(0, floater.sigma_gyro_bias)
+    #floater.accel_bias = rnd_param.normal(0,floater.sigma_accel_bias)
+    #floater.gyro_bias = rnd_param.normal(0, floater.sigma_gyro_bias)
+    floater.accel_bias = floater.sigma_accel_bias
+    floater.gyro_bias = floater.sigma_gyro_bias
     return floater
 
 def calibrate_floater(floater):

@@ -56,5 +56,5 @@ if __name__ == "__main__":
     cbar.ax.tick_params(which="both", labelsize=FONTSIZE)
 
     fig.tight_layout()                    # dopo la colorbar, come in heatmap_plot.py
-    fig.savefig("analytical_heatmap.png", dpi=DPI)
+    fig.savefig("analytical_heatmap.pdf")
     plt.show()

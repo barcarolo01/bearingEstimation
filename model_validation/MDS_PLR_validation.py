@@ -95,7 +95,7 @@ def run_all(calibrated, results_file):
     return np.asarray(PACKET_LOSSES), err_imu, err_mds
 
 
-def plot_results(packet_losses, results, outfile="MDS_packet_loss.png"):
+def plot_results(packet_losses, results, outfile="MDS_packet_loss.pdf"):
     """results: dict case_name -> (err_imu, err_mds), same keys as CASES."""
     N_PL = len(packet_losses)
     x = np.arange(N_PL)

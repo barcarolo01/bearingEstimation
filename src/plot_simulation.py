@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, RadioButtons, Button
 from matplotlib.figure import Figure
-from digitalshadow.Positioning.kalman_filter import *
-from digitalshadow.Positioning.coordinate_generator import *
-from digitalshadow.Positioning.tracking_plots import *
+from digitalshadow.positioning.kalman_filter import *
+from digitalshadow.positioning.coordinate_generator import *
+from digitalshadow.positioning.tracking_plots import *
 from digitalshadow import config
 
 EARTH_RADIUS = 6378137.0
@@ -301,6 +301,7 @@ def plot_simulation_results(simulation_folder):
         draw_ferr(ax_ferr, visible, floaters)
         fig.canvas.draw_idle()
         fig.savefig(os.path.join(simulation_folder,"sim_results.png"))
+        fig.savefig(os.path.join(simulation_folder,"sim_results.pdf"))
 
     def current_tag(floaters):
         tag = "all" if len(floaters) == n_floaters else "floater_" + "_".join(str(n + 1) for n in floaters)
@@ -331,8 +332,9 @@ def plot_simulation_results(simulation_folder):
             ax = f.add_subplot(111)
             draw(ax, visible, floaters, with_title=False)
             f.tight_layout()
-            path = os.path.join(simulation_folder, f"{name}_{tag}.png")
-            f.savefig(path, dpi=SAVE_DPI, bbox_inches="tight", pad_inches=0.05)
+            path = os.path.join(simulation_folder, f"{name}_{tag}")
+            f.savefig(f"{path}.png", dpi=SAVE_DPI, bbox_inches="tight", pad_inches=0.05)
+            f.savefig(f"{path}.pdf", bbox_inches="tight", pad_inches=0.05)
             print(f"Saved: {path}")
 
     radio_source.on_clicked(on_source)
@@ -345,8 +347,8 @@ def plot_simulation_results(simulation_folder):
     # Keep references to the widgets (otherwise garbage collection disables them)
     fig._widgets = (radio_coord, check_f, check_t, check_select, btn_save_figs, radio_source)
     redraw()
-    #plt.show()
+    plt.show()
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulation1")
+        plot_simulation_results("simulationGarda_LONG")

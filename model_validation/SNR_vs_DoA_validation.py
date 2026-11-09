@@ -18,14 +18,13 @@ def wrap_deg(x):
 
 
 if __name__ == "__main__":
-    Center = [28.091633059908357,49.08909082064002]
+    Center = [56.84907641749532,-46.03141479270858] # Atlantic
+    #Center = [28.16588430899801,-95.30713414731443] # Gulf of Mexico
     
     TX = Transmitter(ID=-1,gt_x=0,gt_y=0,gt_z=3,dt=1.0)
     floaters = []
     RX = Floater(ID=1,gt_x=100,gt_y=0,gt_z=3,NF=1,dt=1)
     floaters.append(RX)
-
-    #TX_Coordinates = np.asarray([38.81282072005432,134.05669525507423, 30])
 
     TRUE_BEARING = 180.0
 
@@ -75,6 +74,8 @@ if __name__ == "__main__":
 
     #ax.set_title(f"Bearing error vs SNR  (distance = {DIST} m)")
     fig.tight_layout()
-    fig.savefig("bearing_error_vs_SNR.png", dpi=900)
+    #fig.savefig("bearing_error_vs_SNR.pdf", dpi=900)
+    fig.savefig("DoA_SNR_Atlantic.pdf")
+    
     plt.show()
     clean_temporary_files(SIM_NAME)

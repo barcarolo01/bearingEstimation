@@ -14,7 +14,7 @@ RHO_REF = 0.9
 FONTSIZE = 12
 
 def run(sig, rho,seed):
-    f = Floater(ID=1,gt_x=0,gt_y=0,gt_z=0,NF=1,dt=1,imu_seed=seed)
+    f = Floater(ID=1,gt_x=0,gt_y=0,gt_z=0,NF=1,dt=1,seed=seed)
     # Translational movement 
     f.set_initial_velocity(0,0,0)
     f.sigma = [0, 0, 0] 
@@ -93,5 +93,5 @@ if __name__ == "__main__":
         fontsize=FONTSIZE,ha='right',va='center')
 
     plt.tight_layout(rect=[0, 0, 0.92, 1])
-    plt.savefig("floater_mobility_gyro.png",dpi = 300)
+    plt.savefig("floater_mobility_gyro.pdf",dpi = 300)
     plt.show()

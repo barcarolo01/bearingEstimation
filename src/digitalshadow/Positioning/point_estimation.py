@@ -180,7 +180,7 @@ def triangulate(floaters: np.ndarray, bearings: np.ndarray, elevation_array: np.
                     x_i, y_i = two_line_intersection(xs[n], ys[n], brg_n[n],xs[j], ys[j], brg_n[j])
                     if (not np.isnan(x_i) and not np.isnan(y_i)):
                         candidates.append((x_i, y_i))
-                        candidate_weights.append(w_n[i] * w_n[j])
+                        candidate_weights.append(w_n[n] * w_n[j])
 
              
             opt = _least_squares_point_n(xs, ys, brg_n, w_n)

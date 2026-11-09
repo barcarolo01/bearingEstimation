@@ -6,7 +6,7 @@ from digitalshadow.devices.IMU_models import calibrate_floater, load_imu_model
 from digitalshadow.devices.Transmitter import Transmitter
 from simulation import Simulation
 
-SIMULATE = False
+SIMULATE = True
 
 FONTSIZE = 14
 FONTSIZE_LEGEND = 12
@@ -93,7 +93,7 @@ def run_all(calibrated, results_file):
     return np.asarray(PERIODS), err_imu, err_mds
 
 
-def plot_results(periods, results, outfile="MDS_calibration_comparison.png"):
+def plot_results(periods, results, outfile="MDS_calibration_comparison.pdf"):
     """results: dict case_name -> (err_imu, err_mds), same keys as CASES."""
     N_PERIODS = len(periods)
     x = np.arange(N_PERIODS)

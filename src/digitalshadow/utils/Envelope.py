@@ -226,10 +226,10 @@ def _plot(envelope, env_fs, freqs, r, stat, threshold, detected):
     ax.plot(freqs[mask], r[mask], color='green', linewidth=0.8, zorder=1)
     for h in HARMONICS:
         ax.axvspan(h * F_MIN_HZ, h * F_MAX_HZ, color='orange', alpha=0.25)
-    ax.axhline(threshold, color='k', linestyle='--', linewidth=0.8, label=f"soglia = {threshold}")
+    #ax.axhline(threshold, color='k', linestyle='--', linewidth=0.8, label=f"soglia = {threshold}")
 
     pf, pp = find_demon_peaks(freqs, r, freq_min=FREQ_PLOT_MIN, freq_max=FREQ_PLOT_MAX,
-                              prominence_db=6, max_peaks=3)
+                              prominence_db=40.1, max_peaks=4)
     for f, p in zip(pf, pp):
         ax.scatter(f, p, marker='o', color='red', zorder=5)
         ax.annotate(f"{f:.1f} Hz", (f, p), xytext=(7, -10), textcoords='offset points', color='red')
@@ -237,8 +237,7 @@ def _plot(envelope, env_fs, freqs, r, stat, threshold, detected):
     ax.grid(True, linestyle='--', alpha=0.5)
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Normalized PSD")
-    ax.set_title(f"DEMON Spectrum - statistica {stat:.1f} -> "
-                 f"{'RIVELATO' if detected else 'non rivelato'}")
+    ax.set_title(f"DEMON Spectrum - statistica")# {stat:.1f} -> "f"{'RIVELATO' if detected else 'non rivelato'}")
     ax.legend(loc='upper right')
 
     plt.tight_layout()

@@ -1,6 +1,7 @@
 from digitalshadow.devices.Floater import *
 from digitalshadow.devices.IMU_models import load_imu_model, calibrate_floater
 from digitalshadow.devices.Transmitter import *
+from digitalshadow.positioning.coordinate_generator import compute_TX_circle_trajectory
 from plot_simulation import *
 from simulation import *
 
@@ -31,7 +32,7 @@ if __name__ == '__main__':
                                 y = 0
                         if i == 1:
                                 x = 0
-                                y = 1000
+                                y = 100
                 
                         f = Floater(ID = i+1,
                                         gt_x=x,

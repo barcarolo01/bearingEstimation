@@ -35,7 +35,7 @@ import digitalshadow.utils.Envelope as D
 FONTSIZE = 16
 
 # ======================= PARAMETRI DA ADATTARE =======================
-TRACKS_GLOB = "simulation501_MDS300_bis/SynthTracks/*.wav"  # tracce sintetiche SENZA rumore
+TRACKS_GLOB = "simulationGarda/SynthTracks/*.wav"  # tracce sintetiche SENZA rumore
 CHANNEL = 0             # canale usato se le tracce sono multicanale
 SEG_S = 1.0             # durata di una prova (s), come i frame del simulatore
 
@@ -246,7 +246,7 @@ def main():
     plt.tick_params(axis="both", which="major", labelsize=FONTSIZE)
     plt.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
     fig.tight_layout()
-    fig.savefig(f"{OUT_PREFIX}_roc.png", dpi=150)
+    fig.savefig(f"{OUT_PREFIX}_roc.pdf")
 
     # Pd vs SNR alla soglia scelta
     fig2, ax2 = plt.subplots(figsize=(7, 4.5))
@@ -260,11 +260,10 @@ def main():
     ax2.set_title(f"Pd vs SNR, soglia {thr} (Pfa = {pfa_thr:.3f})")
     ax2.grid(True, ls='--', alpha=0.4)
     fig2.tight_layout()
-    fig2.savefig(f"{OUT_PREFIX}_pd_vs_snr.png", dpi=150)
+    fig2.savefig(f"{OUT_PREFIX}_pd_vs_snr.pdf")
 
     np.savez(f"{OUT_PREFIX}_results.npz", snr_db=np.array(SNR_DB_LIST), T0=T0, T1=T1,
              threshold=thr, files=np.array(files))
-    print(f"\nSalvati: {OUT_PREFIX}_roc.png, {OUT_PREFIX}_pd_vs_snr.png, {OUT_PREFIX}_results.npz")
 
     plt.show()
 

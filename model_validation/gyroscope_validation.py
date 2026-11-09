@@ -5,7 +5,7 @@ from digitalshadow.devices.IMU_models import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 20
+NUMBER_OF_RUNS = 200
 STEPS = 3600
 
 FONTSIZE = 14
@@ -29,7 +29,7 @@ EXPECTED_SLOPE = {
 def build_floater(seed, cfg):
     """Create a static floater with only the selected gyroscope error sources enabled."""
     np.random.seed(seed)
-    f = Floater(0, 0, 0, 0, 1, 1.0, imu_seed=seed)
+    f = Floater(0, 0, 0, 0, 1, 1.0, seed=seed)
 
     # Static: the heading error does not depend on the motion, but keeping the
     # floater still isolates the rotational part completely
@@ -39,6 +39,8 @@ def build_floater(seed, cfg):
     f.sigma_yaw_rate = 0.0
 
     f = load_imu_model(f,'ADIS16470',dt=1.0)
+    f.use_compass = False
+
     # Simulator side: silence the sources that are off
     if not cfg["bias"]:
         f.gyro_bias = 0
@@ -48,15 +50,12 @@ def build_floater(seed, cfg):
     if not cfg["rw"]:
         f.sigma_gyro_bias_driving = 0.0
 
-    # Estimator side: the analytical model must see the same configuration
-    if not cfg["bias"]:
-        f.sigma_gyro_bias = 0.0
-
     f.accel_bias = np.zeros(3)
     f.sigma_accel_bias = np.zeros(3)
     f.sigma_accel_white_noise = np.zeros(3)
     f.sigma_accel_bias_driving = np.zeros(3)
     f.sigma = np.zeros(3)
+    f.use_compass = False
 
     return f
 
@@ -115,7 +114,7 @@ if __name__ == "__main__":
     plt.grid(alpha=0.3, which="both")
     plt.legend(fontsize=FONTSIZE_LEGEND)
     plt.tight_layout()
-    plt.savefig("gyro_validation_single_contributions.png", dpi=600)
+    plt.savefig("gyro_validation_single_contributions.pdf")
 
     # FIGURE 2
     plt.figure()
@@ -134,7 +133,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     
-    plt.savefig("gyro_validation_all.png", dpi=600)
+    plt.savefig("gyro_validation_all.pdf")
 
     # ---- Numerical check --------------------------------------------------
     ratio = rms / pred

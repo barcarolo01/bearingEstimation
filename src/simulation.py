@@ -2,14 +2,14 @@ import os
 import shutil
 from digitalshadow import config
 from dotenv import load_dotenv
-from digitalshadow.Positioning.coordinate_generator import *
+from digitalshadow.positioning.coordinate_generator import *
 from digitalshadow.underwater_sim.discrete_hydromate_single import *
-from digitalshadow.Positioning.point_estimation import *
+from digitalshadow.positioning.point_estimation import *
 from digitalshadow.underwater_sim.floater_ping import *
 from digitalshadow.utils.utils import *
 from digitalshadow.devices.Floater import *
-from digitalshadow.Positioning.kalman_filter import *
-from digitalshadow.Positioning.tracking_plots import *
+from digitalshadow.positioning.kalman_filter import *
+from digitalshadow.positioning.tracking_plots import *
 
 FONTSIZE = 18
 

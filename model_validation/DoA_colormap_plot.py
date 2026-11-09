@@ -11,7 +11,7 @@ from digitalshadow.utils.bearing_calculation import *
 FONTSIZE = 16
 MAX_SAMPLE_DELAY = 23
 PLOT_COLORMAP = True
-BUTTERWORTH_FILTER = False
+BUTTERWORTH_FILTER = True
 
 d = 0.31 # Meters
 c = 1500 # Meters/second
@@ -26,7 +26,7 @@ def filtro_passabanda(segnale, fs, f_bassa, f_alta, ordine=4):
 if __name__ == "__main__":
     precompute_bearing_angles_triangle(d)
 
-    '''
+    
     # Reading 3-tracks file
     fs, data = wav.read('AudioFiles/0958_crop.wav')
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     fs, sig1 = wav.read('simulationGarda/SynthTracks/F1_H1.wav')
     _, sig2 = wav.read('simulationGarda/SynthTracks/F1_H2.wav')
     _, sig3 = wav.read('simulationGarda/SynthTracks/F1_H3.wav')
-    
+    '''
 
     # Signal pre-filtering: if used, spurious peaks are introduced in tau = 0
     if BUTTERWORTH_FILTER:
@@ -142,5 +142,5 @@ if __name__ == "__main__":
     ax.grid(True, linestyle='--', alpha=0.5)
     ax.tick_params(axis="both", which="major", labelsize=FONTSIZE)
 
-    plt.savefig("delay_bearing_estimation.png",dpi=900)
+    plt.savefig("delay_bearing_estimation.pdf")
     plt.show()

@@ -17,7 +17,7 @@ V0 = [(0.0, 0.5), (0.5, 0.0), (0.25, 0.25)]
 FONTSIZE = 12
 
 def run(sig, rho, seed, v0):
-    f = Floater(ID=1,gt_x=0,gt_y=0,gt_z=0,NF=1,dt=1,imu_seed=seed)
+    f = Floater(ID=1,gt_x=0,gt_y=0,gt_z=0,NF=1,dt=1,seed=seed)
     f.set_initial_velocity(0,0,0)
     f.sigma = [sig,sig, 0] # Movements only along x-y axis
     f.Rho = rho
@@ -35,14 +35,14 @@ if __name__ == "__main__":
     # First row: variation of SIGMA
     for ax, sig in zip(axes[0], var_sigmas):
         for k in range(3):
-            traj = run(sig, RHO_REF, k + 100, V0[k])
+            traj = run(sig, RHO_REF, k, V0[k])
             ax.plot(traj[:, 0], traj[:, 1], lw=1.2, label=f"F{k+1}")
         ax.set_title(rf"$\sigma = {sig}$ m/s", fontsize=FONTSIZE)
 
     # Second row: variation of RHO
     for ax, rho in zip(axes[1], var_rhos):
         for k in range(3):
-            traj = run(SIG_REF, rho, k + 100, V0[k])
+            traj = run(SIG_REF, rho, k, V0[k])
             ax.plot(traj[:, 0], traj[:, 1], lw=1.2, label=f"F{k+1}")
         ax.set_title(rf"$\rho = {rho}$", fontsize=FONTSIZE)
 

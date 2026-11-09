@@ -5,7 +5,7 @@ from digitalshadow.devices.IMU_models import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 40
+NUMBER_OF_RUNS = 200
 STEPS = 3600
 
 FONTSIZE = 14
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     plt.grid(alpha=0.3, which="both")
     plt.legend(fontsize=FONTSIZE_LEGEND)
     plt.tight_layout()
-    plt.savefig("accel_validation_single_contributions.png", dpi=600)
+    plt.savefig("accel_validation_single_contributions.pdf")
     
 
     # ---- Panel 2: all sources together ------------------------------------
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     plt.tick_params(axis="both", which="minor", labelsize=FONTSIZE)
 
     plt.tight_layout()
-    plt.savefig("accel_validation_all.png", dpi=600)
+    plt.savefig("accel_validation_all.pdf")
 
     # ---- Numerical check --------------------------------------------------
     ratio = rms / pred

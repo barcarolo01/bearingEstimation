@@ -1,9 +1,9 @@
 import numpy as np
-from digitalshadow.Positioning import *
+from digitalshadow.positioning.Positioning import MDS_estimate
 from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====
-COMPASS_SIGMA_NOISE   = np.deg2rad(2.0)
+COMPASS_SIGMA_NOISE   = np.deg2rad(2)
 COMPASS_BIAS    = np.deg2rad(0.3)
 COMPASS_ALPHA   = 0.999
 
@@ -306,8 +306,12 @@ class Floater(Transmitter):
             innovation = wrap(self.psi_COMPASS - psi_gyro)
             self.est_psi = wrap(psi_gyro + (1.0 - self.alpha_compass) * innovation)
 
+        prv = self.psi_err
         self.psi_err = wrap(self.est_psi - self.gt_psi) # PSI error w.r.t. ground truth
-        self.psi_err_unwrapped += (omega_MEASURED - self.gt_omega) * self.dt
+        self.psi_err_unwrapped = self.psi_err
+
+
+        
 
         # 5. ACCELEROMETER ESTIMATION UPDATE
         # Rotate from navigation frame to body frame

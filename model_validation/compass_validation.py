@@ -5,7 +5,7 @@ from digitalshadow.devices.Floater import *
 
 plt.style.use('seaborn-v0_8-deep')
 
-NUMBER_OF_RUNS = 100
+NUMBER_OF_RUNS = 20
 STEPS = 3600
 
 FONTSIZE = 14
@@ -56,7 +56,14 @@ def run_MC_simulations(alpha, NUMBER_OF_RUNS=NUMBER_OF_RUNS, steps=STEPS):
                 
 
             f.move()
-            err[r, k] = f.psi_err
+            err[r, k] = f.psi_err_unwrapped
+            '''
+            if k > 0:
+                if err[r, k-1] > err[r, k-1]:
+                    print("YES")
+                    err[r, k] += 180
+            '''
+            
     return np.sqrt(np.mean(err**2, axis=0)), err
 
 
@@ -86,5 +93,5 @@ if __name__ == "__main__":
     plt.grid(alpha=0.3, which="both")
     plt.tight_layout()
     plt.legend(fontsize=FONTSIZE_LEGEND)
-    plt.savefig("compass_alpha_sweep.png",dpi=900)
+    plt.savefig("compass_alpha_sweep.pdf")
     plt.show()
