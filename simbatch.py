@@ -6,43 +6,38 @@ from simulation import *
 
 TX_LIMIT = 3
 HYDROMATE_SIMULATION = True
+TRYCATCH = True
 
 if __name__ == '__main__':
-        SEEDS = np.arange(1,100)
+        SEEDS = np.arange(1,10)
         STEPS = 3600
         NUMBER_OF_FLOATERS = 5
         ferr = open("seeds_err.txt","w")
 
         for SEED in SEEDS:      
-                SIMULATION_NAME=f'simulation{SEED}'
+                SIMULATION_NAME=f'simulation{SEED}_0_99'
                 random_sim = np.random.default_rng(SEED)
                 
                 Center = [45.92458622396349,-20.45658040956359]
                 #Center = [20.832813, 88.698390] # India, low depth
 
-                
-                TX_x = random_sim.uniform(500,3000)
-                TX_y = random_sim.uniform(500,3000)
-                q1 = 1 if random_sim.uniform(0,1) > 0.5 else -1
-                q2 = 1 if random_sim.uniform(0,1) > 0.5 else -1
-                
-                TX = Transmitter(ID=-1,
-                                 gt_x=TX_x*q1,
-                                 gt_y=TX_y*q2,
-                                 gt_z=10,
-                                 dt=1)
+                TX_x = random_sim.uniform(500, 3000) * random_sim.choice([-1, 1])
+                TX_y = random_sim.uniform(500, 3000) * random_sim.choice([-1, 1])
 
-                random_deviation = 0.33
-                random_deg = random_sim.normal()
-                print(random_deg)
+                TX = Transmitter(ID=-1, gt_x=TX_x, gt_y=TX_y, gt_z=10, dt=1)
 
-                uv_x = ((TX_x*q1) / np.sqrt((TX_x*q1)**2 + (TX_y*q2)**2))
-                uv_y = ((TX_y*q1) / np.sqrt((TX_x*q1)**2 + (TX_y*q2)**2))
-                uv_x = uv_x * np.cos(np.deg2rad(random_deg))
-                uv_y = uv_y * np.sin(np.deg2rad(random_deg))
+                norm = np.hypot(TX_x, TX_y)
+                ux, uy = -TX_x / norm, -TX_y / norm
+
+                random_deg = random_sim.uniform(-30, 30)
+                theta = np.deg2rad(random_deg)
+                c, s = np.cos(theta), np.sin(theta)
+
+                uv_x = ux * c - uy * s
+                uv_y = ux * s + uy * c 
 
 
-                TX.set_initial_velocity(-5*uv_x,5*uv_y,0)
+                TX.set_initial_velocity(5*uv_x,5*uv_y,0)
                 TX.Rho = 0.999
                 TX.set_sigma(0.05,0.05,0)
 
@@ -75,7 +70,7 @@ if __name__ == '__main__':
                         f = calibrate_floater(f)
                         f.set_initial_velocity(random_sim.uniform(0,1), random_sim.uniform(0,1), 0.0)
                         f.set_sigma(random_sim.uniform(0,0.01), random_sim.uniform(0,0.01), 0.0)
-                        f.Rho = 0.999
+                        f.Rho = 0.99
                         f.use_compass = True
                         f.TX_LIMIT=3
                         f.PLR = 0.0
@@ -83,19 +78,33 @@ if __name__ == '__main__':
                         f.RESURFACE_freq = 1800
                         floaters.append(f)
 
-                try:
+                if TRYCATCH:
+                        try:
+                                sim = Simulation(
+                                                #transmitter_coordinates=TX,
+                                                Floaters=floaters,
+                                                Steps=STEPS,
+                                                Center=Center,
+                                                transmitter=TX,
+                                                seed=SEED,
+                                                sim_name=SIMULATION_NAME,
+                                                HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)
+                                sim.PACKET_LOSS = 0
+                                sim.run_simulation()
+                                plot_simulation_results(SIMULATION_NAME)
+                        except Exception as e:
+                                ferr.write(f"{SEED}\n")
+                                continue
+                else:
                         sim = Simulation(
-                                        #transmitter_coordinates=TX,
-                                        Floaters=floaters,
-                                        Steps=STEPS,
-                                        Center=Center,
-                                        transmitter=TX,
-                                        seed=SEED,
-                                        sim_name=SIMULATION_NAME,
-                                        HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)
+                                                #transmitter_coordinates=TX,
+                                                Floaters=floaters,
+                                                Steps=STEPS,
+                                                Center=Center,
+                                                transmitter=TX,
+                                                seed=SEED,
+                                                sim_name=SIMULATION_NAME,
+                                                HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)
                         sim.PACKET_LOSS = 0
                         sim.run_simulation()
                         plot_simulation_results(SIMULATION_NAME)
-                except Exception as e:
-                        ferr.write(f"{SEED}\n")
-                        continue

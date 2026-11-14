@@ -349,4 +349,4 @@ def plot_simulation_results(simulation_folder):
 
 
 if __name__ == "__main__":
-        plot_simulation_results("simulation1")
+        plot_simulation_results("simulation2_RES_1800")

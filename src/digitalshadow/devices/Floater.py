@@ -1,5 +1,5 @@
 import numpy as np
-from digitalshadow.Positioning import *
+from digitalshadow.Positioning.Positioning import *
 from digitalshadow.devices.Transmitter import Transmitter
 
 # ==== E COMPASS ====
@@ -261,7 +261,7 @@ class Floater(Transmitter):
                 self.ONGOING_RESURFACE = True
                 self.ONGOING_IMMERSION = False
             else:
-                 self.resurface()
+                self.resurface()
 
         # 1. ROTATIONAL UPDATE
         e_w = self.rnd_gt.normal(0, self.sigma_yaw_rate)
