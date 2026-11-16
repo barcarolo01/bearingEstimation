@@ -9,7 +9,7 @@ HYDROMATE_SIMULATION = True
 TRYCATCH = True
 
 if __name__ == '__main__':
-        SEEDS = np.arange(1,10)
+        SEEDS = np.arange(3,10)
         STEPS = 3600
         NUMBER_OF_FLOATERS = 5
         ferr = open("seeds_err.txt","w")
