@@ -10,7 +10,7 @@ HYDROMATE_SIMULATION = True
 if __name__ == '__main__':
         SEEDS = np.arange(56,57)
         STEPS = 3600
-        RESS = [600,900,1800,3600]
+        RESS = [300,600,900,1200,1800,3600]
         NUMBER_OF_FLOATERS = 6
         ferr = open("seeds_err.txt","w")
 
@@ -76,23 +76,23 @@ if __name__ == '__main__':
                                 f.RESURFACE_freq = res
                                 floaters.append(f)
 
-                        #try:
-                        TXX = np.load("TX.npy")*6
-                        TXX = TXX - np.asarray([2400,2400])
-                        TXX = np.asarray((TXX[:,0],TXX[:,1],10*np.ones(TXX.shape[0]))).T
-                        print(TXX.shape)
-                        sim = Simulation(
-                                        transmitter_coordinates=TXX,
-                                        Floaters=floaters,
-                                        #Steps=STEPS,
-                                        Center=Center,
-                                        #transmitter=TX,
-                                        seed=SEED,
-                                        sim_name=SIMULATION_NAME,
-                                        HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)
-                        sim.PACKET_LOSS = 0
-                        sim.run_simulation()
-                        plot_simulation_results(SIMULATION_NAME)
-                        #except Exception as e:
-                                #ferr.write(f"{SEED}\n")
-                                #continue
+                        try:
+                                TXX = np.load("TX.npy")*6
+                                TXX = TXX - np.asarray([2400,2400])
+                                TXX = np.asarray((TXX[:,0],TXX[:,1],10*np.ones(TXX.shape[0]))).T
+                                print(TXX.shape)
+                                sim = Simulation(
+                                                transmitter_coordinates=TXX,
+                                                Floaters=floaters,
+                                                #Steps=STEPS,
+                                                Center=Center,
+                                                #transmitter=TX,
+                                                seed=SEED,
+                                                sim_name=SIMULATION_NAME,
+                                                HYDROMATE_SIMULATION=HYDROMATE_SIMULATION)
+                                sim.PACKET_LOSS = 0
+                                sim.run_simulation()
+                                plot_simulation_results(SIMULATION_NAME)
+                        except Exception as e:
+                                ferr.write(f"{SEED}\n")
+                                continue
