@@ -10,7 +10,7 @@ HYDROMATE_SIMULATION = True
 if __name__ == '__main__':
         SEEDS = np.arange(56,57)
         STEPS = 3600
-        RESS = [300,600,900,1200,1800,3600]
+        RESS = [9999]
         NUMBER_OF_FLOATERS = 6
         ferr = open("seeds_err.txt","w")
 
