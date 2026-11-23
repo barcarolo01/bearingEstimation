@@ -128,6 +128,17 @@ def compute_single_bearing_angle_triangle(track_folder, timestamp, F_index, seed
     # GCC-PHAT peak: mean over the three hydrophone pairs and over all windows
     gcc_peak = np.mean([np.mean(peak_21), np.mean(peak_32), np.mean(peak_31)])
 
+    # TODO: rimuovi (TMP)
+    if os.path.exists(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H1.wav')):
+        os.remove(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H1.wav'))
+    if os.path.exists(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H2.wav')):
+        os.remove(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H2.wav'))
+    if os.path.exists(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H3.wav')):
+        os.remove(os.path.join(track_folder,f'T{timestamp}_F{F_index}_H3.wav'))
+
+
+
+
     return bearing, elevation, gcc_peak
 
 def compute_single_bearing_angle_square(wav_folder, timestamp, F_index, seed = 0):

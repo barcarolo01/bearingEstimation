@@ -194,3 +194,4 @@ def from_arr_to_wav(TX_POS, nr_of_hydrophones, sim_name, sl_db, noise_seed=0, n_
         wav.write(os.path.join(sim_name, "SynthTracks", f"T{sim_timestamp}_F{floater_number}_H{i}.wav"),config.SYNTH_FS,rx)
         if save_clean and add_noise:
             wav.write(os.path.join(sim_name, "SynthTracks", f"T{sim_timestamp}_F{floater_number}_H{i}_clean.wav"), config.SYNTH_FS, clean[i - 1])
+    

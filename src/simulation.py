@@ -14,6 +14,7 @@ from digitalshadow.Positioning.tracking_plots import *
 FONTSIZE = 18
 
 ADD_PSI_ERROR = False
+SAVE_WAVS = False
 
 class Simulation:
         def __init__(self, Floaters, Center, transmitter=None,  Steps=1, transmitter_coordinates=None, sim_name="simulation0", TX_LIMIT=1, seed=256123, HYDROMATE_SIMULATION=True):
@@ -232,7 +233,7 @@ class Simulation:
 
 
                 # Save the complete .wav tracks for each hydrophone
-                if self.HYDROMATE_SIMULATION:
+                if self.HYDROMATE_SIMULATION and SAVE_WAVS:
                         for n in range(self.NUMBER_OF_FLOATERS):
                                 for j in range(config.NUMBER_OF_HYDROPHONES):
                                         segments = []
@@ -255,7 +256,8 @@ class Simulation:
 
                 bearings_with_psi_error = np.full(self.bearing_arrays.shape,np.nan)
                 if ADD_PSI_ERROR:
-                        bearings_with_psi_error = (self.bearing_arrays + psi_error_arrays) & 360
+                        tmparr = np.asarray(psi_error_arrays).T
+                        bearings_with_psi_error = (self.bearing_arrays + tmparr) % 360
                 
                 np.savez(os.path.join(self.sim_name,"results.npz"),
                         Center_coordinates = self.Center,
