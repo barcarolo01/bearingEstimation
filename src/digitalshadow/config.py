@@ -2,7 +2,7 @@
 DT = 1.0                    # Time interval between consevutive timestamps (seconds)
 SYNTH_FS = 96000            # Target sampling frequency of synthetic tracks (Hz)
 NUMBER_OF_HYDROPHONES = 3   # Number of hydrophones per floater (Values allowed: 3, 4, 5)
-SL_DB = 150                 # Source level SL (dB)
+SL_DB = 160                 # Source level SL (dB)
 
 # ====== BELLHOP  ======
 BELLHOP_opt1 = "CVWT"       # "Option1" parameter of BELLHOP
@@ -11,9 +11,9 @@ BELLHOP_frequency = 1000    # Hz
 
 # ===== AMBIENT NOISE =====
 AMBIENT_NOISE = True        # Turn ON/OFF ambient noise generation
-NOISE_SHIPPING = 1.0        # Shipping activity factor (real number between 0 and 1)
-NOISE_WIND = 15.0            # Wind velocity (meter/second)
-NOISE_EXTRA_DB =  3.0       # Extra noise to be added on tracks (dB)
+NOISE_SHIPPING = 0.5        # Shipping activity factor (real number between 0 and 1)
+NOISE_WIND = 5.0            # Wind velocity (meter/second)
+NOISE_EXTRA_DB =  0       # Extra noise to be added on tracks (dB)
 NOISE_SPACING = 0.3         # TODO: check
 
 # ===== KALMAN FILTER ======

@@ -35,8 +35,8 @@ if __name__ == '__main__':
         for i in range(NUMBER_OF_FLOATERS):
                 R = 400
                 f = Floater(ID = i,
-                                gt_x=R*np.cos(np.deg2rad(360*i/NUMBER_OF_FLOATERS)),
-                                gt_y=R*np.sin(np.deg2rad(360*i/NUMBER_OF_FLOATERS)),
+                                gt_x=R*np.cos(np.deg2rad(360*i/NUMBER_OF_FLOATERS))+random_sim.uniform(-100,100),
+                                gt_y=R*np.sin(np.deg2rad(360*i/NUMBER_OF_FLOATERS))+random_sim.uniform(-100,100),
                                 gt_z=10,
                                 NF=NUMBER_OF_FLOATERS,
                                 dt=DE_TI,
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         #TXX = TXX[::108]
         
         sim = Simulation(
-                        transmitter_coordinates=TXX,
+                        transmitter_coordinates=TXX[:2,:],
                         Floaters=floaters,
                         #Steps=STEPS,
                         Center=Center,

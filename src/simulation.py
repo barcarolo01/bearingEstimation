@@ -13,7 +13,7 @@ from digitalshadow.Positioning.tracking_plots import *
 
 FONTSIZE = 18
 
-ADD_PSI_ERROR = False
+ADD_PSI_ERROR = True
 SAVE_WAVS = False
 
 class Simulation:
@@ -132,8 +132,8 @@ class Simulation:
                                                         floater_number = (n + 1),
                                                         n_arrivals=0,
                                                         sl_db=config.SL_DB,
-                                                        add_noise=False,
-                                                        noise_seed=self.init_seed)
+                                                        add_noise=config.AMBIENT_NOISE,
+                                                        noise_seed=self.init_seed*1000)
 
                                         if config.NUMBER_OF_HYDROPHONES == 3:
                                                 self.bearing_arrays[n,i], self.elevation_arrays[n,i], self.bearing_weight[n,i]  = compute_single_bearing_angle_triangle(track_folder=os.path.join(self.sim_name,'SynthTracks'), timestamp=i, F_index=(n + 1))
