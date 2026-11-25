@@ -21,7 +21,7 @@ if __name__ == '__main__':
         NUMBER_OF_FLOATERS = 5
         ferr = open("seeds_err.txt","w")
 
-        SIMULATION_NAME=f'MC_sim{SEED}'
+        SIMULATION_NAME=f'999_3h_{SEED}'
         not_rand = np.random.default_rng(0)
         random_sim = np.random.default_rng(SEED)
         
@@ -53,7 +53,7 @@ if __name__ == '__main__':
                 f.set_initial_velocity(0,0,0)
                 f.set_sigma(random_sim.uniform(0.0,0.1), random_sim.uniform(0.0,0.1), 0.0)
                 #f.Rho = 0.98 # PRIMO BATCH
-                f.Rho = 0.98
+                f.Rho = 0.999
                 f.use_compass = True
                 f.TX_LIMIT = 3
                 f.PLR = 0.0
