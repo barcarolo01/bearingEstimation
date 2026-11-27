@@ -10,18 +10,25 @@ HYDROMATE_SIMULATION = True
 
 DE_TI = 10
 
+RHO_DEI_FLOATER = 0.98
+RESURFACE_SECONDS = (3600*3)
+
 if __name__ == '__main__':
+        SEED = int(sys.argv[1])
+        SIMULATION_NAME=f'ADIS_98_3h_{SEED}'
+
+
         TXX = np.load("TX2.npy")*10
         TXX = TXX - np.asarray([4000,4000])
         TXX = np.stack((TXX[:,0],TXX[:,1],15*np.ones(TXX.shape[0]))).T
         #print(TXX.shape)
         #exit()
-        SEED = int(sys.argv[1])
-        res = 10800
+        
+        
         NUMBER_OF_FLOATERS = 5
         ferr = open("seeds_err.txt","w")
 
-        SIMULATION_NAME=f'999_3h_{SEED}'
+        
         not_rand = np.random.default_rng(0)
         random_sim = np.random.default_rng(SEED)
         
@@ -47,18 +54,18 @@ if __name__ == '__main__':
                                 dt=DE_TI,
                                 seed = i*10+100)
 
-                f = load_imu_model(f,'HG4930',param_seed=SEED*1000+i,dt=DE_TI)
+                f = load_imu_model(f,'ADIS16470',param_seed=SEED*1000+i,dt=DE_TI)
                 #f = calibrate_floater(f)
 
                 f.set_initial_velocity(0,0,0)
                 f.set_sigma(random_sim.uniform(0.0,0.1), random_sim.uniform(0.0,0.1), 0.0)
-                #f.Rho = 0.98 # PRIMO BATCH
-                f.Rho = 0.999
+
+                f.Rho = RHO_DEI_FLOATER
                 f.use_compass = True
                 f.TX_LIMIT = 3
                 f.PLR = 0.0
                 f.MDS_freq = (600 / DE_TI) # Secondi
-                f.RESURFACE_freq = (res / DE_TI)
+                f.RESURFACE_freq = (RESURFACE_SECONDS / DE_TI)
                 floaters.append(f)
 
         #try:
