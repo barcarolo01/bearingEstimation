@@ -10,12 +10,12 @@ HYDROMATE_SIMULATION = True
 
 DE_TI = 10
 
-RHO_DEI_FLOATER = 0.98
+RHO_DEI_FLOATER = 0.999
 RESURFACE_SECONDS = (3600*3)
 
 if __name__ == '__main__':
         SEED = int(sys.argv[1])
-        SIMULATION_NAME=f'ADIS_98_3h_{SEED}'
+        SIMULATION_NAME=f'ADIS_999_3h_{SEED}'
 
 
         TXX = np.load("TX2.npy")*10
